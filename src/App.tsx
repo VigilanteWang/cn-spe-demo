@@ -1,26 +1,85 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, {
+  useState, useEffect
+} from "react";
+import {
+  Providers,
+  ProviderState
+} from "@microsoft/mgt-element";
+import { Login } from "@microsoft/mgt-react";
+import {
+  FluentProvider,
+  Text,
+  webLightTheme
+} from "@fluentui/react-components"
 import './App.css';
+import {
+  InteractionRequiredAuthError,
+  PublicClientApplication
+} from "@azure/msal-browser";
+import * as Scopes from "./common/scopes";
+import * as Constants from "./common/constants";
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+function useIsSignedIn() {
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    const updateState = async () => {
+      const provider = Providers.globalProvider;
+      setIsSignedIn(provider && provider.state === ProviderState.SignedIn);
+    };
+
+    Providers.onProviderUpdated(updateState);
+    updateState();
+
+    return () => {
+      Providers.removeProviderUpdatedListener(updateState);
+    }
+  }, []);
+
+  return isSignedIn;
 }
 
+
+function App() {
+  const isSignedIn = useIsSignedIn();
+
+  const promptForContainerConsent = async (event: CustomEvent<undefined>): Promise<void> => {
+    const containerScopes = {
+      scopes: [Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED],
+      redirectUri: `${window.location.protocol}://${window.location.hostname}${(window.location.port === '80' || window.location.port === '443') ? '' : ':' + window.location.port}`
+    };
+    console.log('tokenResponse');
+    const msalInstance = new PublicClientApplication({
+      auth: {
+        clientId: Constants.CLIENT_ENTRA_APP_CLIENT_ID,
+        authority: Constants.CLIENT_ENTRA_APP_AUTHORITY,
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false,
+      },
+    });
+    await msalInstance.initialize();
+    msalInstance.acquireTokenSilent(containerScopes)
+      .then(response => {
+        console.log('tokenResponse', JSON.stringify(response));
+      })
+      .catch(async (error) => {
+        console.log(error);
+        if (error instanceof InteractionRequiredAuthError) {
+          return msalInstance.acquireTokenPopup(containerScopes);
+        }
+      });
+  }
+  return (
+    <FluentProvider theme={webLightTheme}>
+      <div className="App">
+        <Text size={900} weight='bold'>Sample SPA SharePoint Embedded App</Text>
+        <Login loginCompleted={promptForContainerConsent} />
+        <div>
+        </div>
+      </div>
+    </FluentProvider>
+  );
+}
 export default App;
