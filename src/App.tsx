@@ -48,7 +48,9 @@ function App() {
       scopes: [Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED],
       redirectUri: `${window.location.protocol}://${window.location.hostname}${(window.location.port === '80' || window.location.port === '443') ? '' : ':' + window.location.port}`
     };
-    console.log('tokenResponse');
+
+    console.log('promptForContainerConsent is called');
+
     const msalInstance = new PublicClientApplication({
       auth: {
         clientId: Constants.CLIENT_ENTRA_APP_CLIENT_ID,
@@ -59,7 +61,7 @@ function App() {
         storeAuthStateInCookie: false,
       },
     });
-    await msalInstance.initialize();
+    
     msalInstance.acquireTokenSilent(containerScopes)
       .then(response => {
         console.log('tokenResponse', JSON.stringify(response));
