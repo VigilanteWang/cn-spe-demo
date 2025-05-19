@@ -16,7 +16,7 @@ const msalConfig: MSAL.Configuration = {
     system: {
         loggerOptions: {
             loggerCallback(loglevel: any, message: any, containsPii: any) {
-                console.log(message);
+                //console.log(message);
             },
             piiLoggingEnabled: false,
             logLevel: MSAL.LogLevel.Verbose,
@@ -52,7 +52,8 @@ export const listContainers = async (req: Request, res: Response) => {
         });
 
         const graphResponse = await graphClient.api(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`).get();
-
+console.log('graphResponse:', graphResponse); 
+console.log(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`)// 调试输出
         res.send(200, graphResponse);
         return;
     } catch (error: any) {

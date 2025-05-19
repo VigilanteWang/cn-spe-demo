@@ -33,7 +33,7 @@
     "start": "run-s build:backend start:apps",
     "start:apps": "run-p start:frontend start:backend",
     "start:frontend": "npm run start-cre",
-    "start:backend": "env-cmd --silent -f .env node ./server/index.js",
+    "start:backend": "env-cmd --silent -f .env node ./server/dist/index.js",
     "start-cre": "react-scripts start",
     "build-cre": "react-scripts build",
     "test-cre": "react-scripts test",

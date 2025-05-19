@@ -68,7 +68,7 @@ function App() {
         console.log('tokenResponse', JSON.stringify(response));
       })
       .catch(async (error) => {
-        console.log(error);
+        //console.log(error);
         if (error instanceof InteractionRequiredAuthError) {
           return msalInstance.acquireTokenPopup(containerScopes);
         }

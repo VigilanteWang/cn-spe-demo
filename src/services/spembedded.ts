@@ -6,36 +6,23 @@ import { IContainer } from './../common/IContainer';
 
 export default class SpEmbedded {
     async getApiAccessToken() {
-        const msalConfig: Msal.Configuration = {
-            auth: {
-                clientId: Constants.CLIENT_ENTRA_APP_CLIENT_ID,
-                authority: Constants.CLIENT_ENTRA_APP_AUTHORITY,
-            },
-            cache: {
-                cacheLocation: 'localStorage',
-                storeAuthStateInCookie: false
+        // 重用全局 provider 已登录用户的 token
+        const provider = Providers.globalProvider;
+        if (provider.state === ProviderState.SignedIn) {
+            try {
+                const accessToken = await provider.getAccessToken({
+                    scopes: [
+                      `api://${Constants.CLIENT_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`
+                    ]
+                });
+                console.log(`Reusing token: ${accessToken}`);
+                return accessToken;
+            } catch (error) {
+                console.error('Error getting token from global provider', error);
+                return null;
             }
-        };
-
-        const scopes: Msal.SilentRequest = {
-            scopes: [`api://${Constants.CLIENT_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`],
-            prompt: 'select_account',
-            redirectUri: `${window.location.protocol}//${window.location.hostname}${(window.location.port === '80' || window.location.port === '443') ? '' : ':' + window.location.port}`
-        };
-
-        const publicClientApplication = new Msal.PublicClientApplication(msalConfig);
-        await publicClientApplication.initialize();
-
-        let tokenResponse;
-        try {
-            tokenResponse = await publicClientApplication.acquireTokenSilent(scopes);
-            return tokenResponse.accessToken;
-        } catch (error) {
-            if (error instanceof Msal.InteractionRequiredAuthError) {
-                tokenResponse = await publicClientApplication.acquireTokenPopup(scopes);
-                return tokenResponse.accessToken;
-            }
-            console.log(error)
+        } else {
+            console.warn('Global provider is not signed in');
             return null;
         }
     };

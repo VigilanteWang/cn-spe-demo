@@ -32,54 +32,31 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listContainers = void 0;
-const MSAL = __importStar(require("@azure/msal-node"));
+exports.getGraphToken = void 0;
 require('isomorphic-fetch');
-const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
-const auth_1 = require("./auth");
-const msalConfig = {
-    auth: {
-        clientId: process.env['API_ENTRA_APP_CLIENT_ID'],
-        authority: process.env['API_ENTRA_APP_AUTHORITY'],
-        clientSecret: process.env['API_ENTRA_APP_CLIENT_SECRET']
-    },
-    system: {
-        loggerOptions: {
-            loggerCallback(loglevel, message, containsPii) {
-                console.log(message);
-            },
-            piiLoggingEnabled: false,
-            logLevel: MSAL.LogLevel.Verbose,
-        }
-    }
-};
-const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
-const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!req.headers.authorization) {
-        res.send(401, { message: 'No access token provided.' });
-        return;
-    }
-    const [bearer, token] = (req.headers.authorization || '').split(' ');
-    const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
-    if (!graphSuccess) {
-        res.send(200, oboGraphToken);
-        return;
-    }
-    const authProvider = (callback) => {
-        callback(null, oboGraphToken);
-    };
+const Scopes = __importStar(require("./common/scopes"));
+const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const graphClient = MSGraph.Client.init({
-            authProvider: authProvider,
-            defaultVersion: 'beta'
-        });
-        const graphResponse = yield graphClient.api(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`).get();
-        res.send(200, graphResponse);
-        return;
+        const graphTokenRequest = {
+            oboAssertion: token,
+            scopes: [
+                Scopes.GRAPH_SITES_READ_ALL,
+                Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED
+            ]
+        };
+        const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
+        //console.log('oboGraphToken:', oboGraphToken); // 调试输出
+        return [true, oboGraphToken];
     }
     catch (error) {
-        res.send(500, { message: `Unable to list containers: ${error.message}` });
-        return;
+        const errorResult = {
+            status: 500,
+            body: JSON.stringify({
+                message: `Unable to generate Microsoft Graph OBO token: ${error.message}`,
+                providedToken: token
+            })
+        };
+        return [false, errorResult];
     }
 });
-exports.listContainers = listContainers;
+exports.getGraphToken = getGraphToken;

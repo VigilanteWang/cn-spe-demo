@@ -13,6 +13,8 @@ export const getGraphToken = async (confidentialClient: ConfidentialClientApplic
       ]
     };
     const oboGraphToken = (await confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest))!.accessToken;
+    //console.log('oboGraphToken:', oboGraphToken); // 调试输出
+    
     return [true, oboGraphToken];
   } catch (error: any) {
     const errorResult = {
