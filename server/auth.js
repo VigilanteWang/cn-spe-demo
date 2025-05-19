@@ -32,30 +32,30 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const restify = __importStar(require("restify"));
-const listContainers_1 = require("./listContainers");
-const server = restify.createServer();
-server.use(restify.plugins.bodyParser());
-server.listen(process.env.port || process.env.PORT || 3001, () => {
-    console.log(`\nAPI server started, ${server.name} listening to ${server.url}`);
-});
-// add CORS support
-server.pre((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.header('origin'));
-    res.header('Access-Control-Allow-Headers', req.header('Access-Control-Request-Headers'));
-    res.header('Access-Control-Allow-Credentials', 'true');
-    if (req.method === 'OPTIONS') {
-        return res.send(204);
-    }
-    next();
-});
-server.get('/api/listContainers', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+exports.getGraphToken = void 0;
+require('isomorphic-fetch');
+const Scopes = __importStar(require("./common/scopes"));
+const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield (0, listContainers_1.listContainers)(req, res);
-        res.send(200, response);
+        const graphTokenRequest = {
+            oboAssertion: token,
+            scopes: [
+                Scopes.GRAPH_SITES_READ_ALL,
+                Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED
+            ]
+        };
+        const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
+        return [true, oboGraphToken];
     }
     catch (error) {
-        res.send(500, { message: `Error in API server: ${error.message}` });
+        const errorResult = {
+            status: 500,
+            body: JSON.stringify({
+                message: `Unable to generate Microsoft Graph OBO token: ${error.message}`,
+                providedToken: token
+            })
+        };
+        return [false, errorResult];
     }
-    next();
-}));
+});
+exports.getGraphToken = getGraphToken;

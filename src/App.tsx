@@ -18,6 +18,7 @@ import {
 } from "@azure/msal-browser";
 import * as Scopes from "./common/scopes";
 import * as Constants from "./common/constants";
+import Containers from "./components/containers";
 
 function useIsSignedIn() {
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -61,7 +62,7 @@ function App() {
         storeAuthStateInCookie: false,
       },
     });
-    
+
     msalInstance.acquireTokenSilent(containerScopes)
       .then(response => {
         console.log('tokenResponse', JSON.stringify(response));
@@ -79,6 +80,7 @@ function App() {
         <Text size={900} weight='bold'>Sample SPA SharePoint Embedded App</Text>
         <Login loginCompleted={promptForContainerConsent} />
         <div>
+          {isSignedIn && (<Containers />)}
         </div>
       </div>
     </FluentProvider>

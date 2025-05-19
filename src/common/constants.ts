@@ -7,4 +7,4 @@ export const CLIENT_ENTRA_APP_AUTHORITY = 'https://login.microsoftonline.com/951
 
 export const API_SERVER_URL = 'http://localhost:3001';
 
-export const CONTAINER_TYPE_ID = '';
+export const CONTAINER_TYPE_ID = '4b82ad87-b9d7-4ee7-89dc-dcebdbbbc89f';
