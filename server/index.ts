@@ -1,5 +1,6 @@
 import * as restify from "restify";
 import { listContainers } from "./listContainers";
+import { createContainer } from "./createContainer";
 
 const server = restify.createServer();
 server.use(restify.plugins.bodyParser());
@@ -24,6 +25,16 @@ server.pre((req, res, next) => {
 server.get('/api/listContainers', async (req, res, next) => {
   try {
     const response = await listContainers(req, res);
+    res.send(200, response)
+  } catch (error: any) {
+    res.send(500, { message: `Error in API server: ${error.message}` });
+  }
+  next();
+});
+
+server.post('/api/createContainer', async (req, res, next) => {
+  try {
+    const response = await createContainer(req, res);
     res.send(200, response)
   } catch (error: any) {
     res.send(500, { message: `Error in API server: ${error.message}` });

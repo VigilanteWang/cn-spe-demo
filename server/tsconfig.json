@@ -3,7 +3,7 @@
     "compilerOptions": {
       "outDir": "./dist",
       "target": "ES2015",
-      "module": "commonjs",
+      "module": "Node16",
       "lib": [
         "es5",
         "es6",
@@ -11,7 +11,7 @@
         "es2015.collection"
       ],
       "esModuleInterop": true,
-      "moduleResolution": "node",
+      "moduleResolution": "node16",
       "skipLibCheck": true,
       "strict": true
     }

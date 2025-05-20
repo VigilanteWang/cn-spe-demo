@@ -12,7 +12,7 @@ export default class SpEmbedded {
             try {
                 const accessToken = await provider.getAccessToken({
                     scopes: [
-                      `api://${Constants.CLIENT_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`
+                        `api://${Constants.CLIENT_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`
                     ]
                 });
                 console.log(`Reusing token: ${accessToken}`);
@@ -49,6 +49,38 @@ export default class SpEmbedded {
                     : undefined;
             } else {
                 console.error(`Unable to list Containers: ${JSON.stringify(response)}`);
+                return undefined;
+            }
+        }
+    };
+
+    async createContainer(containerName: string, containerDescription: string = ''): Promise<IContainer | undefined> {
+        const api_endpoint = `${Constants.API_SERVER_URL}/api/createContainer`;
+
+        if (Providers.globalProvider.state === ProviderState.SignedIn) {
+            const token = await this.getApiAccessToken();
+            const containerRequestHeaders = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            const containerRequestData = {
+                displayName: containerName,
+                description: containerDescription
+            };
+            const containerRequestOptions = {
+                method: 'POST',
+                headers: containerRequestHeaders,
+                body: JSON.stringify(containerRequestData)
+            };
+
+            const response = await fetch(api_endpoint, containerRequestOptions);
+
+            if (response.ok) {
+                const containerResponse = await response.json();
+                return containerResponse as IContainer;
+            } else {
+                console.error(`Unable to create container: ${JSON.stringify(response)}`);
                 return undefined;
             }
         }
