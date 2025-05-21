@@ -34,6 +34,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const restify = __importStar(require("restify"));
 const listContainers_1 = require("./listContainers");
+const createContainer_1 = require("./createContainer");
 const server = restify.createServer();
 server.use(restify.plugins.bodyParser());
 server.listen(process.env.port || process.env.PORT || 3001, () => {
@@ -52,6 +53,16 @@ server.pre((req, res, next) => {
 server.get('/api/listContainers', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const response = yield (0, listContainers_1.listContainers)(req, res);
+        res.send(200, response);
+    }
+    catch (error) {
+        res.send(500, { message: `Error in API server: ${error.message}` });
+    }
+    next();
+}));
+server.post('/api/createContainer', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const response = yield (0, createContainer_1.createContainer)(req, res);
         res.send(200, response);
     }
     catch (error) {

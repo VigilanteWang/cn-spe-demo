@@ -58,6 +58,7 @@
     ]
   },
   "devDependencies": {
+    "@microsoft/microsoft-graph-types": "^2.40.0",
     "@types/isomorphic-fetch": "0.0.39",
     "@types/jsonwebtoken": "9.0.9",
     "@types/restify": "8.5.12",

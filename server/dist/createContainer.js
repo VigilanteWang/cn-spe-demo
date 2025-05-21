@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listContainers = void 0;
+exports.createContainer = void 0;
 const MSAL = __importStar(require("@azure/msal-node"));
 require('isomorphic-fetch');
 const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
@@ -54,32 +54,38 @@ const msalConfig = {
     }
 };
 const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
-const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     if (!req.headers.authorization) {
         res.send(401, { message: 'No access token provided.' });
         return;
     }
     const [bearer, token] = (req.headers.authorization || '').split(' ');
-    const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
+    const [graphSuccess, graphTokenRequest] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
     if (!graphSuccess) {
-        res.send(200, oboGraphToken);
+        res.send(200, graphTokenRequest);
         return;
     }
     const authProvider = (callback) => {
-        callback(null, oboGraphToken);
+        callback(null, graphTokenRequest);
     };
     try {
         const graphClient = MSGraph.Client.init({
             authProvider: authProvider,
             defaultVersion: 'beta'
         });
-        const graphResponse = yield graphClient.api(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`).get();
+        const containerRequestData = {
+            displayName: req.body.displayName,
+            description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : '',
+            containerTypeId: process.env["CONTAINER_TYPE_ID"]
+        };
+        const graphResponse = yield graphClient.api(`storage/fileStorage/containers`).post(containerRequestData);
         res.send(200, graphResponse);
         return;
     }
     catch (error) {
-        res.send(500, { message: `Unable to list containers: ${error.message}` });
+        res.send(500, { message: `Failed to create container: ${error.message}` });
         return;
     }
 });
-exports.listContainers = listContainers;
+exports.createContainer = createContainer;

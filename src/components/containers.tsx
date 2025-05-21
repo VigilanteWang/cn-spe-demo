@@ -14,6 +14,7 @@ import type {
 } from '@fluentui/react-combobox'
 import { IContainer } from "./../common/IContainer";
 import SpEmbedded from '../services/spembedded';
+import { Files } from './files';
 
 const spe = new SpEmbedded();
 
@@ -150,7 +151,7 @@ export const Containers = (props: any) => {
 
                 </Dialog>
             </div>
-            {selectedContainer && (`[[TOOD]] container "${selectedContainer.displayName}" contents go here`)}
+            {selectedContainer && (<Files container={selectedContainer} />)}
         </div>
     );
 }
