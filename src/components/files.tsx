@@ -46,6 +46,7 @@ export const Files = (props: IFilesProps) => {
 
     const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
     const [selectedRows, setSelectedRows] = useState<Set<SelectionItemId>>(new Set<TableRowId>([1]));
+    const downloadLinkRef = useRef<HTMLAnchorElement>(null);
     // BOOKMARK 1 - constants & hooks
     useEffect(() => {
         (async () => {
@@ -77,6 +78,17 @@ export const Files = (props: IFilesProps) => {
             console.error(`Failed to load items: ${error.message}`);
         }
     };
+
+    const onSelectionChange: DataGridProps["onSelectionChange"] = (event: React.MouseEvent | React.KeyboardEvent, data: OnSelectionChangeData): void => {
+        setSelectedRows(data.selectedItems);
+    }
+
+    const onDownloadItemClick = (downloadUrl: string) => {
+        const link = downloadLinkRef.current;
+        link!.href = downloadUrl;
+        link!.click();
+    }
+
     // BOOKMARK 2 - handlers go here
     const columns: TableColumnDefinition<IDriveItemExtended>[] = [
         createTableColumn({
@@ -128,7 +140,8 @@ export const Files = (props: IFilesProps) => {
                     <>
                         <Button aria-label="Download"
                             disabled={!selectedRows.has(driveItem.id as string)}
-                            icon={<SaveRegular />}>Download</Button>
+                            icon={<SaveRegular />}
+                            onClick={() => onDownloadItemClick(driveItem.downloadUrl)}>Download</Button>
                         <Button aria-label="Delete"
                             icon={<DeleteRegular />}>Delete</Button>
                     </>
@@ -157,14 +170,18 @@ export const Files = (props: IFilesProps) => {
         }
     };
     // BOOKMARK 3 - component rendering return (
-    return(
+    return (
         <div>
+            <a ref={downloadLinkRef} href="" target="_blank" style={{ display: 'none' }} />
             <DataGrid
                 items={driveItems}
                 columns={columns}
                 getRowId={(item) => item.id}
                 resizableColumns
                 columnSizingOptions={columnSizingOptions}
+                selectionMode='single'
+                selectedItems={selectedRows}
+                onSelectionChange={onSelectionChange}
             >
                 <DataGridHeader>
                     <DataGridRow>
