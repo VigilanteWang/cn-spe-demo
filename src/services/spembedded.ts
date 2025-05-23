@@ -6,7 +6,7 @@ import { IContainer } from './../common/IContainer';
 
 export default class SpEmbedded {
     async getApiAccessToken() {
-        // 重用全局 provider 已登录用户的 token
+        // 重用全局 provider 已登录用户的 token，原代码会出现no account selected的错误
         const provider = Providers.globalProvider;
         if (provider.state === ProviderState.SignedIn) {
             try {
