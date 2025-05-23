@@ -41,12 +41,27 @@ interface IDriveItemExtended extends DriveItem {
     iconElement: JSX.Element;
     downloadUrl: string;
 }
-
+const useStyles = makeStyles({
+    dialogInputControl: {
+        width: '400px',
+    },
+    dialogContent: {
+        display: 'flex',
+        flexDirection: 'column',
+        rowGap: '10px',
+        marginBottom: '25px'
+    }
+});
 export const Files = (props: IFilesProps) => {
 
     const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
     const [selectedRows, setSelectedRows] = useState<Set<SelectionItemId>>(new Set<TableRowId>([1]));
     const downloadLinkRef = useRef<HTMLAnchorElement>(null);
+    // for creating new folders
+    const [folderId, setFolderId] = useState<string>('root');
+    const [folderName, setFolderName] = useState<string>('');
+    const [creatingFolder, setCreatingFolder] = useState<boolean>(false);
+    const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
     // BOOKMARK 1 - constants & hooks
     useEffect(() => {
         (async () => {
@@ -89,6 +104,29 @@ export const Files = (props: IFilesProps) => {
         link!.click();
     }
 
+    const onFolderCreateClick = async () => {
+        setCreatingFolder(true);
+
+        const currentFolderId = folderId;
+        const graphClient = Providers.globalProvider.graph.client;
+        const endpoint = `/drives/${props.container.id}/items/${currentFolderId}/children`;
+        const data = {
+            "name": folderName,
+            "folder": {},
+            "@microsoft.graph.conflictBehavior": "rename"
+        };
+        await graphClient.api(endpoint).post(data);
+
+        await loadItems(currentFolderId);
+
+        setCreatingFolder(false);
+        setNewFolderDialogOpen(false);
+    };
+
+    const onHandleFolderNameChange: InputProps["onChange"] = (event: React.ChangeEvent<HTMLInputElement>, data: InputOnChangeData): void => {
+        setFolderName(data?.value);
+    };
+
     // BOOKMARK 2 - handlers go here
     const columns: TableColumnDefinition<IDriveItemExtended>[] = [
         createTableColumn({
@@ -99,7 +137,13 @@ export const Files = (props: IFilesProps) => {
             renderCell: (driveItem) => {
                 return (
                     <TableCellLayout media={driveItem.iconElement}>
-                        <Link href={driveItem!.webUrl!} target='_blank'>{driveItem.name}</Link>
+                        {(!driveItem.isFolder)
+                            ? <Link href={driveItem!.webUrl!} target='_blank'>{driveItem.name}</Link>
+                            : <Link onClick={() => {
+                                loadItems(driveItem.id);
+                                setFolderId(driveItem.id as string)
+                            }}>{driveItem.name}</Link>
+                        }
                     </TableCellLayout>
                 )
             }
@@ -170,9 +214,37 @@ export const Files = (props: IFilesProps) => {
         }
     };
     // BOOKMARK 3 - component rendering return (
+    const styles = useStyles();
     return (
         <div>
             <a ref={downloadLinkRef} href="" target="_blank" style={{ display: 'none' }} />
+            <Toolbar>
+                <ToolbarButton vertical icon={<AddRegular />} onClick={() => setNewFolderDialogOpen(true)}>New Folder</ToolbarButton>
+            </Toolbar>
+
+            <Dialog open={newFolderDialogOpen}>
+                <DialogSurface>
+                    <DialogBody>
+                        <DialogTitle>Create New Folder</DialogTitle>
+                        <DialogContent className={styles.dialogContent}>
+                            <Label htmlFor={folderName}>Folder name:</Label>
+                            <Input id={folderName} className={styles.dialogInputControl} autoFocus required
+                                value={folderName} onChange={onHandleFolderNameChange}></Input>
+                            {creatingFolder &&
+                                <Spinner size='medium' label='Creating folder...' labelPosition='after' />
+                            }
+                        </DialogContent>
+                        <DialogActions>
+                            <DialogTrigger disableButtonEnhancement>
+                                <Button appearance="secondary" onClick={() => setNewFolderDialogOpen(false)} disabled={creatingFolder}>Cancel</Button>
+                            </DialogTrigger>
+                            <Button appearance="primary"
+                                onClick={onFolderCreateClick}
+                                disabled={creatingFolder || (folderName === '')}>Create Folder</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
             <DataGrid
                 items={driveItems}
                 columns={columns}
