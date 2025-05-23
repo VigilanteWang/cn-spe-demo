@@ -62,6 +62,10 @@ export const Files = (props: IFilesProps) => {
     const [folderName, setFolderName] = useState<string>('');
     const [creatingFolder, setCreatingFolder] = useState<boolean>(false);
     const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+    // for deleting items
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    // for uploading files
+    const uploadFileRef = useRef<HTMLInputElement>(null);
     // BOOKMARK 1 - constants & hooks
     useEffect(() => {
         (async () => {
@@ -127,6 +131,54 @@ export const Files = (props: IFilesProps) => {
         setFolderName(data?.value);
     };
 
+    const onDeleteItemClick = async () => {
+        /**
+         * 使用了解构赋值的方式，从 selectedRows 中获取第一个被选中的 id。
+         * 示例：
+         * const [first, second] = [1, 2, 3]; // first = 1, second = 2
+         * 相比于 `selectedRows.entries().next().value[0]`，这种写法更安全，
+         * 因为如果 selectedRows 为空数组，解构赋值会得到 undefined，
+         * 而直接用迭代器可能会导致 value 为 undefined，访问 [0] 时会报错。
+         */
+        const [firstSelectedId] = selectedRows;
+
+        if (!firstSelectedId) {
+            console.warn('No item selected for deletion');
+            return;
+        }
+
+        const graphClient = Providers.globalProvider.graph.client;
+        const endpoint = `/drives/${props.container.id}/items/${firstSelectedId}`;
+        await graphClient.api(endpoint).delete();
+        await loadItems(folderId || 'root');
+        setDeleteDialogOpen(false);
+    }
+
+    const onUploadFileClick = () => {
+        if (uploadFileRef.current) {
+            uploadFileRef.current.click();
+        }
+    };
+
+    const onUploadFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files![0];
+        const fileReader = new FileReader();
+        fileReader.readAsArrayBuffer(file);
+        fileReader.addEventListener('loadend', async (event: any) => {
+            const graphClient = Providers.globalProvider.graph.client;
+            const endpoint = `/drives/${props.container.id}/items/${folderId || 'root'}:/${file.name}:/content`;
+            graphClient.api(endpoint).putStream(fileReader.result)
+                .then(async (response) => {
+                    await loadItems(folderId || 'root');
+                })
+                .catch((error) => {
+                    console.error(`Failed to upload file ${file.name}: ${error.message}`);
+                });
+        });
+        fileReader.addEventListener('error', (event: any) => {
+            console.error(`Error on reading file: ${event.message}`);
+        });
+    };
     // BOOKMARK 2 - handlers go here
     const columns: TableColumnDefinition<IDriveItemExtended>[] = [
         createTableColumn({
@@ -187,7 +239,8 @@ export const Files = (props: IFilesProps) => {
                             icon={<SaveRegular />}
                             onClick={() => onDownloadItemClick(driveItem.downloadUrl)}>Download</Button>
                         <Button aria-label="Delete"
-                            icon={<DeleteRegular />}>Delete</Button>
+                            icon={<DeleteRegular />}
+                            onClick={() => setDeleteDialogOpen(true)}>Delete</Button>
                     </>
                 )
             }
@@ -217,9 +270,11 @@ export const Files = (props: IFilesProps) => {
     const styles = useStyles();
     return (
         <div>
+            <input ref={uploadFileRef} type="file" onChange={onUploadFileSelected} style={{ display: 'none' }} />
             <a ref={downloadLinkRef} href="" target="_blank" style={{ display: 'none' }} />
             <Toolbar>
                 <ToolbarButton vertical icon={<AddRegular />} onClick={() => setNewFolderDialogOpen(true)}>New Folder</ToolbarButton>
+                <ToolbarButton vertical icon={<ArrowUploadRegular />} onClick={onUploadFileClick}>Upload File</ToolbarButton>
             </Toolbar>
 
             <Dialog open={newFolderDialogOpen}>
@@ -241,6 +296,26 @@ export const Files = (props: IFilesProps) => {
                             <Button appearance="primary"
                                 onClick={onFolderCreateClick}
                                 disabled={creatingFolder || (folderName === '')}>Create Folder</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
+            <Dialog open={deleteDialogOpen} modalType='modal' onOpenChange={() => setSelectedRows(new Set<TableRowId>([0]))}>
+                <DialogSurface>
+                    <DialogBody>
+                        <DialogTitle>Delete Item</DialogTitle>
+                        <DialogContent>
+                            <p>Are you sure you want to delete this item?</p>
+                        </DialogContent>
+                        <DialogActions>
+                            <DialogTrigger>
+                                <Button
+                                    appearance='secondary'
+                                    onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                            </DialogTrigger>
+                            <Button
+                                appearance='primary'
+                                onClick={onDeleteItemClick}>Delete</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>
