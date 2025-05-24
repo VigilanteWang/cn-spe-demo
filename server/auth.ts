@@ -1,29 +1,33 @@
 import { ConfidentialClientApplication } from "@azure/msal-node";
-require('isomorphic-fetch');
-import * as MSGraph from '@microsoft/microsoft-graph-client';
-import * as Scopes from './common/scopes';
+require("isomorphic-fetch");
+import * as Scopes from "./common/scopes";
 
-export const getGraphToken = async (confidentialClient: ConfidentialClientApplication, token: string): Promise<[boolean, string | any]> => {
+export const getGraphToken = async (
+  confidentialClient: ConfidentialClientApplication,
+  token: string
+): Promise<[boolean, string | any]> => {
   try {
     const graphTokenRequest = {
       oboAssertion: token,
       scopes: [
         Scopes.GRAPH_SITES_READ_ALL,
-        Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED
-      ]
+        Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
+      ],
     };
-    const oboGraphToken = (await confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest))!.accessToken;
+    const oboGraphToken = (await confidentialClient.acquireTokenOnBehalfOf(
+      graphTokenRequest
+    ))!.accessToken;
     //console.log('oboGraphToken:', oboGraphToken); // 调试输出
-    
+
     return [true, oboGraphToken];
   } catch (error: any) {
     const errorResult = {
       status: 500,
       body: JSON.stringify({
         message: `Unable to generate Microsoft Graph OBO token: ${error.message}`,
-        providedToken: token
-      })
+        providedToken: token,
+      }),
     };
     return [false, errorResult];
   }
-}
+};

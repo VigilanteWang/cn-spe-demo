@@ -1,18 +1,17 @@
 {
-    "$schema": "http://json.schemastore.org/tsconfig",
-    "compilerOptions": {
-      "outDir": "./dist",
-      "target": "ES2015",
-      "module": "Node16",
-      "lib": [
-        "es5",
-        "es6",
-        "dom",
-        "es2015.collection"
-      ],
-      "esModuleInterop": true,
-      "moduleResolution": "node16",
-      "skipLibCheck": true,
-      "strict": true
-    }
+  "$schema": "http://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "target": "ES2015",
+    "module": "Node16",
+    "lib": [
+      "es5",
+      "es6",
+      "dom",
+      "es2015.collection"
+    ],
+    "esModuleInterop": true,
+    "moduleResolution": "node16",
+    "strict": true
   }
+}
