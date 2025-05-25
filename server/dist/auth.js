@@ -40,7 +40,6 @@ const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, v
         const graphTokenRequest = {
             oboAssertion: token,
             scopes: [
-                Scopes.GRAPH_SITES_READ_ALL,
                 Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
             ],
         };

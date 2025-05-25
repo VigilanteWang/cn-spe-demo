@@ -10,7 +10,6 @@ export const getGraphToken = async (
     const graphTokenRequest = {
       oboAssertion: token,
       scopes: [
-        Scopes.GRAPH_SITES_READ_ALL,
         Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
       ],
     };
