@@ -33,7 +33,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getGraphToken = void 0;
-require('isomorphic-fetch');
+require("isomorphic-fetch");
 const Scopes = __importStar(require("./common/scopes"));
 const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -41,8 +41,8 @@ const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, v
             oboAssertion: token,
             scopes: [
                 Scopes.GRAPH_SITES_READ_ALL,
-                Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED
-            ]
+                Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
+            ],
         };
         const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
         //console.log('oboGraphToken:', oboGraphToken); // 调试输出
@@ -53,8 +53,8 @@ const getGraphToken = (confidentialClient, token) => __awaiter(void 0, void 0, v
             status: 500,
             body: JSON.stringify({
                 message: `Unable to generate Microsoft Graph OBO token: ${error.message}`,
-                providedToken: token
-            })
+                providedToken: token,
+            }),
         };
         return [false, errorResult];
     }

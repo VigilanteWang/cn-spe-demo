@@ -1,5 +1,4 @@
 import { Providers, ProviderState } from '@microsoft/mgt-element';
-import * as Msal from '@azure/msal-browser';
 import * as Constants from './../common/constants';
 import * as Scopes from './../common/scopes';
 import { IContainer } from './../common/IContainer';
