@@ -34,14 +34,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createContainer = void 0;
 const MSAL = __importStar(require("@azure/msal-node"));
-require('isomorphic-fetch');
+require("isomorphic-fetch");
 const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
 const auth_1 = require("./auth");
 const msalConfig = {
     auth: {
-        clientId: process.env['API_ENTRA_APP_CLIENT_ID'],
-        authority: process.env['API_ENTRA_APP_AUTHORITY'],
-        clientSecret: process.env['API_ENTRA_APP_CLIENT_SECRET']
+        clientId: process.env["API_ENTRA_APP_CLIENT_ID"],
+        authority: process.env["API_ENTRA_APP_AUTHORITY"],
+        clientSecret: process.env["API_ENTRA_APP_CLIENT_SECRET"],
     },
     system: {
         loggerOptions: {
@@ -50,17 +50,17 @@ const msalConfig = {
             },
             piiLoggingEnabled: false,
             logLevel: MSAL.LogLevel.Verbose,
-        }
-    }
+        },
+    },
 };
 const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
 const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     if (!req.headers.authorization) {
-        res.send(401, { message: 'No access token provided.' });
+        res.send(401, { message: "No access token provided." });
         return;
     }
-    const [bearer, token] = (req.headers.authorization || '').split(' ');
+    const [bearer, token] = (req.headers.authorization || "").split(" ");
     const [graphSuccess, graphTokenRequest] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
     if (!graphSuccess) {
         res.send(200, graphTokenRequest);
@@ -72,14 +72,16 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
     try {
         const graphClient = MSGraph.Client.init({
             authProvider: authProvider,
-            defaultVersion: 'beta'
+            defaultVersion: "beta",
         });
         const containerRequestData = {
             displayName: req.body.displayName,
-            description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : '',
-            containerTypeId: process.env["CONTAINER_TYPE_ID"]
+            description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : "",
+            containerTypeId: process.env["CONTAINER_TYPE_ID"],
         };
-        const graphResponse = yield graphClient.api(`storage/fileStorage/containers`).post(containerRequestData);
+        const graphResponse = yield graphClient
+            .api(`storage/fileStorage/containers`)
+            .post(containerRequestData);
         res.send(200, graphResponse);
         return;
     }
