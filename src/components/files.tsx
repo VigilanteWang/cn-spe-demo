@@ -98,10 +98,6 @@ const useStyles = makeStyles({
   },
   progressContainer: {
     marginBottom: "16px",
-    padding: "12px",
-    border: "1px solid #e0e0e0",
-    borderRadius: "4px",
-    backgroundColor: "#f9f9f9",
     display: "flex",
     alignItems: "center",
     gap: "12px",
@@ -134,10 +130,10 @@ export const Files = (props: IFilesProps) => {
   // Upload progress state
   const [uploadProgress, setUploadProgress] = useState<IUploadProgress>({
     isUploading: false,
-    currentFile: '',
+    currentFile: "",
     currentIndex: 0,
     totalFiles: 0,
-    fileSize: '',
+    fileSize: "",
     isCompleted: false,
   });
   // for breadcrumb navigation
@@ -153,16 +149,18 @@ export const Files = (props: IFilesProps) => {
 
   // Helper function to format file size
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   // Helper function to get file paths from folder structure
-  const getFolderStructure = (files: FileList): Array<{file: File, relativePath: string}> => {
-    const result: Array<{file: File, relativePath: string}> = [];
+  const getFolderStructure = (
+    files: FileList,
+  ): Array<{ file: File; relativePath: string }> => {
+    const result: Array<{ file: File; relativePath: string }> = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       // Use webkitRelativePath for folder uploads or just the file name for single files
@@ -290,7 +288,7 @@ export const Files = (props: IFilesProps) => {
 
     await uploadFiles(files);
     // Reset the input value to allow re-uploading the same files
-    event.target.value = '';
+    event.target.value = "";
   };
 
   const onUploadFolderSelected = async (
@@ -301,7 +299,7 @@ export const Files = (props: IFilesProps) => {
 
     await uploadFiles(files);
     // Reset the input value
-    event.target.value = '';
+    event.target.value = "";
   };
 
   const uploadFiles = async (files: FileList) => {
@@ -310,10 +308,10 @@ export const Files = (props: IFilesProps) => {
 
     setUploadProgress({
       isUploading: true,
-      currentFile: '',
+      currentFile: "",
       currentIndex: 0,
       totalFiles,
-      fileSize: '',
+      fileSize: "",
       isCompleted: false,
     });
 
@@ -321,9 +319,9 @@ export const Files = (props: IFilesProps) => {
 
     for (let i = 0; i < fileStructure.length; i++) {
       const { file, relativePath } = fileStructure[i];
-      
+
       // Update progress
-      setUploadProgress(prev => ({
+      setUploadProgress((prev) => ({
         ...prev,
         currentFile: relativePath,
         currentIndex: i + 1,
@@ -332,19 +330,23 @@ export const Files = (props: IFilesProps) => {
 
       try {
         // If the file is part of a folder structure, we need to create the folder path
-        const pathParts = relativePath.split('/');
+        const pathParts = relativePath.split("/");
         let currentPath = folderId || "root";
-        
+
         // Create folder structure if needed (skip the last part which is the file name)
         for (let j = 0; j < pathParts.length - 1; j++) {
           const folderName = pathParts[j];
-          currentPath = await createFolderIfNotExists(graphClient, currentPath, folderName);
+          currentPath = await createFolderIfNotExists(
+            graphClient,
+            currentPath,
+            folderName,
+          );
         }
 
         // Upload the file to the final destination
         const fileName = pathParts[pathParts.length - 1];
         const endpoint = `/drives/${props.container.id}/items/${currentPath}:/${fileName}:/content`;
-        
+
         const fileReader = new FileReader();
         const fileData = await new Promise<ArrayBuffer>((resolve, reject) => {
           fileReader.onload = () => resolve(fileReader.result as ArrayBuffer);
@@ -354,12 +356,14 @@ export const Files = (props: IFilesProps) => {
 
         await graphClient.api(endpoint).putStream(fileData);
       } catch (error: any) {
-        console.error(`Failed to upload file ${relativePath}: ${error.message}`);
+        console.error(
+          `Failed to upload file ${relativePath}: ${error.message}`,
+        );
       }
     }
 
     // Show completion state
-    setUploadProgress(prev => ({
+    setUploadProgress((prev) => ({
       ...prev,
       isUploading: false,
       isCompleted: true,
@@ -367,7 +371,7 @@ export const Files = (props: IFilesProps) => {
 
     // Hide completion message after 3 seconds
     setTimeout(() => {
-      setUploadProgress(prev => ({
+      setUploadProgress((prev) => ({
         ...prev,
         isCompleted: false,
       }));
@@ -380,17 +384,17 @@ export const Files = (props: IFilesProps) => {
   const createFolderIfNotExists = async (
     graphClient: any,
     parentId: string,
-    folderName: string
+    folderName: string,
   ): Promise<string> => {
     try {
       // First, try to get the folder if it already exists
       const endpoint = `/drives/${props.container.id}/items/${parentId}/children`;
       const response = await graphClient.api(endpoint).get();
-      
-      const existingFolder = response.value.find((item: any) => 
-        item.name === folderName && item.folder
+
+      const existingFolder = response.value.find(
+        (item: any) => item.name === folderName && item.folder,
       );
-      
+
       if (existingFolder) {
         return existingFolder.id;
       }
@@ -640,15 +644,17 @@ export const Files = (props: IFilesProps) => {
             <>
               <Spinner size="small" />
               <Text className={styles.progressText}>
-                Uploading {uploadProgress.currentFile} ({uploadProgress.currentIndex}/{uploadProgress.totalFiles}) - {uploadProgress.fileSize}
+                Uploading {uploadProgress.currentFile} (
+                {uploadProgress.currentIndex}/{uploadProgress.totalFiles}) -{" "}
+                {uploadProgress.fileSize}
               </Text>
             </>
           ) : uploadProgress.isCompleted ? (
             <>
-              <CheckmarkRegular style={{ color: tokens.colorPaletteGreenForeground1 }} />
-              <Text className={styles.progressCompleted}>
-                Upload completed
-              </Text>
+              <CheckmarkRegular
+                style={{ color: tokens.colorPaletteGreenForeground1 }}
+              />
+              <Text className={styles.progressCompleted}>Upload completed</Text>
             </>
           ) : null}
         </div>
