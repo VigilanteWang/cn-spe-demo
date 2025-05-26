@@ -10,6 +10,8 @@ import {
   ArrowLeftRegular,
   ChevronRightRegular,
   HomeRegular,
+  CheckmarkRegular,
+  FolderAddRegular,
 } from "@fluentui/react-icons";
 import {
   Button,
@@ -46,6 +48,8 @@ import {
   BreadcrumbItem,
   BreadcrumbDivider,
   BreadcrumbButton,
+  Text,
+  tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IContainer } from "./../common/IContainer";
@@ -66,6 +70,15 @@ interface IBreadcrumbItem {
   id: string;
   name: string;
 }
+
+interface IUploadProgress {
+  isUploading: boolean;
+  currentFile: string;
+  currentIndex: number;
+  totalFiles: number;
+  fileSize: string;
+  isCompleted: boolean;
+}
 const useStyles = makeStyles({
   dialogInputControl: {
     width: "400px",
@@ -83,6 +96,24 @@ const useStyles = makeStyles({
   toolbarContainer: {
     marginBottom: "16px",
   },
+  progressContainer: {
+    marginBottom: "16px",
+    padding: "12px",
+    border: "1px solid #e0e0e0",
+    borderRadius: "4px",
+    backgroundColor: "#f9f9f9",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  progressText: {
+    fontSize: "14px",
+    color: tokens.colorNeutralForeground1,
+  },
+  progressCompleted: {
+    color: tokens.colorPaletteGreenForeground1,
+    fontWeight: "600",
+  },
 });
 export const Files = (props: IFilesProps) => {
   const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
@@ -99,6 +130,16 @@ export const Files = (props: IFilesProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   // for uploading files
   const uploadFileRef = useRef<HTMLInputElement>(null);
+  const uploadFolderRef = useRef<HTMLInputElement>(null);
+  // Upload progress state
+  const [uploadProgress, setUploadProgress] = useState<IUploadProgress>({
+    isUploading: false,
+    currentFile: '',
+    currentIndex: 0,
+    totalFiles: 0,
+    fileSize: '',
+    isCompleted: false,
+  });
   // for breadcrumb navigation
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
     { id: "root", name: "Root" },
@@ -109,6 +150,27 @@ export const Files = (props: IFilesProps) => {
       loadItems();
     })();
   }, [props]);
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Helper function to get file paths from folder structure
+  const getFolderStructure = (files: FileList): Array<{file: File, relativePath: string}> => {
+    const result: Array<{file: File, relativePath: string}> = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      // Use webkitRelativePath for folder uploads or just the file name for single files
+      const relativePath = (file as any).webkitRelativePath || file.name;
+      result.push({ file, relativePath });
+    }
+    return result;
+  };
 
   const loadItems = async (itemId?: string, folderName?: string) => {
     try {
@@ -214,28 +276,138 @@ export const Files = (props: IFilesProps) => {
     }
   };
 
+  const onUploadFolderClick = () => {
+    if (uploadFolderRef.current) {
+      uploadFolderRef.current.click();
+    }
+  };
+
   const onUploadFileSelected = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file = event.target.files![0];
-    const fileReader = new FileReader();
-    fileReader.readAsArrayBuffer(file);
-    fileReader.addEventListener("loadend", async (event: any) => {
-      const graphClient = Providers.globalProvider.graph.client;
-      const endpoint = `/drives/${props.container.id}/items/${folderId || "root"}:/${file.name}:/content`;
-      graphClient
-        .api(endpoint)
-        .putStream(fileReader.result)
-        .then(async (response) => {
-          await loadItems(folderId || "root");
-        })
-        .catch((error) => {
-          console.error(`Failed to upload file ${file.name}: ${error.message}`);
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    await uploadFiles(files);
+    // Reset the input value to allow re-uploading the same files
+    event.target.value = '';
+  };
+
+  const onUploadFolderSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    await uploadFiles(files);
+    // Reset the input value
+    event.target.value = '';
+  };
+
+  const uploadFiles = async (files: FileList) => {
+    const fileStructure = getFolderStructure(files);
+    const totalFiles = fileStructure.length;
+
+    setUploadProgress({
+      isUploading: true,
+      currentFile: '',
+      currentIndex: 0,
+      totalFiles,
+      fileSize: '',
+      isCompleted: false,
+    });
+
+    const graphClient = Providers.globalProvider.graph.client;
+
+    for (let i = 0; i < fileStructure.length; i++) {
+      const { file, relativePath } = fileStructure[i];
+      
+      // Update progress
+      setUploadProgress(prev => ({
+        ...prev,
+        currentFile: relativePath,
+        currentIndex: i + 1,
+        fileSize: formatFileSize(file.size),
+      }));
+
+      try {
+        // If the file is part of a folder structure, we need to create the folder path
+        const pathParts = relativePath.split('/');
+        let currentPath = folderId || "root";
+        
+        // Create folder structure if needed (skip the last part which is the file name)
+        for (let j = 0; j < pathParts.length - 1; j++) {
+          const folderName = pathParts[j];
+          currentPath = await createFolderIfNotExists(graphClient, currentPath, folderName);
+        }
+
+        // Upload the file to the final destination
+        const fileName = pathParts[pathParts.length - 1];
+        const endpoint = `/drives/${props.container.id}/items/${currentPath}:/${fileName}:/content`;
+        
+        const fileReader = new FileReader();
+        const fileData = await new Promise<ArrayBuffer>((resolve, reject) => {
+          fileReader.onload = () => resolve(fileReader.result as ArrayBuffer);
+          fileReader.onerror = reject;
+          fileReader.readAsArrayBuffer(file);
         });
-    });
-    fileReader.addEventListener("error", (event: any) => {
-      console.error(`Error on reading file: ${event.message}`);
-    });
+
+        await graphClient.api(endpoint).putStream(fileData);
+      } catch (error: any) {
+        console.error(`Failed to upload file ${relativePath}: ${error.message}`);
+      }
+    }
+
+    // Show completion state
+    setUploadProgress(prev => ({
+      ...prev,
+      isUploading: false,
+      isCompleted: true,
+    }));
+
+    // Hide completion message after 3 seconds
+    setTimeout(() => {
+      setUploadProgress(prev => ({
+        ...prev,
+        isCompleted: false,
+      }));
+    }, 3000);
+
+    // Refresh the file list
+    await loadItems(folderId || "root");
+  };
+
+  const createFolderIfNotExists = async (
+    graphClient: any,
+    parentId: string,
+    folderName: string
+  ): Promise<string> => {
+    try {
+      // First, try to get the folder if it already exists
+      const endpoint = `/drives/${props.container.id}/items/${parentId}/children`;
+      const response = await graphClient.api(endpoint).get();
+      
+      const existingFolder = response.value.find((item: any) => 
+        item.name === folderName && item.folder
+      );
+      
+      if (existingFolder) {
+        return existingFolder.id;
+      }
+
+      // If folder doesn't exist, create it
+      const createEndpoint = `/drives/${props.container.id}/items/${parentId}/children`;
+      const data = {
+        name: folderName,
+        folder: {},
+        "@microsoft.graph.conflictBehavior": "rename",
+      };
+      const newFolder = await graphClient.api(createEndpoint).post(data);
+      return newFolder.id;
+    } catch (error: any) {
+      console.error(`Failed to create folder ${folderName}: ${error.message}`);
+      throw error;
+    }
   };
 
   // Navigation functions
@@ -384,7 +556,16 @@ export const Files = (props: IFilesProps) => {
       <input
         ref={uploadFileRef}
         type="file"
+        multiple
         onChange={onUploadFileSelected}
+        style={{ display: "none" }}
+      />
+      <input
+        ref={uploadFolderRef}
+        type="file"
+        {...({ webkitdirectory: "" } as any)}
+        multiple
+        onChange={onUploadFolderSelected}
         style={{ display: "none" }}
       />
       <a
@@ -442,8 +623,36 @@ export const Files = (props: IFilesProps) => {
           >
             Upload File
           </ToolbarButton>
+          <ToolbarButton
+            vertical
+            icon={<FolderAddRegular />}
+            onClick={onUploadFolderClick}
+          >
+            Upload Folder
+          </ToolbarButton>
         </Toolbar>
       </div>
+
+      {/* Upload Progress */}
+      {(uploadProgress.isUploading || uploadProgress.isCompleted) && (
+        <div className={styles.progressContainer}>
+          {uploadProgress.isUploading ? (
+            <>
+              <Spinner size="small" />
+              <Text className={styles.progressText}>
+                Uploading {uploadProgress.currentFile} ({uploadProgress.currentIndex}/{uploadProgress.totalFiles}) - {uploadProgress.fileSize}
+              </Text>
+            </>
+          ) : uploadProgress.isCompleted ? (
+            <>
+              <CheckmarkRegular style={{ color: tokens.colorPaletteGreenForeground1 }} />
+              <Text className={styles.progressCompleted}>
+                Upload completed
+              </Text>
+            </>
+          ) : null}
+        </div>
+      )}
 
       <Dialog open={newFolderDialogOpen}>
         <DialogSurface>
