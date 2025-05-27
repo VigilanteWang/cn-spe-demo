@@ -23,10 +23,10 @@ const useStyles = makeStyles({
     justifyContent: "space-between",
     alignItems: "center",
     padding: "1px 12px",
-    backgroundColor: tokens.colorNeutralBackground3,
+    backgroundColor: tokens.colorBrandBackground,
   },
   title: {
-    color: tokens.colorBrandForeground1,
+    color: tokens.colorNeutralForegroundOnBrand,
     margin: "15px 0",
   },
 });
