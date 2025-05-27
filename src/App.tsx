@@ -1,20 +1,15 @@
-import React, {
-  useState, useEffect
-} from "react";
-import {
-  Providers,
-  ProviderState
-} from "@microsoft/mgt-element";
+import React, { useState, useEffect } from "react";
+import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { Login } from "@microsoft/mgt-react";
 import {
   FluentProvider,
   Text,
-  webLightTheme
-} from "@fluentui/react-components"
-import './App.css';
+  webLightTheme,
+} from "@fluentui/react-components";
+import "./App.css";
 import {
   InteractionRequiredAuthError,
-  PublicClientApplication
+  PublicClientApplication,
 } from "@azure/msal-browser";
 import * as Scopes from "./common/scopes";
 import * as Constants from "./common/constants";
@@ -34,12 +29,11 @@ function useIsSignedIn() {
 
     return () => {
       Providers.removeProviderUpdatedListener(updateState);
-    }
+    };
   }, []);
 
   return isSignedIn;
 }
-
 
 function App() {
   const isSignedIn = useIsSignedIn();
@@ -82,11 +76,11 @@ function App() {
   return (
     <FluentProvider theme={webLightTheme}>
       <div className="App">
-        <Text size={900} weight='bold'>Sample SPA SharePoint Embedded App</Text>
-        <Login/>
-        <div>
-          {isSignedIn && (<Containers />)}
-        </div>
+        <Text size={900} weight="bold">
+          SharePoint Embedded Demo App
+        </Text>
+        <Login />
+        <div>{isSignedIn && <Containers />}</div>
       </div>
     </FluentProvider>
   );
