@@ -44,10 +44,11 @@ const useStyles = makeStyles({
     height: "100%",
     display: "flex",
     flexDirection: "column",
-    padding: "20px",
+    padding: "15px",
+    maxHeight: "none",
   },
   dialogTitle: {
-    marginBottom: "16px",
+    marginBottom: "5px",
     fontSize: "20px",
     fontWeight: "600",
   },
@@ -63,25 +64,26 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke1}`,
     borderRadius: "4px",
     width: "100%",
-    minHeight: "500px",
+    minHeight: 0,
+    height: "100%",
   },
   navigationContainer: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: "16px",
+    marginTop: "5px",
     "@media (max-width: 768px)": {
       flexDirection: "column",
-      gap: "12px",
+      gap: "10px",
     },
   },
   navigationButtons: {
     display: "flex",
-    gap: "8px",
+    gap: "10px",
   },
   actionButtons: {
     display: "flex",
-    gap: "8px",
+    gap: "10px",
     "@media (max-width: 768px)": {
       width: "100%",
       justifyContent: "center",
@@ -93,8 +95,9 @@ const useStyles = makeStyles({
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "column",
-    gap: "16px",
-    minHeight: "400px",
+    gap: "10px",
+    minHeight: 0,
+    height: "100%",
   },
 });
 
@@ -322,17 +325,14 @@ export const Preview: React.FC<IPreviewProps> = ({
                 disabled={!hasPrevious}
                 onClick={handlePrevious}
                 aria-label="Previous file"
-              >
-                Previous
-              </Button>
+              ></Button>
               <Button
                 icon={<ChevronRightRegular />}
+                iconPosition="after" // 图标在文字右侧
                 disabled={!hasNext}
                 onClick={handleNext}
                 aria-label="Next file"
-              >
-                Next
-              </Button>
+              ></Button>
             </div>
 
             <div className={styles.actionButtons}>
