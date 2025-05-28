@@ -5,15 +5,31 @@ import {
   FluentProvider,
   Text,
   webLightTheme,
+  makeStyles,
+  tokens,
+  Button,
 } from "@fluentui/react-components";
 import "./App.css";
-import {
-  InteractionRequiredAuthError,
-  PublicClientApplication,
-} from "@azure/msal-browser";
-import * as Scopes from "./common/scopes";
-import * as Constants from "./common/constants";
 import Containers from "./components/containers";
+
+const useStyles = makeStyles({
+  appContainer: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+  },
+  topBanner: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "1px 12px",
+    backgroundColor: tokens.colorBrandBackground,
+  },
+  title: {
+    color: tokens.colorNeutralForegroundOnBrand,
+    margin: "15px 0",
+  },
+});
 
 function useIsSignedIn() {
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -37,6 +53,7 @@ function useIsSignedIn() {
 
 function App() {
   const isSignedIn = useIsSignedIn();
+  const styles = useStyles();
 
   //这段源代码不正确，不同于index里的globalProvider，这里PublicClientApplication，
   //完全是个全新的实例，不能使用全局的token，而且PublicClientApplication也没有initialize，不知原用途为何
@@ -75,12 +92,14 @@ function App() {
   // }
   return (
     <FluentProvider theme={webLightTheme}>
-      <div className="App">
-        <Text size={900} weight="bold">
-          SharePoint Embedded Demo App
-        </Text>
-        <Login />
-        <div>{isSignedIn && <Containers />}</div>
+      <div className={styles.appContainer}>
+        <div className={styles.topBanner}>
+          <Text size={600} weight="bold" className={styles.title}>
+            SharePoint Embedded Demo App
+          </Text>
+          <Login />
+        </div>
+        {isSignedIn && <Containers />}
       </div>
     </FluentProvider>
   );

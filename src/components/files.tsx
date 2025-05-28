@@ -52,18 +52,13 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { IContainer } from "./../common/IContainer";
+import { IContainer } from "../common/types";
+import Preview from "./preview";
+import { IDriveItemExtended } from "../common/types";
 require("isomorphic-fetch");
 
 interface IFilesProps {
   container: IContainer;
-}
-
-interface IDriveItemExtended extends DriveItem {
-  isFolder: boolean;
-  modifiedByName: string;
-  iconElement: JSX.Element;
-  downloadUrl: string;
 }
 
 interface IBreadcrumbItem {
@@ -140,12 +135,16 @@ export const Files = (props: IFilesProps) => {
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
     { id: "root", name: "Root" },
   ]);
+  // for file preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [currentPreviewFile, setCurrentPreviewFile] =
+    useState<IDriveItemExtended | null>(null);
   // BOOKMARK 1 - constants & hooks
   useEffect(() => {
     (async () => {
       loadItems();
     })();
-  }, [props]);
+  }, [props]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper function to format file size
   const formatFileSize = (bytes: number): string => {
@@ -455,6 +454,27 @@ export const Files = (props: IFilesProps) => {
   ) => {
     await navigateToFolder(targetFolderId, targetFolderName);
   };
+
+  // Preview handlers
+  const handlePreviewNavigate = (file: IDriveItemExtended) => {
+    setCurrentPreviewFile(file);
+  };
+
+  const handlePreviewDownload = (downloadUrl: string) => {
+    onDownloadItemClick(downloadUrl);
+  };
+
+  const handlePreviewDelete = async () => {
+    if (currentPreviewFile) {
+      // Set the selected row to the current preview file for deletion
+      setSelectedRows(new Set([currentPreviewFile.id as string]));
+      await onDeleteItemClick();
+      setPreviewOpen(false);
+    }
+  };
+
+  // Get only non-folder files for preview navigation
+  const previewableFiles = driveItems.filter((item) => !item.isFolder);
   // BOOKMARK 2 - handlers go here
   const columns: TableColumnDefinition<IDriveItemExtended>[] = [
     createTableColumn({
@@ -466,7 +486,12 @@ export const Files = (props: IFilesProps) => {
         return (
           <TableCellLayout media={driveItem.iconElement}>
             {!driveItem.isFolder ? (
-              <Link href={driveItem!.webUrl!} target="_blank">
+              <Link
+                onClick={() => {
+                  setCurrentPreviewFile(driveItem);
+                  setPreviewOpen(true);
+                }}
+              >
                 {driveItem.name}
               </Link>
             ) : (
@@ -572,12 +597,16 @@ export const Files = (props: IFilesProps) => {
         onChange={onUploadFolderSelected}
         style={{ display: "none" }}
       />
+      {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
       <a
         ref={downloadLinkRef}
-        href=""
+        href="#"
         target="_blank"
         style={{ display: "none" }}
-      />
+        aria-label="Download link"
+      >
+        Download
+      </a>
 
       {/* Breadcrumb Navigation */}
       <div className={styles.breadcrumbContainer}>
@@ -757,6 +786,18 @@ export const Files = (props: IFilesProps) => {
           )}
         </DataGridBody>
       </DataGrid>
+
+      {/* Preview Dialog */}
+      <Preview
+        isOpen={previewOpen}
+        onDismiss={() => setPreviewOpen(false)}
+        currentFile={currentPreviewFile}
+        allFiles={previewableFiles}
+        onNavigate={handlePreviewNavigate}
+        onDownload={handlePreviewDownload}
+        onDelete={handlePreviewDelete}
+        containerId={props.container.id}
+      />
     </div>
   );
 };
