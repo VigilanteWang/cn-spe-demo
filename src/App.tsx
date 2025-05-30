@@ -9,6 +9,7 @@ import {
   tokens,
   Button,
 } from "@fluentui/react-components";
+import { customTheme } from "./customTheme";
 import "./App.css";
 import Containers from "./components/containers";
 
@@ -22,11 +23,10 @@ const useStyles = makeStyles({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "1px 12px",
-    backgroundColor: tokens.colorBrandBackground,
+    padding: "1px 15px",
   },
   title: {
-    color: tokens.colorNeutralForegroundOnBrand,
+    color: tokens.colorBrandForeground1,
     margin: "15px 0",
   },
 });
@@ -91,7 +91,7 @@ function App() {
   //     });
   // }
   return (
-    <FluentProvider theme={webLightTheme}>
+    <FluentProvider theme={customTheme}>
       <div className={styles.appContainer}>
         <div className={styles.topBanner}>
           <Text size={600} weight="bold" className={styles.title}>
