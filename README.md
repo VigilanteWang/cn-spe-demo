@@ -34,3 +34,9 @@
 - `.env`：后端环境变量，包含 API 认证相关配置（clientId、clientSecret、authority、containerTypeId）。
 - `package.json`：依赖和脚本配置。
 - `tsconfig.json`、`server/tsconfig.json`：TypeScript 配置。
+
+## SharePoint Embedded 概念指南
+
+如果你想快速了解 SharePoint Embedded 的核心概念（架构、权限、计费、实施路径等），请参阅：
+
+👉 [SharePoint Embedded 核心概念指南](docs/spe/sharepoint-embedded-guide.md)
