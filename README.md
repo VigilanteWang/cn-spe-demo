@@ -14,6 +14,7 @@
 ## 主要文件说明
 
 ### 后端（server/）
+
 - `auth.ts`：实现 OBO 流程，使用前端传来的 access token 换取 Microsoft Graph 的访问令牌。
 - `createContainer.ts`：实现创建 SPE 容器的 API 逻辑。
 - `listContainers.ts`：实现查询 SPE 容器列表的 API 逻辑。
@@ -21,6 +22,7 @@
 - `common/scopes.ts`：后端用到的 Microsoft Graph 权限定义。
 
 ### 前端（src/）
+
 - `App.tsx`：主页面组件，负责登录、认证状态判断、主内容渲染。
 - `index.tsx`：应用入口，初始化 MGT Provider，配置认证参数。
 - `components/containers.tsx`：容器管理组件，负责容器的列表、选择、新建。
@@ -31,6 +33,7 @@
 - `common/IContainer.ts`：容器对象接口定义。
 
 ### 配置文件
+
 - `.env`：后端环境变量，包含 API 认证相关配置（clientId、clientSecret、authority、containerTypeId）。
 - `package.json`：依赖和脚本配置。
 - `tsconfig.json`、`server/tsconfig.json`：TypeScript 配置。
