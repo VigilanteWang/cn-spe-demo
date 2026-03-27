@@ -28,10 +28,10 @@
 
 类比理解：
 
-| 传统 SharePoint                                                                  | SharePoint Embedded                                                                                                          |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 你在 SharePoint 站点里创建"文档库（Document Library）"，用户通过站点 UI 访问文件 | 你的 App 通过 Microsoft Graph（微软统一 API 网关）创建"File Storage Container（文件存储容器）"，用户通过你的 App UI 访问文件 |
-| 文件和站点都在同一租户内，由 SharePoint 管理员统一管理                           | 文件仍在客户的 M365 租户内，但存放在一个独立分区（Partition），与 SharePoint 站点存储互不影响                                |
+| 传统 SharePoint                                                                  | SharePoint Embedded                                                                           |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 你在 SharePoint 站点里创建"文档库（Document Library）"，用户通过站点 UI 访问文件 | 你的 App 通过 Microsoft Graph 创建 "Container（容器）"，用户通过你的 App UI 访问文件          |
+| 文件和站点都在同一租户内，由 SharePoint 管理员统一管理                           | 文件仍在客户的 M365 租户内，但存放在一个独立分区（Partition），与 SharePoint 站点存储互不影响 |
 
 > **关键点：** SPE 中的文档始终驻留在客户（消费方）的 M365 租户，开发者的 App 只负责"读写"而非"持有"数据。
 
@@ -58,9 +58,9 @@ Owning Tenant（开发租户）
 
 ### 核心对象速解
 
-- **Container（容器）**：SPE 最基本的存储单元，也是安全与合规的边界。可以类比为一个"仅通过 API 访问的SharePoint Document Library"。每个 Container 可以独立设置成员权限，存储多层级文件和文件夹。
+- **Container（容器）**：SPE 最基本的存储单元，也是安全与合规的边界。可以类比为一个"仅通过 API 访问的 Document Library"。每个 Container 可以独立设置成员权限，存储多层级文件和文件夹。
 
-- **Container Type（容器类型）**：Container 的统一配置模板——它对同类型的所有 Container 实例定义三个核心配置：
+- **Container Type（容器类型）**：Container 的配置模板——它对同类型的所有 Container 实例定义三个核心配置：
 
   - **访问授权**：规定哪些 App 可以访问该类型的 Container。每个 Container 实例都携带一个不可变的 `ContainerTypeID` 属性，用于在整个 SPE 识别其所属 Container Type。
 
@@ -69,9 +69,7 @@ Owning Tenant（开发租户）
 
   每个 Container Type 与一个 Owning Application 严格 **1:1 绑定**，且创建后类型（Trial / Standard / directToCustomer）**不可互转**。
 
-- **Application（应用）**：指在 **Azure AD 中 Application Registration（应用程序注册）**——它是代码在调用被AAD保护的资源，如 Graph API 时的**数字身份**，而非运行中的服务器代码本身。
-
-  - **身份实体**：Application Registration 持有 Client ID 与凭据（密码/证书）；当其被部署到任意租户时，会在该租户生成对应的**服务主体（Service Principal）**，实际的权限授予给该服务主体。
+- **Application（应用）**：分为 Owning Application 和 Guest Application 两种角色：
 
   - **Owning Application（拥有应用）**：与 Container Type **1:1 强绑定**，是其创建者和管理者，默认对该 Container Type 下所有 Container 拥有最高权限，并负责声明所需的 Graph 权限（如 `FileStorageContainer.Selected`）。
 
@@ -101,12 +99,19 @@ SPE 引入了两个关键租户角色：
 
 #### 场景示例
 
-> Contoso（ISV）开发了一款 ISV App，部署到 Fabrikam 的租户。Fabrikam 同时也自建了一个 Compliance App。两个 App 各自拥有独立的 Container Type，互不可见。Contoso 是 ISV App 的 Owning Tenant，Fabrikam 既是 ISV App 的 Consuming Tenant，也是 Compliance App 的 Owning + Consuming Tenant。
+> Contoso（ISV）开发了一款 ISV App，部署到 Fabrikam 的租户。Fabrikam 同时也自建了一个 LOB App。
+>
+> Contoso 是 ISV App 的 Owning Tenant，Fabrikam 既是 ISV App 的 Consuming Tenant，也是 LOB App 的 Owning + Consuming Tenant。
+>
+> 两个 App 各自创建 1:1 绑定的 Container Type，然后注册到 Consuming Tenant ( LOB Container Type 创建和注册在同一 Tenant )。
+>
+> Compliance App，一个不带 Container Type 的 Guest Application，被授权访问 LOB App 的 Container 来扫描文件合规状态。
 >
 > <img src="./img/SPEKeyComponents.jpg" alt="SPE Key Components" width="600" />
 
-- [SharePoint Embedded app architecture](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/app-architecture)
-- [Install your SPE application for customers](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/tutorials/vendor-install-app-customer)
+**Read more:**
+
+- [Register container type](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/getting-started/register-api-documentation)
 
 ---
 
@@ -114,9 +119,9 @@ SPE 引入了两个关键租户角色：
 
 SPE 的认证授权体系分为 **三层**，理解这三层之间的关系是避免权限问题的关键。
 
-### 第一层：Microsoft Graph 权限
+### 第一层：Microsoft Graph API 权限 (APP 权限1)
 
-App 需要在 Azure AD 注册中声明以下核心 Graph 权限：
+App 需要在 Azure AD App Registration 中声明以下核心 Graph API 权限：
 
 | 权限                                   | 用途                                    | 需要时机                          |
 | -------------------------------------- | --------------------------------------- | --------------------------------- |
@@ -126,9 +131,9 @@ App 需要在 Azure AD 注册中声明以下核心 Graph 权限：
 
 > **注意：** 创建 Container Type 后，应移除 `FileStorageContainerType.Manage.All`，避免客户对过度权限的担忧。
 
-### 第二层：Container Type Application Permission（ Container Type 级别权限）
+### 第二层：Container Type 权限 (APP 权限2)
 
-通过 Container Type Registration API（ Container Type 注册 API）配置，决定了 App 对某个 Container Type 下所有 Container 能做什么操作。常用权限如下：
+通过 Container Type Registration API 配置，决定了 App 对某个 Container Type 下所有 Container 能做什么操作。常用权限如下：
 
 | 权限                           | 说明                 |
 | ------------------------------ | -------------------- |
@@ -137,11 +142,11 @@ App 需要在 Azure AD 注册中声明以下核心 Graph 权限：
 | `ManagePermissions`            | 管理 Container 成员  |
 | `Full`                         | 拥有全部权限         |
 
-> Graph 权限 + Container Type 权限的 **组合** 才构成完整的 App 授权。
+> Graph API 权限 + Container Type 权限的 **交集** 才构成完整的 **App 权限**。
 
-### 第三层：Container Permission（容器实例级别权限/用户角色）
+### 第三层：Container 权限（用户权限）
 
-当 App 代表用户（Delegated/委托模式）访问 Container 时，用户必须是该 Container 的成员。成员权限通过角色授予：
+当 App 代表用户（Delegated/委托模式）访问 Container 时，用户必须是该 Container 的成员。可授予以下权限：
 
 | 角色        | 能力范围                                 |
 | ----------- | ---------------------------------------- |
@@ -155,7 +160,7 @@ App 需要在 Azure AD 注册中声明以下核心 Graph 权限：
 ### 两种访问模式
 
 - **Delegated（委托/用户代理）**：推荐方式。 App 代表登录用户操作，有效权限 = App 权限 ∩ 用户权限。可审计到具体用户。
-- **App-only（纯应用）**： App 使用 Client Credentials 直接操作，拥有 Container Type 级别的全部权限，不受用户角色限制。适合后台任务，但审计粒度较低。
+- **App-only（纯应用）**： App 使用 Service Principal 直接操作，不受 Container 权限限制。适合后台任务，但审计粒度较低。
 
 **Read more:**
 
@@ -171,9 +176,14 @@ App 需要在 Azure AD 注册中声明以下核心 Graph 权限：
 
 Container 内的内容默认继承父级权限（Container → Folder → File），这个继承链 **不可打破**。但可以通过 Additive Permission（附加权限）给特定文件或文件夹 **扩展** 访问范围。
 
-例如：UserA 是 Reader 角色（通常只能读），但可以通过 Additive Permission 获得对某个文档的编辑权限。
+> 经研究，这其实类似普通 SharePoint Library里，文件的 **Direct Access 权限** (如下图，用户会被添加到文件的访问列表中)，但区别在于，这个权限继承在 SPE 中是不会断开的
+>
+> <img src="./img/DirectAccessShare.jpg" alt="Direct Access" width="600" />
+>
+> <br/>
+> 其次，**没有**文档表示 SPE 支持 Shareable Link（匿名, 组织内, 或特定用户）
 
-> **限制：** 不能对 Container 根目录添加 Additive Permission（这相当于直接修改角色了），且只能通过 Delegated 模式设置。
+<br/>**限制：** 不能对 Container 根目录添加 Additive Permission（这相当于直接修改角色了），且只能通过 Delegated 模式设置。
 
 ### 共享模型
 
