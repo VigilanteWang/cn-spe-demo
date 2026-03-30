@@ -19,10 +19,17 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "storage", "fileStorage", "containers"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -66,10 +73,17 @@
                   "raw": "{\r\n    \"displayName\": \"My Container\",\r\n    \"description\": \"My container description.\",\r\n    \"containerTypeId\": \"{{ContainerTypeId}}\"\r\n}"
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "storage", "fileStorage", "containers"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers"
+                  ]
                 }
               },
               "response": []
@@ -93,11 +107,13 @@
                   "raw": ""
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -132,11 +148,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -153,11 +171,13 @@
                 "method": "POST",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/activate",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/activate",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -188,11 +208,13 @@
                   "raw": ""
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -235,11 +257,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -265,11 +289,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -302,11 +328,13 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -324,7 +352,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -333,11 +363,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -380,11 +412,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -401,7 +435,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -410,11 +446,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -447,11 +485,13 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -469,11 +509,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/customProperties",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -499,11 +541,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/customProperties",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -520,7 +564,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -538,11 +584,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -558,11 +606,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers"
@@ -607,11 +657,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/deletedContainers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers",
@@ -627,15 +679,485 @@
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
             },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
+            }
+          ]
+        },
+        {
+          "name": "Container Types",
+          "item": [
+            {
+              "name": "ContainerType",
+              "item": [
+                {
+                  "name": "List container types",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create container type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"name\": \"My Trial Container Type\",\r\n    \"owningAppId\": \"{{ClientID}}\",\r\n    \"billingClassification\": \"trial\",\r\n    \"settings\": {\r\n        \"isItemVersioningEnabled\": true,\r\n        \"isSharingRestricted\": false\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Get container type",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update container type",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"etag\": \"{{ContainerTypeEtag}}\",\r\n    \"settings\": {\r\n        \"isSearchEnabled\": true\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete container type",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "Registrations",
+              "item": [
+                {
+                  "name": "List container type registrations",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create container type registration",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"applicationPermissionGrants\": [\r\n        {\r\n            \"appId\": \"{{TargetAppId}}\",\r\n            \"delegatedPermissions\": [\"readContent\", \"writeContent\"],\r\n            \"applicationPermissions\": [\"full\"]\r\n        }\r\n    ]\r\n}"
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 201 || pm.response.code === 200) {\r",
+                          "    var json = pm.response.json();\r",
+                          "    if (json.id) { postman.setEnvironmentVariable(\"ContainerTypeRegistrationId\", json.id); }\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Get container type registration",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update container type registration",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"etag\": \"{{ContainerTypeRegistrationEtag}}\",\r\n    \"settings\": {\r\n        \"isSearchEnabled\": true\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete container type registration",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 204) {\r",
+                          "    pm.environment.unset(\"ContainerTypeRegistrationId\");\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "App Permission Grants",
+              "item": [
+                {
+                  "name": "List app permission grants",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create app permission grant",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"delegatedPermissions\": [\"readContent\", \"writeContent\"],\r\n    \"applicationPermissions\": [\"full\"]\r\n}"
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 201 || pm.response.code === 200) {\r",
+                          "    var json = pm.response.json();\r",
+                          "    if (json.appId) { postman.setEnvironmentVariable(\"TargetAppId\", json.appId); }\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Get app permission grant",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update app permission grant",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"delegatedPermissions\": [\"readContent\"],\r\n    \"applicationPermissions\": [\"read\"]\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete app permission grant",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
             }
           ]
         },
@@ -651,7 +1173,9 @@
                     {
                       "listen": "test",
                       "script": {
-                        "exec": [""],
+                        "exec": [
+                          ""
+                        ],
                         "type": "text/javascript",
                         "packages": {}
                       }
@@ -669,7 +1193,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -716,7 +1242,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/invite",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -763,7 +1291,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/createLink",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -817,7 +1347,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -860,7 +1392,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -917,8 +1451,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "drives", "{{ContainerId}}"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "drives",
+                    "{{ContainerId}}"
+                  ]
                 }
               },
               "response": []
@@ -965,7 +1505,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/root/children?$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1030,8 +1572,15 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items?$filter=startswith(listitem/fields/MyColumn, 'My Value')&$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "drives", "{{ContainerId}}", "items"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "drives",
+                    "{{ContainerId}}",
+                    "items"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -1077,7 +1626,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root:/{{file_name_with_extension}}:/content",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1096,7 +1647,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1108,7 +1661,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1126,7 +1681,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1147,7 +1704,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1182,7 +1741,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1202,7 +1763,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1233,7 +1796,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1253,7 +1818,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1265,7 +1832,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/thumbnails",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1284,7 +1853,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1296,7 +1867,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/versions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1315,7 +1888,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -1335,7 +1910,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/preview",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1383,7 +1960,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/children",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1401,7 +1980,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1413,7 +1994,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1431,7 +2014,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1452,7 +2037,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1470,7 +2057,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1488,7 +2077,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}/children",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1524,7 +2115,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1542,7 +2135,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1560,7 +2155,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/search(q='{contoso}')",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1595,8 +2192,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "search", "query"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "search",
+                    "query"
+                  ]
                 }
               },
               "response": []
@@ -1619,8 +2222,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "search", "query"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "search",
+                    "query"
+                  ]
                 }
               },
               "response": []
@@ -1642,7 +2251,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -1653,7 +2264,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1693,7 +2306,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1712,7 +2327,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1741,7 +2358,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1783,7 +2402,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1804,7 +2425,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1846,7 +2469,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/{{custodianId}}/userSources",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1867,7 +2492,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -1887,7 +2514,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/applyHold",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1909,7 +2538,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/{{custodianId}}/userSources",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1954,7 +2585,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -1984,7 +2617,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources/applyHold",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2006,7 +2641,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2053,7 +2690,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2080,7 +2719,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2099,7 +2740,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -2119,7 +2762,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches/{{ediscoverySearchId}}/estimateStatistics",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2148,7 +2793,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches/{{ediscoverySearchId}}/lastEstimateStatisticsOperation",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2192,7 +2839,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2219,7 +2868,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2238,7 +2889,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -2258,7 +2911,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/addToReviewSet",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2302,7 +2957,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2323,7 +2980,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -2343,7 +3002,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries/{{ediscoveryReviewSetQueryId}}",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2373,7 +3034,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2394,7 +3057,9 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [""],
+                            "exec": [
+                              ""
+                            ],
                             "type": "text/javascript"
                           }
                         }
@@ -2414,7 +3079,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries/{{ediscoveryReviewSetQueryId}}",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2444,7 +3111,9 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/operations",
                           "protocol": "https",
-                          "host": ["{{GraphHost}}"],
+                          "host": [
+                            "{{GraphHost}}"
+                          ],
                           "path": [
                             "v1.0",
                             "security",
@@ -2496,8 +3165,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ]
                 }
               },
               "response": []
@@ -2537,8 +3212,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Severity eq 'High'&$top=5",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -2588,8 +3269,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=vendorInformation/provider eq 'ASC'&$top=5",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -2639,8 +3326,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Category eq 'ransomware'&$top=5",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -2690,8 +3383,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=networkConnections/any(d:d/destinationAddress eq '{destination-address}')",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -2737,8 +3436,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Status eq 'NewAlert'&$top=1",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "alerts"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "alerts"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -2788,8 +3493,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/secureScores?$top=5",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "security", "secureScores"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "security",
+                    "secureScores"
+                  ],
                   "query": [
                     {
                       "key": "$top",
@@ -2835,8 +3546,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/secureScoreControlProfiles?$top=5",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "security", "secureScoreControlProfiles"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "security",
+                    "secureScoreControlProfiles"
+                  ],
                   "query": [
                     {
                       "key": "$top",
@@ -2887,8 +3604,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/tiIndicators",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "security", "tiIndicators"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "security",
+                    "tiIndicators"
+                  ]
                 }
               },
               "response": []
@@ -2928,7 +3651,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/tiIndicators/{{TIIndicatorId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "beta",
                     "security",
@@ -2979,8 +3704,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/securityActions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "security", "securityActions"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "security",
+                    "securityActions"
+                  ]
                 }
               },
               "response": []
@@ -3025,7 +3756,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/securityActions/{{SecurityActionsId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "beta",
                     "security",
@@ -3076,8 +3809,15 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/labels/retentionLabels",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "security", "labels", "retentionLabels"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "security",
+                    "labels",
+                    "retentionLabels"
+                  ]
                 }
               },
               "response": []
@@ -3165,14 +3905,18 @@
           "listen": "prerequest",
           "script": {
             "type": "text/javascript",
-            "exec": [""]
+            "exec": [
+              ""
+            ]
           }
         },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
-            "exec": [""]
+            "exec": [
+              ""
+            ]
           }
         }
       ]
@@ -3235,7 +3979,9 @@
                 },
                 "url": {
                   "raw": "{{RootSiteUrl}}/_api/v2.1/storageContainerTypes/{{ContainerTypeId}}/applicationPermissions",
-                  "host": ["{{RootSiteUrl}}"],
+                  "host": [
+                    "{{RootSiteUrl}}"
+                  ],
                   "path": [
                     "_api",
                     "v2.1",
@@ -3253,10 +3999,17 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "storage", "fileStorage", "containers"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -3300,10 +4053,17 @@
                   "raw": "{\r\n    \"displayName\": \"My Container\",\r\n    \"description\": \"My container description.\",\r\n    \"containerTypeId\": \"{{ContainerTypeId}}\"\r\n}"
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "storage", "fileStorage", "containers"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers"
+                  ]
                 }
               },
               "response": []
@@ -3327,11 +4087,13 @@
                   "raw": ""
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3366,11 +4128,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3387,11 +4151,13 @@
                 "method": "POST",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/activate",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/activate",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3422,11 +4188,13 @@
                   "raw": ""
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3469,11 +4237,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3499,11 +4269,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3536,11 +4308,13 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3558,7 +4332,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -3567,11 +4343,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3614,11 +4392,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3635,7 +4415,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -3644,11 +4426,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3681,11 +4465,13 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3703,11 +4489,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/customProperties",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3733,11 +4521,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}/customProperties",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3754,7 +4544,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -3772,11 +4564,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/containers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "containers",
@@ -3792,11 +4586,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers"
@@ -3841,11 +4637,13 @@
                   }
                 },
                 "url": {
-                  "raw": "{{GraphBaseUrl}}/beta/storage/fileStorage/deletedContainers/{{ContainerId}}",
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
-                    "beta",
+                    "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers",
@@ -3861,15 +4659,485 @@
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
             },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
+            }
+          ]
+        },
+        {
+          "name": "Container Types",
+          "item": [
+            {
+              "name": "ContainerType",
+              "item": [
+                {
+                  "name": "List container types",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create container type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"name\": \"My Trial Container Type\",\r\n    \"owningAppId\": \"{{ClientID}}\",\r\n    \"billingClassification\": \"trial\",\r\n    \"settings\": {\r\n        \"isItemVersioningEnabled\": true,\r\n        \"isSharingRestricted\": false\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Get container type",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update container type",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"etag\": \"{{ContainerTypeEtag}}\",\r\n    \"settings\": {\r\n        \"isSearchEnabled\": true\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete container type",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypes",
+                        "{{ContainerTypeId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "Registrations",
+              "item": [
+                {
+                  "name": "List container type registrations",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create container type registration",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"applicationPermissionGrants\": [\r\n        {\r\n            \"appId\": \"{{TargetAppId}}\",\r\n            \"delegatedPermissions\": [\"readContent\", \"writeContent\"],\r\n            \"applicationPermissions\": [\"full\"]\r\n        }\r\n    ]\r\n}"
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 201 || pm.response.code === 200) {\r",
+                          "    var json = pm.response.json();\r",
+                          "    if (json.id) { postman.setEnvironmentVariable(\"ContainerTypeRegistrationId\", json.id); }\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Get container type registration",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update container type registration",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"etag\": \"{{ContainerTypeRegistrationEtag}}\",\r\n    \"settings\": {\r\n        \"isSearchEnabled\": true\r\n    }\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete container type registration",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}"
+                      ]
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 204) {\r",
+                          "    pm.environment.unset(\"ContainerTypeRegistrationId\");\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "App Permission Grants",
+              "item": [
+                {
+                  "name": "List app permission grants",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create app permission grant",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"delegatedPermissions\": [\"readContent\", \"writeContent\"],\r\n    \"applicationPermissions\": [\"full\"]\r\n}"
+                    }
+                  },
+                  "response": [],
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "\r",
+                          "if (pm.response.code === 201 || pm.response.code === 200) {\r",
+                          "    var json = pm.response.json();\r",
+                          "    if (json.appId) { postman.setEnvironmentVariable(\"TargetAppId\", json.appId); }\r",
+                          "}\r",
+                          ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Get app permission grant",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update app permission grant",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"delegatedPermissions\": [\"readContent\"],\r\n    \"applicationPermissions\": [\"read\"]\r\n}"
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete app permission grant",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
+                      "protocol": "https",
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
+                      "path": [
+                        "v1.0",
+                        "storage",
+                        "fileStorage",
+                        "containerTypeRegistrations",
+                        "{{ContainerTypeRegistrationId}}",
+                        "applicationPermissionGrants",
+                        "{{TargetAppId}}"
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
             }
           ]
         },
@@ -3885,7 +5153,9 @@
                     {
                       "listen": "test",
                       "script": {
-                        "exec": [""],
+                        "exec": [
+                          ""
+                        ],
                         "type": "text/javascript",
                         "packages": {}
                       }
@@ -3903,7 +5173,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -3950,7 +5222,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/invite",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -3997,7 +5271,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/createLink",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -4051,7 +5327,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -4094,7 +5372,9 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": ["{{GraphHost}}"],
+                      "host": [
+                        "{{GraphHost}}"
+                      ],
                       "path": [
                         "v1.0",
                         "drives",
@@ -4151,8 +5431,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "drives", "{{ContainerId}}"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "drives",
+                    "{{ContainerId}}"
+                  ]
                 }
               },
               "response": []
@@ -4199,7 +5485,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/root/children?$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4264,8 +5552,15 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items?$filter=startswith(listitem/fields/MyColumn, 'My Value')&$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["v1.0", "drives", "{{ContainerId}}", "items"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "v1.0",
+                    "drives",
+                    "{{ContainerId}}",
+                    "items"
+                  ],
                   "query": [
                     {
                       "key": "$filter",
@@ -4311,7 +5606,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root:/{{file_name_with_extension}}:/content",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4330,7 +5627,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4342,7 +5641,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4360,7 +5661,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4381,7 +5684,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4416,7 +5721,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4436,7 +5743,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4467,7 +5776,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4487,7 +5798,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4499,7 +5812,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/thumbnails",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4518,7 +5833,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4530,7 +5847,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/versions",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4549,7 +5868,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript"
                   }
                 }
@@ -4569,7 +5890,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/preview",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4617,7 +5940,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/children",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4635,7 +5960,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4647,7 +5974,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4665,7 +5994,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4686,7 +6017,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4704,7 +6037,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4722,7 +6057,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}/children",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4758,7 +6095,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4776,7 +6115,9 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [""],
+                    "exec": [
+                      ""
+                    ],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -4794,7 +6135,9 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/search(q='{contoso}')",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
                   "path": [
                     "v1.0",
                     "drives",
@@ -4829,8 +6172,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "search", "query"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "search",
+                    "query"
+                  ]
                 }
               },
               "response": []
@@ -4853,8 +6202,14 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": ["{{GraphHost}}"],
-                  "path": ["beta", "search", "query"]
+                  "host": [
+                    "{{GraphHost}}"
+                  ],
+                  "path": [
+                    "beta",
+                    "search",
+                    "query"
+                  ]
                 }
               },
               "response": []
@@ -5122,7 +6477,9 @@
           "listen": "test",
           "script": {
             "type": "text/javascript",
-            "exec": [""]
+            "exec": [
+              ""
+            ]
           }
         }
       ]
@@ -5189,7 +6546,9 @@
       "listen": "test",
       "script": {
         "type": "text/javascript",
-        "exec": [""]
+        "exec": [
+          ""
+        ]
       }
     }
   ],
