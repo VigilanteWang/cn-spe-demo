@@ -13,7 +13,7 @@ const msalConfig: MSAL.Configuration = {
   system: {
     loggerOptions: {
       loggerCallback(loglevel: any, message: any, containsPii: any) {
-        //console.log(message);
+        console.log(message);
       },
       piiLoggingEnabled: false,
       logLevel: MSAL.LogLevel.Verbose,
@@ -33,7 +33,7 @@ export const createContainer = async (req: Request, res: Response) => {
 
   const [graphSuccess, graphTokenRequest] = await getGraphToken(
     confidentialClient,
-    token
+    token,
   );
 
   if (!graphSuccess) {

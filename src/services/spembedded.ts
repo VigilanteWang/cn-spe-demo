@@ -11,7 +11,7 @@ export default class SpEmbedded {
       try {
         const accessToken = await provider.getAccessToken({
           scopes: [
-            `api://${Constants.CLIENT_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
+            `api://${Constants.API_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
           ],
         });
         console.log(`Reusing token: ${accessToken}`);

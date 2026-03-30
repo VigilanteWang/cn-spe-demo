@@ -115,7 +115,7 @@ export default App;
 
 <Login /> 组件会自动检测 Providers.globalProvider 的状态（你在 index.tsx 里设置的 Msal2Provider）。
 当用户点击登录时，<Login /> 会调用 Providers.globalProvider.login()，实际就是 Msal2Provider 的登录方法。
-Msal2Provider 内部使用 @azure/msal-browser 的 PublicClientApplication 实例，但这个实例是由 Msal2Provider 自己管理的，不是你在 App.tsx 里 new 的那个。
+Msal2Provider 内部使用 @azure/msal-browser 的 PublicClientApplication 实例，但这个实例是由 Msal2Provider 自己管理的，不是你在 App.tsx 里 new 的那个(上方被comment掉的代码)。
 你在 index.tsx 里配置的 clientId、authority、scopes 等参数，会传递给 Msal2Provider，进而用于初始化它内部的 msalInstance。
  */
 

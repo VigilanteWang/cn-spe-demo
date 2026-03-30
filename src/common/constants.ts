@@ -1,6 +1,7 @@
 export const CLIENT_ENTRA_APP_CLIENT_ID =
   "a036da11-eb22-4436-99fb-94efa1861999";
 
+export const API_ENTRA_APP_CLIENT_ID = "23cde6e4-7c2b-4201-a46a-c62e01194b4b";
 // Add your tenant ID here - replace with your actual tenant ID
 export const CLIENT_ENTRA_APP_TENANT_ID =
   "9517aa17-4352-4384-a035-49eb9d1bc46b";
