@@ -62,7 +62,7 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
         return;
     }
     const [bearer, token] = (req.headers.authorization || "").split(" ");
-    const [graphSuccess, graphTokenRequest] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
+    const [graphSuccess, graphTokenRequest] = yield (0, auth_1.getGraphToken)(confidentialClient, token, config_1.serverConfig.graphBaseUrl);
     if (!graphSuccess) {
         res.send(200, graphTokenRequest);
         return;
@@ -74,6 +74,8 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
         const graphClient = MSGraph.Client.init({
             authProvider: authProvider,
             defaultVersion: "beta",
+            baseUrl: config_1.serverConfig.graphBaseUrl,
+            customHosts: new Set([new URL(config_1.serverConfig.graphBaseUrl).hostname]),
         });
         const containerRequestData = {
             displayName: req.body.displayName,

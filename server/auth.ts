@@ -1,22 +1,19 @@
 import { ConfidentialClientApplication } from "@azure/msal-node";
 require("isomorphic-fetch");
-import * as Scopes from "./common/scopes";
 
 export const getGraphToken = async (
   confidentialClient: ConfidentialClientApplication,
-  token: string
+  token: string,
+  graphBaseUrl: string,
 ): Promise<[boolean, string | any]> => {
   try {
     const graphTokenRequest = {
       oboAssertion: token,
-      scopes: [
-        Scopes.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
-      ],
+      scopes: [`${graphBaseUrl}/FileStorageContainer.Selected`],
     };
     const oboGraphToken = (await confidentialClient.acquireTokenOnBehalfOf(
-      graphTokenRequest
+      graphTokenRequest,
     ))!.accessToken;
-    //console.log('oboGraphToken:', oboGraphToken); // 调试输出
 
     return [true, oboGraphToken];
   } catch (error: any) {

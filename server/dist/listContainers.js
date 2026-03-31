@@ -61,7 +61,7 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
         return;
     }
     const [bearer, token] = (req.headers.authorization || "").split(" ");
-    const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
+    const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token, config_1.serverConfig.graphBaseUrl);
     if (!graphSuccess) {
         res.send(200, oboGraphToken);
         return;
@@ -73,6 +73,8 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
         const graphClient = MSGraph.Client.init({
             authProvider: authProvider,
             defaultVersion: "beta",
+            baseUrl: config_1.serverConfig.graphBaseUrl,
+            customHosts: new Set([new URL(config_1.serverConfig.graphBaseUrl).hostname]),
         });
         const graphResponse = yield graphClient
             .api(`storage/fileStorage/containers?$filter=containerTypeId eq ${config_1.serverConfig.containerTypeId}`)

@@ -35,6 +35,7 @@ export const createContainer = async (req: Request, res: Response) => {
   const [graphSuccess, graphTokenRequest] = await getGraphToken(
     confidentialClient,
     token,
+    serverConfig.graphBaseUrl,
   );
 
   if (!graphSuccess) {
@@ -50,6 +51,8 @@ export const createContainer = async (req: Request, res: Response) => {
     const graphClient = MSGraph.Client.init({
       authProvider: authProvider,
       defaultVersion: "beta",
+      baseUrl: serverConfig.graphBaseUrl,
+      customHosts: new Set([new URL(serverConfig.graphBaseUrl).hostname]),
     });
 
     const containerRequestData = {
