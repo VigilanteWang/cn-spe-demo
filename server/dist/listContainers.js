@@ -34,14 +34,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listContainers = void 0;
 const MSAL = __importStar(require("@azure/msal-node"));
-require('isomorphic-fetch');
+require("isomorphic-fetch");
 const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
 const auth_1 = require("./auth");
+const config_1 = require("./config");
 const msalConfig = {
     auth: {
-        clientId: process.env['API_ENTRA_APP_CLIENT_ID'],
-        authority: process.env['API_ENTRA_APP_AUTHORITY'],
-        clientSecret: process.env['API_ENTRA_APP_CLIENT_SECRET']
+        clientId: config_1.serverConfig.clientId,
+        authority: config_1.serverConfig.authority,
+        clientSecret: config_1.serverConfig.clientSecret,
     },
     system: {
         loggerOptions: {
@@ -50,16 +51,16 @@ const msalConfig = {
             },
             piiLoggingEnabled: false,
             logLevel: MSAL.LogLevel.Verbose,
-        }
-    }
+        },
+    },
 };
 const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
 const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     if (!req.headers.authorization) {
-        res.send(401, { message: 'No access token provided.' });
+        res.send(401, { message: "No access token provided." });
         return;
     }
-    const [bearer, token] = (req.headers.authorization || '').split(' ');
+    const [bearer, token] = (req.headers.authorization || "").split(" ");
     const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
     if (!graphSuccess) {
         res.send(200, oboGraphToken);
@@ -71,9 +72,11 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         const graphClient = MSGraph.Client.init({
             authProvider: authProvider,
-            defaultVersion: 'beta'
+            defaultVersion: "beta",
         });
-        const graphResponse = yield graphClient.api(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`).get();
+        const graphResponse = yield graphClient
+            .api(`storage/fileStorage/containers?$filter=containerTypeId eq ${config_1.serverConfig.containerTypeId}`)
+            .get();
         res.send(200, graphResponse);
         return;
     }

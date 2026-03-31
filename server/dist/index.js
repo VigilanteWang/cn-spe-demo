@@ -33,6 +33,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const restify = __importStar(require("restify"));
+require("./config");
 const listContainers_1 = require("./listContainers");
 const createContainer_1 = require("./createContainer");
 const server = restify.createServer();
@@ -42,15 +43,15 @@ server.listen(process.env.port || process.env.PORT || 3001, () => {
 });
 // add CORS support
 server.pre((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.header('origin'));
-    res.header('Access-Control-Allow-Headers', req.header('Access-Control-Request-Headers'));
-    res.header('Access-Control-Allow-Credentials', 'true');
-    if (req.method === 'OPTIONS') {
+    res.header("Access-Control-Allow-Origin", req.header("origin"));
+    res.header("Access-Control-Allow-Headers", req.header("Access-Control-Request-Headers"));
+    res.header("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") {
         return res.send(204);
     }
     next();
 });
-server.get('/api/listContainers', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+server.get("/api/listContainers", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const response = yield (0, listContainers_1.listContainers)(req, res);
         res.send(200, response);
@@ -60,7 +61,7 @@ server.get('/api/listContainers', (req, res, next) => __awaiter(void 0, void 0, 
     }
     next();
 }));
-server.post('/api/createContainer', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+server.post("/api/createContainer", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const response = yield (0, createContainer_1.createContainer)(req, res);
         res.send(200, response);

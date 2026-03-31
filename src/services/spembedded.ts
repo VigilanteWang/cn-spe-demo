@@ -1,5 +1,5 @@
 import { Providers, ProviderState } from "@microsoft/mgt-element";
-import * as Constants from "./../common/constants";
+import { clientConfig } from "./../common/config";
 import * as Scopes from "./../common/scopes";
 import { IContainer } from "../common/types";
 
@@ -11,7 +11,7 @@ export default class SpEmbedded {
       try {
         const accessToken = await provider.getAccessToken({
           scopes: [
-            `api://${Constants.API_ENTRA_APP_CLIENT_ID}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
+            `api://${clientConfig.apiEntraAppClientId}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
           ],
         });
         console.log(`Reusing token: ${accessToken}`);
@@ -27,7 +27,7 @@ export default class SpEmbedded {
   }
 
   async listContainers(): Promise<IContainer[] | undefined> {
-    const api_endpoint = `${Constants.API_SERVER_URL}/api/listContainers`;
+    const api_endpoint = `${clientConfig.apiServerUrl}/api/listContainers`;
 
     if (Providers.globalProvider.state === ProviderState.SignedIn) {
       const token = await this.getApiAccessToken();
@@ -57,7 +57,7 @@ export default class SpEmbedded {
     containerName: string,
     containerDescription: string = "",
   ): Promise<IContainer | undefined> {
-    const api_endpoint = `${Constants.API_SERVER_URL}/api/createContainer`;
+    const api_endpoint = `${clientConfig.apiServerUrl}/api/createContainer`;
 
     if (Providers.globalProvider.state === ProviderState.SignedIn) {
       const token = await this.getApiAccessToken();

@@ -3,12 +3,13 @@ import * as MSAL from "@azure/msal-node";
 require("isomorphic-fetch");
 import * as MSGraph from "@microsoft/microsoft-graph-client";
 import { getGraphToken } from "./auth";
+import { serverConfig } from "./config";
 
 const msalConfig: MSAL.Configuration = {
   auth: {
-    clientId: process.env["API_ENTRA_APP_CLIENT_ID"]!,
-    authority: process.env["API_ENTRA_APP_AUTHORITY"]!,
-    clientSecret: process.env["API_ENTRA_APP_CLIENT_SECRET"]!,
+    clientId: serverConfig.clientId,
+    authority: serverConfig.authority,
+    clientSecret: serverConfig.clientSecret,
   },
   system: {
     loggerOptions: {
@@ -54,7 +55,7 @@ export const createContainer = async (req: Request, res: Response) => {
     const containerRequestData = {
       displayName: req.body!.displayName,
       description: req.body?.description ? req.body.description : "",
-      containerTypeId: process.env["CONTAINER_TYPE_ID"],
+      containerTypeId: serverConfig.containerTypeId,
     };
 
     const graphResponse = await graphClient

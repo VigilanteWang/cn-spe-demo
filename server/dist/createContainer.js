@@ -37,11 +37,12 @@ const MSAL = __importStar(require("@azure/msal-node"));
 require("isomorphic-fetch");
 const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
 const auth_1 = require("./auth");
+const config_1 = require("./config");
 const msalConfig = {
     auth: {
-        clientId: process.env["API_ENTRA_APP_CLIENT_ID"],
-        authority: process.env["API_ENTRA_APP_AUTHORITY"],
-        clientSecret: process.env["API_ENTRA_APP_CLIENT_SECRET"],
+        clientId: config_1.serverConfig.clientId,
+        authority: config_1.serverConfig.authority,
+        clientSecret: config_1.serverConfig.clientSecret,
     },
     system: {
         loggerOptions: {
@@ -77,7 +78,7 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
         const containerRequestData = {
             displayName: req.body.displayName,
             description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : "",
-            containerTypeId: process.env["CONTAINER_TYPE_ID"],
+            containerTypeId: config_1.serverConfig.containerTypeId,
         };
         const graphResponse = yield graphClient
             .api(`storage/fileStorage/containers`)

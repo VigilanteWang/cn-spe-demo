@@ -14,6 +14,7 @@
 ## 主要文件说明
 
 ### 后端（server/）
+
 - `auth.ts`：实现 OBO 流程，使用前端传来的 access token 换取 Microsoft Graph 的访问令牌。
 - `createContainer.ts`：实现创建 SPE 容器的 API 逻辑。
 - `listContainers.ts`：实现查询 SPE 容器列表的 API 逻辑。
@@ -21,6 +22,7 @@
 - `common/scopes.ts`：后端用到的 Microsoft Graph 权限定义。
 
 ### 前端（src/）
+
 - `App.tsx`：主页面组件，负责登录、认证状态判断、主内容渲染。
 - `index.tsx`：应用入口，初始化 MGT Provider，配置认证参数。
 - `components/containers.tsx`：容器管理组件，负责容器的列表、选择、新建。
@@ -31,6 +33,10 @@
 - `common/IContainer.ts`：容器对象接口定义。
 
 ### 配置文件
-- `.env`：后端环境变量，包含 API 认证相关配置（clientId、clientSecret、authority、containerTypeId）。
+
+- `.env`：**本地配置文件，不提交到 Git**。复制 `.env.example` 为 `.env` 并填入真实值。包含后端私有配置（clientId、clientSecret、authority、containerTypeId）及前端 `REACT_APP_*` 变量。
+- `.env.example`：配置模板，仅含占位符，无真实密钥，可安全提交到 Git。
 - `package.json`：依赖和脚本配置。
 - `tsconfig.json`、`server/tsconfig.json`：TypeScript 配置。
+
+> **注意**：`REACT_APP_*` 前缀的变量由 `react-scripts` 在构建时打包进浏览器 bundle，**对最终用户可见**，切勿将 secret 或敏感信息放入这些变量。后端私有配置（`API_ENTRA_APP_CLIENT_SECRET` 等）仅在服务端进程中读取，不会打包进前端。
