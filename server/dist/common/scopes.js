@@ -12,3 +12,4 @@ exports.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED = exports.SPEMBEDDED_CONTAINER_
 // SharePoint Embedded scopes
 exports.SPEMBEDDED_CONTAINER_MANAGE = "Container.Manage";
 exports.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED = "FileStorageContainer.Selected";
+//# sourceMappingURL=scopes.js.map

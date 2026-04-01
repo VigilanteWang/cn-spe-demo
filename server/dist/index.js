@@ -108,3 +108,4 @@ server.post("/api/createContainer", (req, res, next) => __awaiter(void 0, void 0
     }
     next();
 }));
+//# sourceMappingURL=index.js.map

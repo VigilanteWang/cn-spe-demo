@@ -34,9 +34,35 @@
 
 ### 配置文件
 
-- `.env`：**本地配置文件，不提交到 Git**。复制 `.env.example` 为 `.env` 并填入真实值。包含后端私有配置（clientId、clientSecret、authority、containerTypeId）及前端 `REACT_APP_*` 变量。
-- `.env.example`：配置模板，仅含占位符，无真实密钥，可安全提交到 Git。
+- `.env.development.local`：**开发环境本地配置文件，不提交到 Git**。复制 `.env.development.local.example` 后填入真实值。
+- `.env.production.local`：**本地模拟生产配置文件，不提交到 Git**。复制 `.env.production.local.example` 后填入真实值。
+- `.env.example`：通用变量模板，仅含占位符，无真实密钥，可安全提交到 Git。
+- `.env.development.local.example`：开发环境模板。
+- `.env.production.local.example`：本地生产环境模板。
 - `package.json`：依赖和脚本配置。
 - `tsconfig.json`、`server/tsconfig.json`：TypeScript 配置。
 
 > **注意**：`REACT_APP_*` 前缀的变量由 `react-scripts` 在构建时打包进浏览器 bundle，**对最终用户可见**，切勿将 secret 或敏感信息放入这些变量。后端私有配置（`API_ENTRA_APP_CLIENT_SECRET` 等）仅在服务端进程中读取，不会打包进前端。
+
+## 运行与调试
+
+### 环境准备
+
+1. 复制 `.env.development.local.example` 为 `.env.development.local` 并填写开发环境参数。
+2. 复制 `.env.production.local.example` 为 `.env.production.local` 并填写本地模拟生产参数。
+
+### npm 命令
+
+- `npm run dev`：开发模式并行启动前后端。
+- `npm run dev:frontend`：仅启动前端开发服务器（CRA）。
+- `npm run dev:backend`：仅启动后端（`nodemon + ts-node`，读取 `.env.development.local`）。
+- `npm run start:prod`：本地模拟生产模式（先构建前后端，再以 production 启动后端，读取 `.env.production.local`）。
+
+### VS Code 调试入口
+
+项目已提供 `.vscode/launch.json` 与 `.vscode/tasks.json`：
+
+- `Run Dev`：复合调试配置，一次启动前端 Chrome 调试和后端 Node 附加调试。
+- `Start Prod (Local)`：在 VS Code 内执行本地模拟生产启动链路。
+
+如果首次运行 `Run Dev` 较慢，请等待前端编译完成并看到后端 `Debugger listening on` 日志后再访问页面。

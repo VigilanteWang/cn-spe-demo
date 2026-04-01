@@ -41,3 +41,4 @@ exports.serverConfig = {
     graphBaseUrl: (_c = process.env.GRAPH_BASE_URL) !== null && _c !== void 0 ? _c : cloudEndpoints.graphBaseUrl,
     cloudEnv,
 };
+//# sourceMappingURL=config.js.map

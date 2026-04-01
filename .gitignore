@@ -20,6 +20,8 @@
 .env.test.local
 .env.production.local
 !.env.example
+!.env.development.local.example
+!.env.production.local.example
 
 npm-debug.log*
 yarn-debug.log*
