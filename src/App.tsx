@@ -4,13 +4,10 @@ import { Login } from "@microsoft/mgt-react";
 import {
   FluentProvider,
   Text,
-  webLightTheme,
   makeStyles,
   tokens,
-  Button,
 } from "@fluentui/react-components";
 import { customTheme } from "./customTheme";
-import "./App.css";
 import Containers from "./components/containers";
 
 const useStyles = makeStyles({
@@ -97,7 +94,7 @@ function App() {
           <Text size={600} weight="bold" className={styles.title}>
             SharePoint Embedded Demo App
           </Text>
-          <Login />
+          <Login loginView="compact" />
         </div>
         {isSignedIn && <Containers />}
       </div>
