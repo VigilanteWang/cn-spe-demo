@@ -12,6 +12,9 @@ import {
   HomeRegular,
   CheckmarkRegular,
   FolderAddRegular,
+  ArrowDownloadRegular,
+  HistoryRegular,
+  PeopleRegular,
 } from "@fluentui/react-icons";
 import {
   Button,
@@ -55,7 +58,10 @@ import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IContainer } from "../common/types";
 import Preview from "./preview";
 import { IDriveItemExtended } from "../common/types";
+import SpEmbedded, { IJobProgress } from "../services/spembedded";
 require("isomorphic-fetch");
+
+const spEmbedded = new SpEmbedded();
 
 interface IFilesProps {
   container: IContainer;
@@ -73,6 +79,13 @@ interface IUploadProgress {
   totalFiles: number;
   fileSize: string;
   isCompleted: boolean;
+}
+
+interface IDownloadProgress {
+  isActive: boolean; // polling in progress
+  jobProgress: IJobProgress | null;
+  isCompleted: boolean;
+  errorMessage: string;
 }
 const useStyles = makeStyles({
   dialogInputControl: {
@@ -109,9 +122,10 @@ const useStyles = makeStyles({
 export const Files = (props: IFilesProps) => {
   const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
   const [selectedRows, setSelectedRows] = useState<Set<SelectionItemId>>(
-    new Set<TableRowId>([1]),
+    new Set<TableRowId>(),
   );
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
+  const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // for creating new folders
   const [folderId, setFolderId] = useState<string>("root");
   const [folderName, setFolderName] = useState<string>("");
@@ -130,6 +144,13 @@ export const Files = (props: IFilesProps) => {
     totalFiles: 0,
     fileSize: "",
     isCompleted: false,
+  });
+  // Download progress state (for ZIP jobs)
+  const [downloadProgress, setDownloadProgress] = useState<IDownloadProgress>({
+    isActive: false,
+    jobProgress: null,
+    isCompleted: false,
+    errorMessage: "",
   });
   // for breadcrumb navigation
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
@@ -218,6 +239,150 @@ export const Files = (props: IFilesProps) => {
     link!.click();
   };
 
+  // ── Toolbar: Download selected items ──────────────────────────────────────
+  const onToolbarDownloadClick = async () => {
+    const selectedIds = Array.from(selectedRows) as string[];
+    if (selectedIds.length === 0) return;
+
+    // Single file that is not a folder → direct link download
+    if (selectedIds.length === 1) {
+      const item = driveItems.find((d) => d.id === selectedIds[0]);
+      if (item && !item.isFolder && item.downloadUrl) {
+        onDownloadItemClick(item.downloadUrl);
+        return;
+      }
+    }
+
+    // Multiple or contains folder → ZIP via backend job
+    await startZipDownload(selectedIds);
+  };
+
+  const startZipDownload = async (itemIds: string[]) => {
+    // Clear any previous download progress
+    if (downloadPollRef.current) {
+      clearInterval(downloadPollRef.current);
+      downloadPollRef.current = null;
+    }
+
+    setDownloadProgress({
+      isActive: true,
+      jobProgress: null,
+      isCompleted: false,
+      errorMessage: "",
+    });
+
+    let jobId: string;
+    try {
+      jobId = await spEmbedded.startDownloadArchive(
+        props.container.id,
+        itemIds,
+      );
+    } catch (err: any) {
+      setDownloadProgress({
+        isActive: false,
+        jobProgress: null,
+        isCompleted: false,
+        errorMessage: `Failed to start download: ${err.message}`,
+      });
+      return;
+    }
+
+    // Poll for progress every 800 ms
+    downloadPollRef.current = setInterval(async () => {
+      try {
+        const progress = await spEmbedded.getDownloadProgress(jobId);
+
+        setDownloadProgress((prev) => ({
+          ...prev,
+          jobProgress: progress,
+        }));
+
+        if (progress.status === "ready") {
+          clearInterval(downloadPollRef.current!);
+          downloadPollRef.current = null;
+
+          setDownloadProgress((prev) => ({
+            ...prev,
+            isActive: false,
+            isCompleted: true,
+          }));
+
+          // Trigger the actual file download
+          try {
+            await spEmbedded.triggerArchiveFileDownload(jobId);
+          } catch (err: any) {
+            setDownloadProgress((prev) => ({
+              ...prev,
+              errorMessage: `Download failed: ${err.message}`,
+            }));
+          }
+
+          // Auto-clear the completed notice after 4 seconds
+          setTimeout(() => {
+            setDownloadProgress({
+              isActive: false,
+              jobProgress: null,
+              isCompleted: false,
+              errorMessage: "",
+            });
+          }, 4000);
+        } else if (progress.status === "failed") {
+          clearInterval(downloadPollRef.current!);
+          downloadPollRef.current = null;
+          setDownloadProgress({
+            isActive: false,
+            jobProgress: progress,
+            isCompleted: false,
+            errorMessage:
+              progress.errors.length > 0
+                ? progress.errors.join("; ")
+                : "Archive job failed.",
+          });
+        }
+      } catch (err: any) {
+        clearInterval(downloadPollRef.current!);
+        downloadPollRef.current = null;
+        setDownloadProgress({
+          isActive: false,
+          jobProgress: null,
+          isCompleted: false,
+          errorMessage: `Progress check failed: ${err.message}`,
+        });
+      }
+    }, 800);
+  };
+
+  // ── Toolbar: Delete selected items ─────────────────────────────────────────
+  const onToolbarDeleteClick = () => {
+    if (selectedRows.size === 0) return;
+    setDeleteDialogOpen(true);
+  };
+
+  const onDeleteItemClick = async () => {
+    const selectedIds = Array.from(selectedRows) as string[];
+    if (selectedIds.length === 0) return;
+
+    try {
+      const result = await spEmbedded.deleteItems(
+        props.container.id,
+        selectedIds,
+      );
+
+      if (result.failed.length > 0) {
+        console.warn(
+          "Some items failed to delete:",
+          result.failed.map((f) => `${f.id}: ${f.reason}`).join(", "),
+        );
+      }
+    } catch (err: any) {
+      console.error("Delete failed:", err.message);
+    }
+
+    await loadItems(folderId || "root");
+    setDeleteDialogOpen(false);
+    setSelectedRows(new Set<TableRowId>());
+  };
+
   const onFolderCreateClick = async () => {
     setCreatingFolder(true);
 
@@ -242,29 +407,6 @@ export const Files = (props: IFilesProps) => {
     data: InputOnChangeData,
   ): void => {
     setFolderName(data?.value);
-  };
-
-  const onDeleteItemClick = async () => {
-    /**
-     * 使用了解构赋值的方式，从 selectedRows 中获取第一个被选中的 id。
-     * 示例：
-     * const [first, second] = [1, 2, 3]; // first = 1, second = 2
-     * 相比于 `selectedRows.entries().next().value[0]`，这种写法更安全，
-     * 因为如果 selectedRows 为空数组，解构赋值会得到 undefined，
-     * 而直接用迭代器可能会导致 value 为 undefined，访问 [0] 时会报错。
-     */
-    const [firstSelectedId] = selectedRows;
-
-    if (!firstSelectedId) {
-      console.warn("No item selected for deletion");
-      return;
-    }
-
-    const graphClient = Providers.globalProvider.graph.client;
-    const endpoint = `/drives/${props.container.id}/items/${firstSelectedId}`;
-    await graphClient.api(endpoint).delete();
-    await loadItems(folderId || "root");
-    setDeleteDialogOpen(false);
   };
 
   const onUploadFileClick = () => {
@@ -418,6 +560,7 @@ export const Files = (props: IFilesProps) => {
     targetFolderId: string,
     targetFolderName: string,
   ) => {
+    setSelectedRows(new Set());
     await loadItems(targetFolderId, targetFolderName);
 
     // Update breadcrumb path
@@ -465,10 +608,15 @@ export const Files = (props: IFilesProps) => {
   };
 
   const handlePreviewDelete = async () => {
-    if (currentPreviewFile) {
-      // Set the selected row to the current preview file for deletion
-      setSelectedRows(new Set([currentPreviewFile.id as string]));
-      await onDeleteItemClick();
+    if (currentPreviewFile?.id) {
+      try {
+        await spEmbedded.deleteItems(props.container.id, [
+          currentPreviewFile.id as string,
+        ]);
+      } catch (err: any) {
+        console.error("Preview delete failed:", err.message);
+      }
+      await loadItems(folderId || "root");
       setPreviewOpen(false);
     }
   };
@@ -496,12 +644,13 @@ export const Files = (props: IFilesProps) => {
               </Link>
             ) : (
               <Link
-                onClick={() =>
+                onClick={(e) => {
+                  e.stopPropagation();
                   navigateToFolder(
                     driveItem.id as string,
                     driveItem.name as string,
-                  )
-                }
+                  );
+                }}
               >
                 {driveItem.name}
               </Link>
@@ -536,22 +685,29 @@ export const Files = (props: IFilesProps) => {
         return "Actions";
       },
       renderCell: (driveItem) => {
+        // Placeholder handlers – no real implementation yet
+        const onVersionsClick = () => {
+          console.log("Versions placeholder clicked for:", driveItem.id);
+        };
+        const onPermissionsClick = () => {
+          console.log("Permissions placeholder clicked for:", driveItem.id);
+        };
+
         return (
           <>
             <Button
-              aria-label="Download"
-              disabled={!selectedRows.has(driveItem.id as string)}
-              icon={<SaveRegular />}
-              onClick={() => onDownloadItemClick(driveItem.downloadUrl)}
+              aria-label="Versions"
+              icon={<HistoryRegular />}
+              onClick={onVersionsClick}
             >
-              Download
+              Versions
             </Button>
             <Button
-              aria-label="Delete"
-              icon={<DeleteRegular />}
-              onClick={() => setDeleteDialogOpen(true)}
+              aria-label="Permissions"
+              icon={<PeopleRegular />}
+              onClick={onPermissionsClick}
             >
-              Delete
+              Permissions
             </Button>
           </>
         );
@@ -574,8 +730,8 @@ export const Files = (props: IFilesProps) => {
       defaultWidth: 150,
     },
     actions: {
-      minWidth: 250,
-      defaultWidth: 250,
+      minWidth: 300,
+      defaultWidth: 320,
     },
   };
   // BOOKMARK 3 - component rendering return (
@@ -663,6 +819,22 @@ export const Files = (props: IFilesProps) => {
           >
             Upload Folder
           </ToolbarButton>
+          <ToolbarButton
+            vertical
+            icon={<ArrowDownloadRegular />}
+            onClick={onToolbarDownloadClick}
+            disabled={selectedRows.size === 0 || downloadProgress.isActive}
+          >
+            Download
+          </ToolbarButton>
+          <ToolbarButton
+            vertical
+            icon={<DeleteRegular />}
+            onClick={onToolbarDeleteClick}
+            disabled={selectedRows.size === 0}
+          >
+            Delete
+          </ToolbarButton>
         </Toolbar>
       </div>
 
@@ -685,6 +857,39 @@ export const Files = (props: IFilesProps) => {
               />
               <Text className={styles.progressCompleted}>Upload completed</Text>
             </>
+          ) : null}
+        </div>
+      )}
+
+      {/* Download / Archive Progress */}
+      {(downloadProgress.isActive ||
+        downloadProgress.isCompleted ||
+        downloadProgress.errorMessage) && (
+        <div className={styles.progressContainer}>
+          {downloadProgress.isActive ? (
+            <>
+              <Spinner size="small" />
+              <Text className={styles.progressText}>
+                {downloadProgress.jobProgress?.status === "preparing"
+                  ? `Preparing archive${downloadProgress.jobProgress.currentItem ? `: ${downloadProgress.jobProgress.currentItem}` : "…"}`
+                  : downloadProgress.jobProgress?.status === "zipping"
+                    ? `Compressing ${downloadProgress.jobProgress.processedFiles}/${downloadProgress.jobProgress.totalFiles}: ${downloadProgress.jobProgress.currentItem}`
+                    : "Starting download job…"}
+              </Text>
+            </>
+          ) : downloadProgress.isCompleted ? (
+            <>
+              <CheckmarkRegular
+                style={{ color: tokens.colorPaletteGreenForeground1 }}
+              />
+              <Text className={styles.progressCompleted}>
+                Archive ready – download started
+              </Text>
+            </>
+          ) : downloadProgress.errorMessage ? (
+            <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
+              {downloadProgress.errorMessage}
+            </Text>
           ) : null}
         </div>
       )}
@@ -735,13 +940,22 @@ export const Files = (props: IFilesProps) => {
       <Dialog
         open={deleteDialogOpen}
         modalType="modal"
-        onOpenChange={() => setSelectedRows(new Set<TableRowId>([0]))}
+        onOpenChange={() => setDeleteDialogOpen(false)}
       >
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>Delete Item</DialogTitle>
+            <DialogTitle>
+              Delete{" "}
+              {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
+            </DialogTitle>
             <DialogContent>
-              <p>Are you sure you want to delete this item?</p>
+              <p>
+                Are you sure you want to delete{" "}
+                {selectedRows.size > 1
+                  ? `these ${selectedRows.size} items`
+                  : "this item"}
+                ?
+              </p>
             </DialogContent>
             <DialogActions>
               <DialogTrigger>
@@ -765,7 +979,7 @@ export const Files = (props: IFilesProps) => {
         getRowId={(item) => item.id}
         resizableColumns
         columnSizingOptions={columnSizingOptions}
-        selectionMode="single"
+        selectionMode="multiselect"
         selectedItems={selectedRows}
         onSelectionChange={onSelectionChange}
       >

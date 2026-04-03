@@ -309,7 +309,7 @@ export const Preview: React.FC<IPreviewProps> = ({
                 src={previewUrl}
                 className={styles.previewFrame}
                 title={`Preview of ${currentFile.name}`}
-                sandbox="allow-same-origin allow-scripts allow-forms"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox"
               />
             ) : (
               <div className={styles.loadingContainer}>
