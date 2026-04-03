@@ -1,117 +1,65 @@
 /**
- * 前端应用配置管理模块
+ * 前端配置管理模块
  *
  * 本模块负责：
- * 1. 从环境变量读取配置（如客户端 ID、服务器地址等）
- * 2. 验证所有必需的配置都已提供
- * 3. 根据云环境（全球/中国）配置对应的端点
- * 4. 导出一个集中式的配置对象供应用使用
+ * 1. 从环境变量读取前端配置（以 REACT_APP_ 前缀）
+ * 2. 根据 CLOUD_ENV 自动选择对应的云环境端点（全球版 / 世纪互联版）
+ * 3. 导出统一的 clientConfig 对象供全局使用
  *
- * 配置来源：
- * - 环境变量（.env 文件或系统环境变量）
- * - 前缀为 REACT_APP_ 的变量（Create React App 惯例）
+ * 环境变量说明（在 .env.development.local 或 .env.production.local 中配置）：
+ * - REACT_APP_CLIENT_ENTRA_APP_CLIENT_ID: 前端 Entra App 的客户端 ID（用于 MSAL 登录）
+ * - REACT_APP_CLIENT_ENTRA_APP_TENANT_ID: Azure AD 租户 ID
+ * - REACT_APP_API_ENTRA_APP_CLIENT_ID: 后端 API 的 Entra App 客户端 ID（用于 token scope）
+ * - REACT_APP_API_SERVER_URL: 后端 API 服务器地址（如 http://localhost:3001）
+ * - REACT_APP_CLOUD_ENV: 云环境选择，"global"（默认）或 "china"
+ * - REACT_APP_GRAPH_BASE_URL: （可选）自定义 Graph API 基础 URL
  *
- * 使用场景：
- * 所有需要配置的地方（API URL、客户端 ID 等）都通过 clientConfig 获取，
- * 避免硬编码，提高应用的可配置性和可移植性。
+ * 安全注意：REACT_APP_ 前缀的变量会被 CRA 打包进浏览器 bundle，
+ * 对最终用户可见，绝不能放入 secret 或敏感信息！
  *
- * 示例：
- * ```
- * import { clientConfig } from "./common/config";
- * const apiUrl = clientConfig.apiServerUrl;
- * const clientId = clientConfig.clientEntraAppClientId;
- * ```
- */
+ * 云环境对照：
+ * | 环境     | AAD 登录地址                        | Graph API 地址                          |
+ * |----------|------------------------------------|-----------------------------------------|
+ * | global   | login.microsoftonline.com          | graph.microsoft.com                     |
+ * | china    | login.chinacloudapi.cn             | microsoftgraph.chinacloudapi.cn          |
+ **/
 
 /**
- * 从环境变量读取配置值的辅助函数
- *
- * 流程：
- * 1. 尝试从 process.env 读取指定的环境变量
- * 2. 如果变量未定义或为空，抛出错误
- * 3. 错误信息包含缺失的环境变量名，便于调试
- *
- * @param {string} key - 环境变量名称
- * @returns {string} 环境变量的值
- * @throws {Error} 如果环境变量未定义或为空，抛出错误
- *
- * 使用示例：
- * ```
- * const clientId = required("REACT_APP_CLIENT_ENTRA_APP_CLIENT_ID");
- * // 如果变量未设置，输出：[config] Missing required env var: REACT_APP_CLIENT_ENTRA_APP_CLIENT_ID
- * ```
- */
+ * 读取必需的环境变量，缺失时抛出明确错误
+ * @param key 环境变量名
+ * @returns 环境变量值
+ * @throws 如果环境变量未设置
+ **/
 const required = (key: string): string => {
   const value = process.env[key];
   if (!value) throw new Error(`[config] Missing required env var: ${key}`);
   return value;
 };
 
-/**
- * 云环境类型
- * - "global": 全球 Azure 环境（默认）
- * - "china": 由 21Vianet 运营的中国 Azure 环境
- *
- * 不同的云环境有不同的：
- * - Entra ID 端点（AAD Authority）
- * - Microsoft Graph 端点
- */
+/** 支持的云环境类型 */
 type CloudEnv = "global" | "china";
 
-/**
- * 不同云环境的 API 端点配置
- *
- * 为什么需要不同的端点？
- * - 全球 Azure 和中国 Azure 是两个完全独立的系统
- * - 它们有不同的数据中心、合规要求和服务端点
- * - 应用必须使用正确的环境端点，否则认证或 API 调用会失败
- *
- * 端点说明：
- * - aadAuthorityHost: Entra ID (Azure AD) 的认证服务地址
- *   用于用户登录和令牌获取
- * - graphBaseUrl: Microsoft Graph API 的根地址
- *   所有 Graph API 调用都基于这个地址
- *
- * 用例：
- * - 访问全球环境：所有用户都在此
- * - 访问中国环境：必须符合中国政府要求和数据驻留政策的部署
- */
+/** 各云环境的端点地址映射 */
 const CLOUD_ENDPOINTS: Record<
   CloudEnv,
   { aadAuthorityHost: string; graphBaseUrl: string }
 > = {
   global: {
-    aadAuthorityHost: "https://login.microsoftonline.com", // 全球 Entra ID 认证端点
-    graphBaseUrl: "https://graph.microsoft.com", // 全球 Graph API 端点
+    aadAuthorityHost: "https://login.microsoftonline.com",
+    graphBaseUrl: "https://graph.microsoft.com",
   },
   china: {
-    aadAuthorityHost: "https://login.chinacloudapi.cn", // 中国 Entra ID 认证端点
-    graphBaseUrl: "https://microsoftgraph.chinacloudapi.cn", // 中国 Graph API 端点
+    aadAuthorityHost: "https://login.chinacloudapi.cn",
+    graphBaseUrl: "https://microsoftgraph.chinacloudapi.cn",
   },
 };
 
 /**
- * 解析和验证云环境配置
- *
- * 流程：
- * 1. 从 REACT_APP_CLOUD_ENV 环境变量读取配置（默认为 "global"）
- * 2. 将值转换为小写以支持各种大小写形式
- * 3. 验证值只能是 "global" 或 "china"
- * 4. 如果值无效，抛出错误告知用户哪些值是允许的
- * 5. 返回类型安全的 CloudEnv 值
- *
- * @returns {CloudEnv} 有效的云环境值
- * @throws {Error} 如果环境变量值无效
- *
- * 使用示例：
- * ```
- * // 假设 REACT_APP_CLOUD_ENV=china
- * const env = resolveCloudEnv(); // 返回 "china"
- *
- * // 假设 REACT_APP_CLOUD_ENV=invalid
- * const env = resolveCloudEnv(); // 抛出错误：Unsupported REACT_APP_CLOUD_ENV value
- * ```
- */
+ * 解析云环境配置
+ * 从 REACT_APP_CLOUD_ENV 环境变量读取，默认为 "global"
+ * @returns 合法的 CloudEnv 值
+ * @throws 如果环境变量值不是 "global" 或 "china"
+ **/
 const resolveCloudEnv = (): CloudEnv => {
   const val = (process.env.REACT_APP_CLOUD_ENV ?? "global").toLowerCase();
   if (val !== "global" && val !== "china") {
@@ -122,61 +70,29 @@ const resolveCloudEnv = (): CloudEnv => {
   return val as CloudEnv;
 };
 
-// ── 配置初始化 ─────────────────────────────────────────────────────────────
-// 应用启动时立即执行这些步骤，确保所有必需的配置都已加载
-
-const cloudEnv = resolveCloudEnv(); // 确定当前使用的云环境
-const cloudEndpoints = CLOUD_ENDPOINTS[cloudEnv]; // 获取该环境的端点配置
-const tenantId = required("REACT_APP_CLIENT_ENTRA_APP_TENANT_ID"); // 租户 ID
+const cloudEnv = resolveCloudEnv();
+const cloudEndpoints = CLOUD_ENDPOINTS[cloudEnv];
+const tenantId = required("REACT_APP_CLIENT_ENTRA_APP_TENANT_ID");
 
 /**
- * 前端应用的全局配置对象
+ * 前端全局配置对象
  *
- * 这是应用使用的集中式配置。所有其他模块都应该从这里获取配置值。
- *
- * 字段说明：
- * - clientEntraAppClientId: 前端应用在 Entra ID 中注册的应用 ID
- *   用于 MSAL/MGT 初始化和 token 验证
- * - tenantId: Azure 租户 ID（可以是租户 UUID 或 tenant.onmicrosoft.com）
- *   用于限制登录只能使用该租户的账户
- * - apiEntraAppClientId: 后端 API 在 Entra ID 中注册的应用 ID
- *   用于请求访问后端 API 的权限范围
- * - apiServerUrl: 后端 API 服务的根 URL
- *   所有 API 调用都相对于这个 URL
- * - authority: Entra ID 认证授权管理 URL
- *   格式：https://{aadAuthorityHost}/{tenantId}
- *   用于 MSAL 和 MGT 的登录重定向
- * - graphBaseUrl: Microsoft Graph API 的根地址
- *   所有 Graph API 调用都基于这个 URL
- * - cloudEnv: 当前使用的云环境
- *   值为 "global" 或 "china"
- *
- * 使用示例：
- * ```
- * // 在任何需要配置的地方
- * import { clientConfig } from "./common/config";
- *
- * // 获取 API 服务器地址
- * const apiUrl = clientConfig.apiServerUrl; // https://api.example.com
- *
- * // 获取客户端 ID
- * const clientId = clientConfig.clientEntraAppClientId;
- *
- * // 获取认证授权 URL
- * const authority = clientConfig.authority; // https://login.microsoftonline.com/tenant-id
- * ```
- */
+ * 导出给 index.tsx（初始化 Msal2Provider）和 spembedded.ts（调用后端 API）使用
+ **/
 export const clientConfig = {
+  /** 前端 Entra App 的客户端 ID（MSAL 登录用） */
   clientEntraAppClientId: required("REACT_APP_CLIENT_ENTRA_APP_CLIENT_ID"),
+  /** Azure AD 租户 ID */
   tenantId,
+  /** 后端 API 的 Entra App 客户端 ID（构建 token scope 用） */
   apiEntraAppClientId: required("REACT_APP_API_ENTRA_APP_CLIENT_ID"),
+  /** 后端 API 服务器地址 */
   apiServerUrl: required("REACT_APP_API_SERVER_URL"),
-  // 根据云环境和租户 ID 构造认证授权 URL
-  // 用户登录时会被重定向到这个地址
+  /** MSAL 认证 authority URL，格式: {loginHost}/{tenantId} */
   authority: `${cloudEndpoints.aadAuthorityHost}/${tenantId}`,
-  // 使用环境变量 REACT_APP_GRAPH_BASE_URL（如果提供），否则使用默认值
-  // 这允许在某些特殊场景下覆盖 Graph API 地址
+  /** Graph API 基础 URL，可通过 REACT_APP_GRAPH_BASE_URL 覆盖 */
   graphBaseUrl: (process.env.REACT_APP_GRAPH_BASE_URL ??
     cloudEndpoints.graphBaseUrl) as string,
+  /** 当前云环境 */
   cloudEnv,
 };

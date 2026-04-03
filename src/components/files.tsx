@@ -1,27 +1,40 @@
 /**
- * 文件管理组件 - 核心业务逻辑
+ * 文件管理组件模块
  *
- * 功能概述：
- * 这是应用的核心组件，让用户能够在选定的 SharePoint Embedded 容器内：
- * 1. 浏览文件和文件夹（支持文件夹导航）
- * 2. 上传单个文件或完整的文件夹结构
- * 3. 下载单个文件或多个文件/文件夹（打包为 ZIP）
- * 4. 删除文件和文件夹
- * 5. 创建新文件夹
- * 6. 预览文件内容（通过 Preview 组件）
+ * 本模块负责：
+ * 1. 展示选中容器内的文件和文件夹列表（DataGrid 表格）
+ * 2. 支持文件/文件夹的上传（单文件、多文件、整个文件夹）
+ * 3. 支持文件下载（单文件直链下载、多文件/文件夹 ZIP 归档下载）
+ * 4. 支持文件/文件夹的删除（批量删除）
+ * 5. 支持创建新文件夹
+ * 6. 支持文件夹导航（面包屑导航 + 返回上级）
+ * 7. 支持文件预览（通过 <Preview /> 子组件）
  *
- * 架构设计：
- * - 使用 Microsoft Graph API 进行所有文件操作
- * - 长时间操作（如下载多个文件）通过后端 job 队列异步处理
- * - 进度反馈通过轮询后端 progress API 实现
- * - 使用 Fluent UI DataGrid 组件显示文件列表
+ * 组件结构：
+ *   <div>
+ *     <input type="file" hidden />       ← 隐藏的文件上传和文件夹上传输入框
+ *     <a hidden />                        ← 隐藏的下载链接（用于单文件下载）
+ *     <Breadcrumb />                      ← 面包屑导航
+ *     <Toolbar />                         ← 工具栏（返回、新建文件夹、上传、下载、删除）
+ *     {uploadProgress UI}                 ← 上传进度提示
+ *     {downloadProgress UI}               ← 下载进度提示
+ *     <Dialog newFolder />                ← 新建文件夹对话框
+ *     <Dialog delete />                   ← 确认删除对话框
+ *     <DataGrid />                        ← 文件列表表格（支持多选）
+ *     <Preview />                         ← 文件预览对话框
+ *   </div>
  *
- * 核心概念：
- * - 文件夹导航：维护面包屑路径，支持快速返回
- * - 文件夹上传：保留文件夹结构，递归创建目录
- * - ZIP 下载：后端生成 ZIP job，前端轮询并下载
- * - 进度反馈：实时显示上传/下载进度、文件数、当前文件等
- */
+ * Graph API 调用（前端直接调用，不经后端）：
+ * - GET  /drives/{driveId}/items/{itemId}/children  → 列出文件夹内容
+ * - POST /drives/{driveId}/items/{itemId}/children  → 创建子文件夹
+ * - PUT  /drives/{driveId}/items/{itemId}:/{name}:/content  → 上传文件
+ *
+ * 后端 API 调用（通过 SpEmbedded 服务层）：
+ * - deleteItems()            → 批量删除文件
+ * - startDownloadArchive()   → 启动 ZIP 归档任务
+ * - getDownloadProgress()    → 轮询归档进度
+ * - triggerArchiveFileDownload() → 触发归档文件下载
+ **/
 
 import React, { useState, useEffect, useRef } from "react";
 import { Providers } from "@microsoft/mgt-element";
@@ -86,31 +99,41 @@ import { IDriveItemExtended } from "../common/types";
 import SpEmbedded, { IJobProgress } from "../services/spembedded";
 require("isomorphic-fetch");
 
+/** SpEmbedded 服务实例（全局单例），用于调用后端 API（删除、下载归档） */
 const spEmbedded = new SpEmbedded();
 
+/** Files 组件的属性接口 */
 interface IFilesProps {
+  /** 当前选中的容器（由 Containers 父组件传入），其 id 即 Drive ID */
   container: IContainer;
 }
 
+/** 面包屑导航项 */
 interface IBreadcrumbItem {
-  id: string;
-  name: string;
+  id: string; // 文件夹 ID（"root" 表示根目录）
+  name: string; // 文件夹显示名称
 }
 
+/** 文件上传进度状态 */
 interface IUploadProgress {
-  isUploading: boolean;
-  currentFile: string;
-  currentIndex: number;
-  totalFiles: number;
-  fileSize: string;
-  isCompleted: boolean;
+  isUploading: boolean; // 是否正在上传
+  currentFile: string; // 当前上传的文件路径
+  currentIndex: number; // 当前文件序号（从 1 开始）
+  totalFiles: number; // 总文件数
+  fileSize: string; // 当前文件大小（格式化后，如 "1.5 MB"）
+  isCompleted: boolean; // 上传是否已完成（用于显示完成提示）
 }
 
+/**
+ * ZIP 归档下载进度状态
+ *
+ * 下载流程：启动任务 → 轮询进度 → 任务完成 → 触发浏览器下载
+ **/
 interface IDownloadProgress {
-  isActive: boolean; // polling in progress
-  jobProgress: IJobProgress | null;
-  isCompleted: boolean;
-  errorMessage: string;
+  isActive: boolean; // 是否正在轮询进度
+  jobProgress: IJobProgress | null; // 后端返回的任务进度详情
+  isCompleted: boolean; // 是否下载完成
+  errorMessage: string; // 错误信息（为空表示无错误）
 }
 const useStyles = makeStyles({
   dialogInputControl: {
@@ -144,7 +167,21 @@ const useStyles = makeStyles({
     fontWeight: "600",
   },
 });
+/**
+ * 文件管理组件
+ *
+ * @param props.container 当前选中的容器对象
+ *
+ * 状态管理概览：
+ * - driveItems: 当前文件夹内的文件/文件夹列表
+ * - selectedRows: DataGrid 中选中的行 ID 集合
+ * - folderId: 当前文件夹 ID（"root" 表示根目录）
+ * - breadcrumbPath: 面包屑导航路径
+ * - uploadProgress / downloadProgress: 上传/下载进度状态
+ * - previewOpen / currentPreviewFile: 文件预览对话框状态
+ **/
 export const Files = (props: IFilesProps) => {
+  // =============== 文件列表状态 ===============
   const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
   const [selectedRows, setSelectedRows] = useState<Set<SelectionItemId>>(
     new Set<TableRowId>(),
@@ -186,13 +223,17 @@ export const Files = (props: IFilesProps) => {
   const [currentPreviewFile, setCurrentPreviewFile] =
     useState<IDriveItemExtended | null>(null);
   // BOOKMARK 1 - constants & hooks
+
+  // =============== 副作用：容器变化时重新加载文件列表 ===============
   useEffect(() => {
     (async () => {
       loadItems();
     })();
   }, [props]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper function to format file size
+  // =============== 工具函数 ===============
+
+  /** 格式化文件大小为人类可读格式（如 "1.5 MB"） */
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -201,7 +242,11 @@ export const Files = (props: IFilesProps) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Helper function to get file paths from folder structure
+  /**
+   * 从 FileList 中提取文件及其相对路径
+   * 对于文件夹上传（webkitdirectory），会保留完整的相对路径结构
+   * 对于单文件上传，relativePath 就是文件名
+   **/
   const getFolderStructure = (
     files: FileList,
   ): Array<{ file: File; relativePath: string }> => {
@@ -215,6 +260,17 @@ export const Files = (props: IFilesProps) => {
     return result;
   };
 
+  /**
+   * 加载指定文件夹内的文件/文件夹列表
+   *
+   * @param itemId 文件夹 ID，默认 "root"（根目录）
+   * @param folderName 文件夹名称（可选，用于面包屑）
+   *
+   * 流程：
+   * 1. 调用 Graph API 获取指定文件夹的子项
+   * 2. 将 DriveItem 转换为 IDriveItemExtended（添加 UI 辅助属性）
+   * 3. 更新 driveItems 状态和当前 folderId
+   **/
   const loadItems = async (itemId?: string, folderName?: string) => {
     try {
       const graphClient = Providers.globalProvider.graph.client;
@@ -251,6 +307,10 @@ export const Files = (props: IFilesProps) => {
     }
   };
 
+  /**
+   * DataGrid 行选中状态变化处理
+   * 将选中的行 ID 集合同步到 selectedRows 状态，供工具栏下载/删除按钮判断是否有选中项
+   **/
   const onSelectionChange: DataGridProps["onSelectionChange"] = (
     event: React.MouseEvent | React.KeyboardEvent,
     data: OnSelectionChangeData,
@@ -258,13 +318,22 @@ export const Files = (props: IFilesProps) => {
     setSelectedRows(data.selectedItems);
   };
 
+  /**
+   * 通过隐藏 <a> 标签触发单文件直链下载
+   * @param downloadUrl 文件的 @microsoft.graph.downloadUrl 直链
+   **/
   const onDownloadItemClick = (downloadUrl: string) => {
     const link = downloadLinkRef.current;
     link!.href = downloadUrl;
     link!.click();
   };
 
-  // ── Toolbar: Download selected items ──────────────────────────────────────
+  // ── 工具栏：下载选中项 ──────────────────────────────────────────────────────
+  /**
+   * 工具栏下载按钮处理
+   * - 单个非文件夹文件：使用直链下载（@microsoft.graph.downloadUrl）
+   * - 多个文件或包含文件夹：通过后端 ZIP 归档任务下载
+   **/
   const onToolbarDownloadClick = async () => {
     const selectedIds = Array.from(selectedRows) as string[];
     if (selectedIds.length === 0) return;
@@ -282,6 +351,16 @@ export const Files = (props: IFilesProps) => {
     await startZipDownload(selectedIds);
   };
 
+  /**
+   * 启动 ZIP 归档下载
+   *
+   * 完整流程：
+   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端任务
+   * 2. 每 800ms 轮询 spEmbedded.getDownloadProgress() 查看进度
+   * 3. 当 status === "ready" 时，调用 triggerArchiveFileDownload() 触发浏览器下载
+   * 4. 下载完成后 4 秒自动清除完成提示
+   * 5. 如果任务失败，显示错误信息
+   **/
   const startZipDownload = async (itemIds: string[]) => {
     // Clear any previous download progress
     if (downloadPollRef.current) {
@@ -377,12 +456,17 @@ export const Files = (props: IFilesProps) => {
     }, 800);
   };
 
-  // ── Toolbar: Delete selected items ─────────────────────────────────────────
+  // ── 工具栏：删除选中项 ─────────────────────────────────────────────────────
+  /** 打开确认删除对话框 */
   const onToolbarDeleteClick = () => {
     if (selectedRows.size === 0) return;
     setDeleteDialogOpen(true);
   };
 
+  /**
+   * 确认删除：调用后端 API 批量删除选中的文件/文件夹
+   * 删除后刷新文件列表并清空选择
+   **/
   const onDeleteItemClick = async () => {
     const selectedIds = Array.from(selectedRows) as string[];
     if (selectedIds.length === 0) return;
@@ -408,6 +492,10 @@ export const Files = (props: IFilesProps) => {
     setSelectedRows(new Set<TableRowId>());
   };
 
+  /**
+   * 创建新文件夹
+   * 在当前目录下创建子文件夹，使用 conflictBehavior: "rename" 避免重名冲突
+   **/
   const onFolderCreateClick = async () => {
     setCreatingFolder(true);
 
@@ -427,6 +515,10 @@ export const Files = (props: IFilesProps) => {
     setNewFolderDialogOpen(false);
   };
 
+  /**
+   * 输入框文件夹名称变化处理
+   * @param data.value 最新输入内容，用于创建文件夹对话框的和输入框
+   **/
   const onHandleFolderNameChange: InputProps["onChange"] = (
     event: React.ChangeEvent<HTMLInputElement>,
     data: InputOnChangeData,
@@ -434,18 +526,30 @@ export const Files = (props: IFilesProps) => {
     setFolderName(data?.value);
   };
 
+  /**
+   * 触发文件选择对话框弹出（单个或多个文件）
+   * 点击工具栏中的 "Upload File" 按钮时触发隐藏 <input type="file"> 的点击
+   **/
   const onUploadFileClick = () => {
     if (uploadFileRef.current) {
       uploadFileRef.current.click();
     }
   };
 
+  /**
+   * 触发文件夹选择对话框弹出
+   * 点击工具栏中的 "Upload Folder" 按钮时触发隐藏 <input webkitdirectory> 的点击
+   **/
   const onUploadFolderClick = () => {
     if (uploadFolderRef.current) {
       uploadFolderRef.current.click();
     }
   };
 
+  /**
+   * 文件选择回调：用户选择文件后委托给 uploadFiles 处理
+   * 处理完成后重置 input value，允许重复选择相同文件
+   **/
   const onUploadFileSelected = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -457,6 +561,10 @@ export const Files = (props: IFilesProps) => {
     event.target.value = "";
   };
 
+  /**
+   * 文件夹选择回调：用户选择文件夹后委托给 uploadFiles 处理
+   * webkitdirectory 模式下，FileList 包含完整文件夹结构及相对路径
+   **/
   const onUploadFolderSelected = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -468,6 +576,18 @@ export const Files = (props: IFilesProps) => {
     event.target.value = "";
   };
 
+  /**
+   * 上传文件核心逻辑
+   *
+   * @param files 用户选择的文件列表（来自 <input type="file" />）
+   *
+   * 流程：
+   * 1. 解析文件列表及其相对路径（支持文件夹结构）
+   * 2. 遍历每个文件，按路径创建必要的中间文件夹
+   * 3. 使用 Graph API PUT 请求上传文件内容
+   * 4. 上传过程中实时更新进度状态
+   * 5. 完成后刷新文件列表
+   **/
   const uploadFiles = async (files: FileList) => {
     const fileStructure = getFolderStructure(files);
     const totalFiles = fileStructure.length;
@@ -547,6 +667,15 @@ export const Files = (props: IFilesProps) => {
     await loadItems(folderId || "root");
   };
 
+  /**
+   * 如果文件夹不存在则创建
+   * 上传文件夹结构时，递归确保每层中间文件夹都存在
+   *
+   * @param graphClient Graph 客户端实例
+   * @param parentId 父文件夹 ID
+   * @param folderName 要创建的文件夹名称
+   * @returns 文件夹 ID（已存在则返回现有的，否则返回新创建的）
+   **/
   const createFolderIfNotExists = async (
     graphClient: any,
     parentId: string,
@@ -580,7 +709,14 @@ export const Files = (props: IFilesProps) => {
     }
   };
 
-  // Navigation functions
+  // =============== 文件夹导航 ===============
+
+  /**
+   * 导航到指定文件夹
+   * 加载目标文件夹内容并更新面包屑路径
+   * - 如果目标文件夹已在面包屑中（后退导航），截断路径
+   * - 如果是新文件夹（前进导航），追加到路径末尾
+   **/
   const navigateToFolder = async (
     targetFolderId: string,
     targetFolderName: string,
@@ -609,6 +745,7 @@ export const Files = (props: IFilesProps) => {
     }
   };
 
+  /** 返回上级文件夹（取面包屑倒数第二项） */
   const navigateToParentFolder = async () => {
     if (breadcrumbPath.length > 1) {
       const parentFolder = breadcrumbPath[breadcrumbPath.length - 2];
@@ -623,15 +760,21 @@ export const Files = (props: IFilesProps) => {
     await navigateToFolder(targetFolderId, targetFolderName);
   };
 
-  // Preview handlers
+  // =============== 文件预览处理 ===============
+  /** 预览对话框中点击前/后导航时，更新当前预览文件 */
   const handlePreviewNavigate = (file: IDriveItemExtended) => {
     setCurrentPreviewFile(file);
   };
 
+  /** 预览对话框中点击下载时，使用隐藏 <a> 标签触发直链下载 */
   const handlePreviewDownload = (downloadUrl: string) => {
     onDownloadItemClick(downloadUrl);
   };
 
+  /**
+   * 预览对话框中点击删除时，删除当前预览文件并关闭对话框
+   * 删除完成后刷新文件列表，使 UI 保持同步
+   **/
   const handlePreviewDelete = async () => {
     if (currentPreviewFile?.id) {
       try {
@@ -646,9 +789,11 @@ export const Files = (props: IFilesProps) => {
     }
   };
 
-  // Get only non-folder files for preview navigation
+  /** 仅保留非文件夹项用于预览导航（前/后切换时跳过文件夹） */
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
   // BOOKMARK 2 - handlers go here
+
+  // =============== DataGrid 列定义 ===============
   const columns: TableColumnDefinition<IDriveItemExtended>[] = [
     createTableColumn({
       columnId: "driveItemName",
@@ -657,6 +802,7 @@ export const Files = (props: IFilesProps) => {
       },
       renderCell: (driveItem) => {
         return (
+          // 文件点击弹出预览对话框；文件夸点击进入该层级
           <TableCellLayout media={driveItem.iconElement}>
             {!driveItem.isFolder ? (
               <Link
@@ -670,7 +816,7 @@ export const Files = (props: IFilesProps) => {
             ) : (
               <Link
                 onClick={(e) => {
-                  e.stopPropagation();
+                  e.stopPropagation(); // 防止事件冒泡到 DataGrid 行选中处理
                   navigateToFolder(
                     driveItem.id as string,
                     driveItem.name as string,
@@ -740,6 +886,10 @@ export const Files = (props: IFilesProps) => {
     }),
   ];
 
+  /**
+   * 列宽预设配置
+   * idealWidth 选中到想要的初始宽度，maxWidth 附却会被 resizableColumns 动态调整
+   **/
   const columnSizingOptions = {
     driveItemName: {
       minWidth: 150,
@@ -778,6 +928,10 @@ export const Files = (props: IFilesProps) => {
         onChange={onUploadFolderSelected}
         style={{ display: "none" }}
       />
+      {/*
+        隐藏的下载锚点：单文件直链下载时，由 onDownloadItemClick 动态设置 href
+        后触发此元素的 click()，浏览器会在新标签页中静默下载文件
+      */}
       {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
       <a
         ref={downloadLinkRef}
@@ -789,7 +943,13 @@ export const Files = (props: IFilesProps) => {
         Download
       </a>
 
-      {/* Breadcrumb Navigation */}
+      {/*
+        面包屑导航：显示当前文件夹层级路径（如 Root > FolderA > FolderB）
+        - 第一项（index === 0）固定为 Root，显示 HomeRegular 图标
+        - 最后一项（current=true）为当前所在文件夹，高亮显示
+        - 点击任意路径项时调用 onBreadcrumbClick，导航到对应文件夹
+        - 两个相邻项之间渲染 ChevronRightRegular 分隔符
+      */}
       <div className={styles.breadcrumbContainer}>
         <Breadcrumb>
           {breadcrumbPath.map((item, index) => (
@@ -813,8 +973,18 @@ export const Files = (props: IFilesProps) => {
         </Breadcrumb>
       </div>
 
+      {/*
+        操作工具栏：包含文件夹导航和文件操作按钮
+        - Back: 返回上一级文件夹（面包屑只有 Root 时禁用）
+        - New Folder: 打开创建文件夹对话框
+        - Upload File: 弹出文件选择框，支持多文件上传
+        - Upload Folder: 弹出文件夹选择框，保留完整目录结构上传
+        - Download: 无选中时禁用；ZIP 任务进行中时也禁用，防止重复提交
+        - Delete: 无选中时禁用，点击后弹出确认对话框
+      */}
       <div className={styles.toolbarContainer}>
         <Toolbar>
+          {/* 返回上级：breadcrumbPath 仅剩 Root 时（length <= 1）不可后退 */}
           <ToolbarButton
             vertical
             icon={<ArrowLeftRegular />}
@@ -823,6 +993,7 @@ export const Files = (props: IFilesProps) => {
           >
             Back
           </ToolbarButton>
+          {/* 新建文件夹：打开 newFolderDialogOpen 受控对话框 */}
           <ToolbarButton
             vertical
             icon={<AddRegular />}
@@ -830,6 +1001,7 @@ export const Files = (props: IFilesProps) => {
           >
             New Folder
           </ToolbarButton>
+          {/* 上传文件：触发隐藏的 <input type="file" multiple> */}
           <ToolbarButton
             vertical
             icon={<ArrowUploadRegular />}
@@ -837,6 +1009,7 @@ export const Files = (props: IFilesProps) => {
           >
             Upload File
           </ToolbarButton>
+          {/* 上传文件夹：触发隐藏的 <input webkitdirectory>，保留目录层级 */}
           <ToolbarButton
             vertical
             icon={<FolderAddRegular />}
@@ -844,6 +1017,7 @@ export const Files = (props: IFilesProps) => {
           >
             Upload Folder
           </ToolbarButton>
+          {/* 下载：单文件直链下载，多文件/文件夹走 ZIP 归档后端任务 */}
           <ToolbarButton
             vertical
             icon={<ArrowDownloadRegular />}
@@ -852,6 +1026,7 @@ export const Files = (props: IFilesProps) => {
           >
             Download
           </ToolbarButton>
+          {/* 删除：根据 selectedRows 数量在对话框中显示单/多项措辞 */}
           <ToolbarButton
             vertical
             icon={<DeleteRegular />}
@@ -863,7 +1038,11 @@ export const Files = (props: IFilesProps) => {
         </Toolbar>
       </div>
 
-      {/* Upload Progress */}
+      {/*
+        上传进度条：仅在上传进行中或刚完成时显示（完成后 3 秒自动隐藏）
+        - isUploading=true: 显示 Spinner + 当前文件名、序号和大小
+        - isCompleted=true: 显示绿色 Checkmark + "Upload completed" 提示
+      */}
       {(uploadProgress.isUploading || uploadProgress.isCompleted) && (
         <div className={styles.progressContainer}>
           {uploadProgress.isUploading ? (
@@ -886,7 +1065,15 @@ export const Files = (props: IFilesProps) => {
         </div>
       )}
 
-      {/* Download / Archive Progress */}
+      {/*
+        ZIP 归档下载进度：在归档任务活跃、完成或失败时显示
+        - isActive=true: 显示 Spinner，文字根据后端 status 细分三个阶段：
+            * 无 jobProgress（任务刚提交）: "Starting download job…"
+            * status=="preparing": 正在遍历文件结构，显示当前文件名
+            * status=="zipping": 正在压缩，显示 processedFiles/totalFiles 进度
+        - isCompleted=true: 显示绿色 Checkmark + "Archive ready" 提示（4 秒后自动清除）
+        - errorMessage 非空: 以红色文字显示错误原因
+      */}
       {(downloadProgress.isActive ||
         downloadProgress.isCompleted ||
         downloadProgress.errorMessage) && (
@@ -919,6 +1106,12 @@ export const Files = (props: IFilesProps) => {
         </div>
       )}
 
+      {/*
+        新建文件夹对话框：由工具栏 "New Folder" 按钮触发
+        - 输入框绑定 folderName 状态，空字符串时禁用确认按钮
+        - 点击 "Create Folder" 调用 onFolderCreateClick，期间显示 Spinner 并禁用所有按钮
+        - 创建完成后自动关闭对话框并刷新当前文件夹列表
+      */}
       <Dialog open={newFolderDialogOpen}>
         <DialogSurface>
           <DialogBody>
@@ -933,6 +1126,7 @@ export const Files = (props: IFilesProps) => {
                 value={folderName}
                 onChange={onHandleFolderNameChange}
               ></Input>
+              {/* 创建中显示 Spinner 阻止用户重复提交 */}
               {creatingFolder && (
                 <Spinner
                   size="medium"
@@ -951,6 +1145,7 @@ export const Files = (props: IFilesProps) => {
                   Cancel
                 </Button>
               </DialogTrigger>
+              {/* folderName 为空或正在创建时禁用，避免提交空名称或重复请求 */}
               <Button
                 appearance="primary"
                 onClick={onFolderCreateClick}
@@ -962,6 +1157,12 @@ export const Files = (props: IFilesProps) => {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+      {/*
+        确认删除对话框：由工具栏 "Delete" 按钮或行内删除触发
+        - 标题和正文根据 selectedRows.size 动态展示单/多项措辞
+        - 点击 "Delete" 调用 onDeleteItemClick（批量删除 → 刷新列表 → 关闭对话框）
+        - modalType="modal" 确保对话框获得焦点捕获，防止误操作背景区域
+      */}
       <Dialog
         open={deleteDialogOpen}
         modalType="modal"
@@ -969,6 +1170,7 @@ export const Files = (props: IFilesProps) => {
       >
         <DialogSurface>
           <DialogBody>
+            {/* 动态标题：单项显示 "Delete Item"，多项显示 "Delete N items" */}
             <DialogTitle>
               Delete{" "}
               {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
@@ -998,6 +1200,15 @@ export const Files = (props: IFilesProps) => {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+      {/*
+        文件列表 DataGrid：展示当前文件夹内所有文件和子文件夹
+        - items: 当前文件夹的 DriveItem 列表（IDriveItemExtended）
+        - getRowId: 使用 DriveItem.id 作为行唯一键，供多选状态跟踪
+        - resizableColumns + columnSizingOptions: 支持用户拖拽调整列宽
+        - selectionMode="multiselect": 支持 Shift/Ctrl 多选，选中集合存入 selectedRows
+        - DataGridHeader: 渲染列标题行（Name / Last Modified / Last Modified By / Actions）
+        - DataGridBody: 每行调用列定义中的 renderCell 渲染单元格内容
+      */}
       <DataGrid
         items={driveItems}
         columns={columns}
@@ -1026,7 +1237,16 @@ export const Files = (props: IFilesProps) => {
         </DataGridBody>
       </DataGrid>
 
-      {/* Preview Dialog */}
+      {/*
+        文件预览对话框（全屏）：点击文件名时打开
+        - isOpen / onDismiss: 受 previewOpen 状态控制，关闭时重置为 false
+        - currentFile: 当前预览的文件（IDriveItemExtended），由 DataGrid 行点击设置
+        - allFiles: 仅包含非文件夹文件（previewableFiles），用于前/后导航
+        - onNavigate: 点击前/后按钮时更新 currentPreviewFile，触发 Preview 重新加载 URL
+        - onDownload: 调用隐藏 <a> 标签触发直链下载
+        - onDelete: 删除当前文件并刷新列表后关闭对话框
+        - containerId: 容器 Drive ID，用于 Preview 内部构建 Graph API 路径
+      */}
       <Preview
         isOpen={previewOpen}
         onDismiss={() => setPreviewOpen(false)}
