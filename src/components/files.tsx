@@ -1,3 +1,28 @@
+/**
+ * 文件管理组件 - 核心业务逻辑
+ *
+ * 功能概述：
+ * 这是应用的核心组件，让用户能够在选定的 SharePoint Embedded 容器内：
+ * 1. 浏览文件和文件夹（支持文件夹导航）
+ * 2. 上传单个文件或完整的文件夹结构
+ * 3. 下载单个文件或多个文件/文件夹（打包为 ZIP）
+ * 4. 删除文件和文件夹
+ * 5. 创建新文件夹
+ * 6. 预览文件内容（通过 Preview 组件）
+ *
+ * 架构设计：
+ * - 使用 Microsoft Graph API 进行所有文件操作
+ * - 长时间操作（如下载多个文件）通过后端 job 队列异步处理
+ * - 进度反馈通过轮询后端 progress API 实现
+ * - 使用 Fluent UI DataGrid 组件显示文件列表
+ *
+ * 核心概念：
+ * - 文件夹导航：维护面包屑路径，支持快速返回
+ * - 文件夹上传：保留文件夹结构，递归创建目录
+ * - ZIP 下载：后端生成 ZIP job，前端轮询并下载
+ * - 进度反馈：实时显示上传/下载进度、文件数、当前文件等
+ */
+
 import React, { useState, useEffect, useRef } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import {

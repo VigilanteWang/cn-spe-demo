@@ -1,16 +1,679 @@
-# 代码注释指南 - 初级开发者学习文档
-
-> 本文档为改动的所有后端服务器文件详细讲解了代码含义和实现原理，适合初级开发者快速理解项目架构。
-
----
+# 后端服务文档
 
 ## 📋 目录
 
-1. [auth.ts - 权限验证核心模块](#authtx)
-2. [createContainer.ts - 创建容器API](#createcontainertx)
-3. [listContainers.ts - 列表容器API](#listcontainertx)
-4. [index.ts - 服务器主入口](#indextx)
-5. [关键概念速查表](#关键概念速查表)
+1. [项目概述](#项目概述)
+2. [项目结构](#项目结构)
+3. [核心模块详解](#核心模块详解)
+4. [API 端点参考](#api-端点参考)
+5. [权限验证流程](#权限验证流程)
+6. [开发指南](#开发指南)
+7. [关键概念速查表](#关键概念速查表)
+
+---
+
+## 项目概述
+
+**SharePoint Embedded Demo 后端**是一个基于 Node.js + Express 的 REST API 服务，负责与 Microsoft Graph API 集成，为前端应用提供容器和文件操作接口。
+
+### 主要职责
+
+✅ **权限验证**：验证前端传来的 Access Token，确保用户有权限操作  
+✅ **OBO 流程**：使用 On-Behalf-Of 流程交换 Graph API Token  
+✅ **容器操作**：创建、列表、查询 SharePoint Embedded 容器  
+✅ **文件操作**：上传、下载、删除、列表文件，通过 Graph API  
+✅ **异步任务**：处理长时间的下载/归档操作（Job 队列）  
+✅ **错误处理**：捕获并返回有意义的错误信息
+
+### 技术栈
+
+| 技术                       | 用途               |
+| -------------------------- | ------------------ |
+| **Node.js**                | 运行时环境         |
+| **Restify**                | HTTP 服务框架      |
+| **TypeScript**             | 类型安全           |
+| **MSAL-Node**              | Entr ID 认证       |
+| **Microsoft Graph**        | 与 SharePoint 交互 |
+| **Express/Restify 中间件** | CORS、认证等       |
+
+---
+
+## 项目结构
+
+```
+server/
+├── index.ts                         # 服务器主入口
+├── auth.ts                          # 权限验证和 Token 处理
+├── createContainer.ts               # 创建容器 API
+├── listContainers.ts                # 列表容器 API
+├── downloadArchive.ts               # 下载归档 API（Job 队列）
+├── deleteItems.ts                   # 删除项目 API
+├── config.ts                        # 配置和环境变量
+├── tsconfig.json                    # TypeScript 配置
+├── README.md                        # 本文件
+│
+└── common/
+    └── scopes.ts                    # 权限范围定义
+```
+
+### 文件说明
+
+| 文件                   | 职责                         | 关键函数                                                      |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------- |
+| **index.ts**           | 服务器启动、路由注册、中间件 | n/a (Express 应用设置)                                        |
+| **auth.ts**            | Token 验证、权限检查、OBO 流 | `authorizeContainerManageRequest()`                           |
+| **createContainer.ts** | 容器创建 API                 | `createContainer()`                                           |
+| **listContainers.ts**  | 容器列表 API                 | `listContainers()`                                            |
+| **downloadArchive.ts** | 异步下载/归档                | `startDownloadArchive()`, `expandItem()`, `expandFolder()` 等 |
+| **deleteItems.ts**     | 删除项目 API                 | `deleteItems()`                                               |
+| **config.ts**          | 环境变量加载和验证           | n/a                                                           |
+
+---
+
+## 核心模块详解
+
+### 1. auth.ts - 权限验证和 Token 处理
+
+**文件位置**: `server/auth.ts`
+
+**模块概要**
+
+这是安全核心模块，负责：
+
+- ✅ 验证前端 Access Token 的真实性
+- ✅ 提取 Token 中的身份和权限信息
+- ✅ 检查用户是否拥有 Container.Manage 权限
+- ✅ 使用 OBO 流程获取 Graph API 的 Token
+- ✅ 创建用于调用 Graph API 的客户端
+
+**核心概念**
+
+#### JWT (JSON Web Token)
+
+JWT 是标准的身份令牌格式，分三部分用 `.` 分隔：
+
+```
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwcyI6In0.nV...
+|         Header (头)        |  |    Payload (载荷)      |  | Signature (签名) |
+```
+
+- **Header**：加密算法（如 RS256 = RSA + SHA256）
+- **Payload**：用户身份、权限、过期时间等声明 (Claims)
+- **Signature**：服务器私钥签署的数字签名，防止篡改
+
+#### JWKS (JSON Web Key Set)
+
+JWKS 是微软发布的**公钥集合**，用来验证 JWT 签名：
+
+```
+获取 JWKS → 查找签署 Token 的公钥 → 验证签名有效
+```
+
+#### Scope (权限范围)
+
+Token 中的 `scp` claim 包含用户拥有的权限，示例：
+
+```
+scp: "Container.Manage FileStorageContainer.Selected"
+```
+
+#### Token 版本
+
+Entra ID 支持两个 Token 版本：
+
+| 版本     | 特点           | Issuer                                                                         |
+| -------- | -------------- | ------------------------------------------------------------------------------ |
+| **v1.0** | 旧版，向后兼容 | `sts.windows.net` (全球) / `sts.chinacloudapi.cn` (中国)                       |
+| **v2.0** | 新版，推荐使用 | `login.microsoftonline.com` (全球) / `login.partner.microsoftonline.cn` (中国) |
+
+**关键函数**
+
+```typescript
+/**
+ * 验证容器管理权限
+ *
+ * 流程：
+ * 1. 从 Header 提取 Bearer Token
+ * 2. 从 Token Header 识别 kid (密钥 ID)
+ * 3. 从 JWKS 获取该密钥的公钥
+ * 4. 验证 Token 签名
+ * 5. 验证 Token 未过期
+ * 6. 验证 Token 的 audience（目标用户）
+ * 7. 验证 Token 中包含 Container.Manage 权限
+ *
+ * @param req 请求对象
+ * @returns 验证结果（成功或失败）
+ */
+async function authorizeContainerManageRequest(
+  req,
+): Promise<AuthorizationResult>;
+
+/**
+ * 使用 OBO 流程获取 Graph API Token
+ *
+ * On-Behalf-Of (代表用户) 流程：
+ * 1. 后端接收前端的 Access Token (token A)
+ * 2. 后端以应用身份向 Entra ID 请求：
+ *    "我想代表用户使用 token A，给我一个 Graph API Token"
+ * 3. Entra ID 验证 token A 有效，返回 Graph Token (token B)
+ * 4. 后端使用 token B 调用 Graph API
+ *
+ * 优点：
+ * - 保密：前端的敏感信息（如 Token）在后端验证
+ * - 一致性：后端代表用户调用 Graph，权限检查一致
+ */
+async function getGraphToken(refreshToken): Promise<string>;
+
+/**
+ * 创建 Graph API 客户端
+ *
+ * 作用：初始化 Microsoft Graph SDK 客户端，配置认证、基 URL 等
+ */
+function createGraphClient(graphToken): GraphClient;
+```
+
+**工作流程示例**
+
+```
+前端用户点击 "创建容器"
+  ↓
+前端发送 POST /api/createContainer，Header: Authorization: Bearer {token A}
+  ↓
+后端接收请求
+  ↓
+调用 authorizeContainerManageRequest()
+  ├─ 从 Header 提取 token A
+  ├─ 验证签名和过期时间
+  ├─ 检查 Container.Manage 权限
+  └─ 提取用户身份 (claims)
+  ↓
+调用 getGraphToken(token A via OBO)
+  ├─ 向 Entra ID 使用 OBO 流程
+  └─ 获取 Graph API Token (token B)
+  ↓
+创建 Graph 客户端，使用 token B
+  ↓
+调用 Graph API 创建容器
+  ↓
+返回结果给前端
+```
+
+### 2. createContainer.ts - 创建容器 API
+
+**模块概要**
+
+提供 POST /api/createContainer API，允许用户创建新容器。
+
+**请求/响应**
+
+```bash
+POST /api/createContainer
+
+请求 Header:
+  Authorization: Bearer {access_token}
+  Content-Type: application/json
+
+请求 Body:
+  {
+    "displayName": "My Container",
+    "description": "A test container"
+  }
+
+响应 (201 Created):
+  {
+    "id": "b!abc123...",
+    "displayName": "My Container",
+    "containerTypeId": "...-...-...",
+    "createdDateTime": "2024-01-01T10:00:00Z"
+  }
+```
+
+**设计特点**
+
+- ✅ 验证容器名称有效
+- ✅ 使用 containerTypeId (从环境变量) 指定容器类型
+- ✅ 捕获并返回 Graph API 错误
+
+### 3. listContainers.ts - 容器列表 API
+
+**模块概要**
+
+提供 GET /api/listContainers API，返回用户有权访问的容器列表。
+
+**请求/响应**
+
+```bash
+GET /api/listContainers
+
+请求 Header:
+  Authorization: Bearer {access_token}
+
+响应 (200 OK):
+  {
+    "value": [
+      {
+        "id": "b!abc123...",
+        "displayName": "Container 1",
+        "containerTypeId": "...",
+        "createdDateTime": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": "b!def456...",
+        "displayName": "Container 2",
+        "containerTypeId": "...",
+        "createdDateTime": "2024-01-02T00:00:00Z"
+      }
+    ]
+  }
+```
+
+### 4. downloadArchive.ts - 异步文件下载/归档
+
+**模块概要**
+
+处理长时间操作的异步 API，将多个文件打包成 ZIP。使用工作队列 (Job Queue) 实现：
+
+```
+POST /api/downloadArchive/start → 返回 jobId
+                ↓
+GET /api/downloadArchive/progress/{jobId} → 轮询进度
+                ↓
+GET /api/downloadArchive/file/{jobId} → 下载 ZIP
+```
+
+**API 端点**
+
+```bash
+# 启动下载任务
+POST /api/downloadArchive/start
+  Body: { "containerId": "...", "itemIds": [...] }
+  Response: { "jobId": "job-123-..." }
+
+# 查询进度
+GET /api/downloadArchive/progress/job-123-...
+  Response: {
+    "status": "preparing|zipping|ready|failed",
+    "processedFiles": 45,
+    "totalFiles": 100,
+    "currentItem": "document.pdf",
+    "errors": []
+  }
+
+# 下载 ZIP 文件
+GET /api/downloadArchive/file/job-123-...
+  Response: Binary ZIP data
+```
+
+**关键函数**
+
+```typescript
+/**
+ * 递归展开项目（获取文件夹内容）
+ *
+ * 场景：用户选择了一个文件夹，需要下载其所有内容
+ *
+ * 处理过程：
+ * 1. 获取文件夹的 children
+ * 2. 对每个 child：
+ *    - 如果是文件，记录文件 URL
+ *    - 如果是文件夹，递归展开
+ * 3. 返回扁平的文件列表
+ */
+async function expandItem(graphClient, driveId, itemId): Promise<FileInfo[]>
+
+/**
+ * 递归获取文件夹所有文件
+ *
+ * 特点：处理 Graph API 分页（默认返回 200 项）
+ * 如果文件夹包含超过 200 个文件，需要尝试获取更多页
+ */
+async function expandFolder(...)
+```
+
+**设计考虑**
+
+- **内存管理**：大量文件不会一次性加载到内存，使用流式处理
+- **超时处理**：长时间归档可能超时，通过 Job Queue 处理
+- **并发控制**：避免同时开始过多的文件下载
+- **错误恢复**：如果某些文件下载失败，记录错误继续
+
+### 5. deleteItems.ts - 删除项目 API
+
+**请求/响应**
+
+```bash
+POST /api/deleteItems
+
+请求 Body:
+  {
+    "containerId": "b!...",
+    "itemIds": ["item-1", "item-2", ...]
+  }
+
+响应:
+  {
+    "successful": ["item-1"],
+    "failed": [
+      { "id": "item-2", "reason": "Access Denied" }
+    ]
+  }
+```
+
+**特点**
+
+- ✅ 逐个删除，收集成功/失败结果
+- ✅ 不会因为某个文件删除失败而中断
+- ✅ 返回详细的失败原因
+
+---
+
+## API 端点参考
+
+### 容器操作
+
+#### GET /api/listContainers
+
+获取用户有权访问的容器列表。
+
+**权限要求**：Container.Manage
+
+**响应**
+
+```json
+{
+  "value": [
+    {
+      "id": "string",
+      "displayName": "string",
+      "containerTypeId": "string",
+      "createdDateTime": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+#### POST /api/createContainer
+
+创建新的 SharePoint Embedded 容器。
+
+**权限要求**：Container.Manage
+
+**请求体**
+
+```json
+{
+  "displayName": "string", // 必需：容器名称
+  "description": "string" // 可选：容器描述
+}
+```
+
+**响应** (IContainer)
+
+```json
+{
+  "id": "b!...",
+  "displayName": "string",
+  "containerTypeId": "string",
+  "createdDateTime": "2024-01-01T00:00:00Z"
+}
+```
+
+### 文件操作
+
+#### POST /api/deleteItems
+
+删除一个或多个文件/文件夹。
+
+**权限要求**：FileStorageContainer.Selected
+
+**请求体**
+
+```json
+{
+  "containerId": "b!...",           // 容器 ID
+  "itemIds": ["id1", "id2", ...]   // 要删除的项目 ID
+}
+```
+
+**响应**
+
+```json
+{
+  "successful": ["id1"],
+  "failed": [
+    {
+      "id": "id2",
+      "reason": "Access Denied"
+    }
+  ]
+}
+```
+
+### 下载/归档操作
+
+#### POST /api/downloadArchive/start
+
+启动文件下载/归档任务。
+
+**权限要求**：FileStorageContainer.Selected
+
+**请求体**
+
+```json
+{
+  "containerId": "b!...",
+  "itemIds": ["file1", "folder1", ...]
+}
+```
+
+**响应**
+
+```json
+{
+  "jobId": "job-uuid-..."
+}
+```
+
+#### GET /api/downloadArchive/progress/:jobId
+
+查询下载任务的进度。
+
+**响应**
+
+```json
+{
+  "status": "queued|preparing|zipping|ready|failed",
+  "processedFiles": 0,
+  "totalFiles": 5,
+  "currentItem": "filename.pdf",
+  "errors": []
+}
+```
+
+#### GET /api/downloadArchive/file/:jobId
+
+下载已完成的 ZIP 文件。
+
+**响应**：Binary ZIP data (Content-Type: application/zip)
+
+---
+
+## 权限验证流程
+
+### 整体流程
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 前端请求 API                                        │
+│ GET /api/listContainers                             │
+│ Header: Authorization: Bearer {accessToken}         │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────┐
+│ 后端接收请求                                        │
+│ 调用 authorizeContainerManageRequest()              │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────┐
+│ 步骤1. 解析 Bearer Token                            │
+│ const token = req.headers.authorization.split(" ")[1]
+└────────────────────┬────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────┐
+│ 步骤2. 验证 Token 签名                              │
+│ - 获取 Token Header 中的 kid (密钥 ID)              │
+│ - 从 JWKS 获取该 kid 对应的公钥                     │
+│ - 验证 Token 签名                                  │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────┐
+│ 步骤3. 验证 Token 声明 (Claims)                    │
+│ - exp: Token 未过期                                │
+│ - aud: Audience 是本应用的 Client ID               │
+│ - iss: Issuer 是微软 Entra ID                      │
+│ - ver: Token 版本（1.0 或 2.0）                    │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────┐
+│ 步骤4. 检查权限 (Scopes)                           │
+│ 检查 scp claim 是否包含 "Container.Manage"         │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+         验证通过 ✓         验证失败 ✗
+            ↓                  ↓
+    调用实际 API          返回 401/403 错误
+         ↓
+    调用 getGraphToken(token) 获取 Graph API Token
+         ↓
+    创建 Graph Client
+         ↓
+    调用 Graph API
+         ↓
+    返回结果给前端
+```
+
+### 云环境选择
+
+后端支持全球和中国 Azure 环境：
+
+```typescript
+// 全球环境
+AAD AUTHORITY: https://login.microsoftonline.com
+GRAPH API:     https://graph.microsoft.com
+
+// 中国环境
+AAD AUTHORITY: https://login.chinacloudapi.cn
+GRAPH API:     https://microsoftgraph.chinacloudapi.cn
+```
+
+通过环境变量 `API_CLOUD_ENV` (global|china) 选择。
+
+---
+
+## 开发指南
+
+### 环境变量配置
+
+复制 `.env` 文件，填入您的值：
+
+```bash
+# Entra ID 应用配置
+API_ENTRA_APP_CLIENT_ID=<your_app_id>
+API_ENTRA_APP_CLIENT_SECRET=<your_app_secret>
+API_ENTRA_APP_TENANT_ID=<your_tenant_id>
+
+# SharePoint Embedded 配置
+API_CONTAINER_TYPE_ID=<your_container_type_id>
+
+# 云环境
+API_CLOUD_ENV=global
+
+# 前端地址（CORS）
+API_FRONTEND_URL=http://localhost:3000
+
+# 服务器配置
+API_PORT=5000
+API_BASE_URL=http://localhost:5000
+```
+
+### 本地运行
+
+```bash
+# 安装依赖
+npm install
+
+# 编译 TypeScript
+npm run build
+
+# 运行（调试模式）
+npm run dev:backend:debug
+
+# 或生产模式
+npm start
+```
+
+### 新增 API 端点
+
+1. 在 `index.ts` 中注册路由：
+
+```typescript
+server.post("/api/newEndpoint", authenticateAndHandle);
+```
+
+2. 创建处理函数，验证权限：
+
+```typescript
+async function handleNewEndpoint(req, res) {
+  // 验证权限
+  const auth = await authorizeContainerManageRequest(req);
+  if (!auth.ok) {
+    return res.send(auth.status, { message: auth.body.message });
+  }
+
+  // 业务逻辑
+  const graphToken = await getGraphToken(auth.token);
+  const graphClient = createGraphClient(graphToken);
+
+  // 调用 Graph API
+  const result = await graphClient.api(...).get();
+  res.send(200, result);
+}
+```
+
+### 测试 API
+
+使用 Postman 或 curl 测试：
+
+```bash
+# 获取容器列表
+curl -H "Authorization: Bearer {token}" \
+     http://localhost:5000/api/listContainers
+
+# 创建容器
+curl -X POST http://localhost:5000/api/createContainer \
+     -H "Authorization: Bearer {token}" \
+     -H "Content-Type: application/json" \
+     -d '{"displayName":"Test","description":"Test container"}'
+```
+
+---
+
+## 关键概念速查表
+
+| 概念              | 说明                                   | 相关文件                  |
+| ----------------- | -------------------------------------- | ------------------------- |
+| **JWT**           | JSON Web Token，身份令牌格式           | auth.ts                   |
+| **JWKS**          | JSON Web Key Set，微软公钥集合         | auth.ts                   |
+| **OBO**           | On-Behalf-Of，代表用户交换 token       | auth.ts                   |
+| **Scope**         | OAuth 权限范围，如 Container.Manage    | common/scopes.ts, auth.ts |
+| **Token Version** | v1.0 (旧) vs v2.0 (新)                 | auth.ts                   |
+| **Cloud Env**     | 云环境选择：Global vs China            | config.ts                 |
+| **Job Queue**     | 异步任务队列，处理长时间操作           | downloadArchive.ts        |
+| **Pagination**    | Graph API 分页（默认 200 + next link） | downloadArchive.ts        |
+
+---
+
+**最后更新**：2024 年 4 月
 
 ---
 
