@@ -170,6 +170,18 @@ const OFFICE_EXTENSIONS = [
 const VISIO_EXTENSIONS = ["vsd", "vsdx"];
 
 /**
+ * 安全地在新标签页打开 URL：
+ * - 使用 noopener/noreferrer 防止新页面通过 window.opener 回跳控制当前页面
+ * - 避免将来源页面 URL 作为 Referer 传递
+ */
+const openInIsolatedTab = (url: string) => {
+  const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+  if (newWindow) {
+    newWindow.opener = null;
+  }
+};
+
+/**
  * 文件预览组件
  *
  * 状态管理：
@@ -209,7 +221,7 @@ export const Preview: React.FC<IPreviewProps> = ({
     if (currentFile && isOpen) {
       loadPreviewUrl();
     }
-  }, [currentFile, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentFile, isOpen]);
 
   /**
    * 加载文件预览 URL
@@ -319,20 +331,17 @@ export const Preview: React.FC<IPreviewProps> = ({
     const fileExtension =
       currentFile.name?.split(".").pop()?.toLowerCase() || "";
 
-    // Check if it's an Office or Visio document
-    if (
+    const isOfficeOrVisio =
       OFFICE_EXTENSIONS.includes(fileExtension) ||
-      VISIO_EXTENSIONS.includes(fileExtension)
-    ) {
-      // Open webUrl for Office/Visio documents to enable editing
-      if (currentFile.webUrl) {
-        window.open(currentFile.webUrl, "_blank");
-      }
-    } else {
-      // Open preview URL for other files
-      if (previewUrl) {
-        window.open(previewUrl, "_blank");
-      }
+      VISIO_EXTENSIONS.includes(fileExtension);
+
+    // 优先使用 webUrl，减少在地址栏暴露 preview 临时令牌的概率；不可用时再回退 previewUrl
+    const targetUrl = isOfficeOrVisio
+      ? currentFile.webUrl
+      : currentFile.webUrl || previewUrl;
+
+    if (targetUrl) {
+      openInIsolatedTab(targetUrl);
     }
   };
 
@@ -387,12 +396,13 @@ export const Preview: React.FC<IPreviewProps> = ({
               </div>
             ) : previewUrl ? (
               <>
-                {/* sandbox 属性允许脚本、表单和弹窗，但技术上限制了最高权限访问，防止跨域击穿 */}
+                {/*  sandbox：保留预览必需能力，避免弹窗逃逸并减少跨域隔离削弱 */}
                 <iframe
                   src={previewUrl}
                   className={styles.previewFrame}
                   title={`Preview of ${currentFile.name}`}
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox"
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"
+                  referrerPolicy="no-referrer"
                 />
               </>
             ) : (
@@ -429,7 +439,7 @@ export const Preview: React.FC<IPreviewProps> = ({
               >
                 Download
               </Button>
-              {/* 新标签页打开：Office 文档 → webUrl（编辑模式），其他文件 → previewUrl（只读） */}
+              {/* 新标签页打开，默认webUrl（编辑模式）, 非Office文件会显示access denied，只有在没有webUrl时才使用previewUrl，保证文件安全 */}
               <Button
                 icon={<OpenRegular />}
                 onClick={handleOpenInNewTab}

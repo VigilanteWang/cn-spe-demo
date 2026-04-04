@@ -21,15 +21,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "storage",
-                    "fileStorage",
-                    "containers"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "storage", "fileStorage", "containers"],
                   "query": [
                     {
                       "key": "$filter",
@@ -75,15 +68,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "storage",
-                    "fileStorage",
-                    "containers"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "storage", "fileStorage", "containers"]
                 }
               },
               "response": []
@@ -109,9 +95,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -150,9 +134,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -173,9 +155,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/activate",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -210,9 +190,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -259,9 +237,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -291,9 +267,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -330,9 +304,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -352,9 +324,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -365,9 +335,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -414,9 +382,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -435,9 +401,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -448,9 +412,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -487,9 +449,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -511,9 +471,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -543,9 +501,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -564,9 +520,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -586,9 +540,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -608,9 +560,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -659,15 +609,111 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers",
                     "{{ContainerId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List recycle bin items",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete recycle bin items",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"ids\": [\r\n    \"{{RecycleBinItemId}}\"\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items/delete",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items",
+                    "delete"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Restore recycle bin items",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"ids\": [\r\n    \"{{RecycleBinItemId}}\"\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items/restore",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items",
+                    "restore"
                   ]
                 }
               },
@@ -679,18 +725,14 @@
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  ""
-                ]
+                "exec": [""]
               }
             },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  ""
-                ]
+                "exec": [""]
               }
             }
           ]
@@ -709,9 +751,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -736,9 +776,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -761,9 +799,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -789,9 +825,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -815,9 +849,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -842,9 +874,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -869,9 +899,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -912,9 +940,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -940,9 +966,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -966,9 +990,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1009,9 +1031,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1038,9 +1058,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1083,9 +1101,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1113,9 +1129,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1141,9 +1155,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -1173,9 +1185,7 @@
                     {
                       "listen": "test",
                       "script": {
-                        "exec": [
-                          ""
-                        ],
+                        "exec": [""],
                         "type": "text/javascript",
                         "packages": {}
                       }
@@ -1193,9 +1203,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -1242,9 +1250,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/invite",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -1291,9 +1297,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/createLink",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -1347,9 +1351,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -1392,9 +1394,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -1451,14 +1451,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "drives",
-                    "{{ContainerId}}"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "drives", "{{ContainerId}}"]
                 }
               },
               "response": []
@@ -1505,9 +1499,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/root/children?$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1572,15 +1564,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items?$filter=startswith(listitem/fields/MyColumn, 'My Value')&$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "drives",
-                    "{{ContainerId}}",
-                    "items"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "drives", "{{ContainerId}}", "items"],
                   "query": [
                     {
                       "key": "$filter",
@@ -1626,9 +1611,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root:/{{file_name_with_extension}}:/content",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1647,9 +1630,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1661,9 +1642,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1681,9 +1660,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1704,9 +1681,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1741,9 +1716,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1763,9 +1736,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1796,9 +1767,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1818,9 +1787,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1832,9 +1799,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/thumbnails",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1853,9 +1818,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1867,9 +1830,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/versions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1888,9 +1849,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -1910,9 +1869,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/preview",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1960,9 +1917,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/children",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -1980,9 +1935,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -1994,9 +1947,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -2014,9 +1965,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -2037,9 +1986,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -2057,9 +2004,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -2077,9 +2022,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}/children",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -2115,9 +2058,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -2135,9 +2076,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -2155,9 +2094,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/search(q='{contoso}')",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -2192,14 +2129,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "search",
-                    "query"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "search", "query"]
                 }
               },
               "response": []
@@ -2222,14 +2153,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "search",
-                    "query"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "search", "query"]
                 }
               },
               "response": []
@@ -2251,9 +2176,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -2264,9 +2187,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2306,9 +2227,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2327,9 +2246,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2358,9 +2275,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2402,9 +2317,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2425,9 +2338,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2469,9 +2380,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/{{custodianId}}/userSources",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2492,9 +2401,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -2514,9 +2421,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/applyHold",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2538,9 +2443,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/custodians/{{custodianId}}/userSources",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2585,9 +2488,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2617,9 +2518,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources/applyHold",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2641,9 +2540,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/noncustodialDataSources",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2690,9 +2587,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2719,9 +2614,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2740,9 +2633,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -2762,9 +2653,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches/{{ediscoverySearchId}}/estimateStatistics",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2793,9 +2682,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/searches/{{ediscoverySearchId}}/lastEstimateStatisticsOperation",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2839,9 +2726,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2868,9 +2753,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2889,9 +2772,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -2911,9 +2792,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/addToReviewSet",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2957,9 +2836,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -2980,9 +2857,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -3002,9 +2877,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries/{{ediscoveryReviewSetQueryId}}",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -3034,9 +2907,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -3057,9 +2928,7 @@
                         {
                           "listen": "test",
                           "script": {
-                            "exec": [
-                              ""
-                            ],
+                            "exec": [""],
                             "type": "text/javascript"
                           }
                         }
@@ -3079,9 +2948,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/reviewSets/{{ediscoveryReviewSetId}}/queries/{{ediscoveryReviewSetQueryId}}",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -3111,9 +2978,7 @@
                         "url": {
                           "raw": "{{GraphBaseUrl}}/v1.0/security/cases/ediscoveryCases/{{ediscoveryCaseId}}/operations",
                           "protocol": "https",
-                          "host": [
-                            "{{GraphHost}}"
-                          ],
+                          "host": ["{{GraphHost}}"],
                           "path": [
                             "v1.0",
                             "security",
@@ -3165,14 +3030,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"]
                 }
               },
               "response": []
@@ -3212,14 +3071,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Severity eq 'High'&$top=5",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"],
                   "query": [
                     {
                       "key": "$filter",
@@ -3269,14 +3122,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=vendorInformation/provider eq 'ASC'&$top=5",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"],
                   "query": [
                     {
                       "key": "$filter",
@@ -3326,14 +3173,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Category eq 'ransomware'&$top=5",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"],
                   "query": [
                     {
                       "key": "$filter",
@@ -3383,14 +3224,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=networkConnections/any(d:d/destinationAddress eq '{destination-address}')",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"],
                   "query": [
                     {
                       "key": "$filter",
@@ -3436,14 +3271,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/alerts?$filter=Status eq 'NewAlert'&$top=1",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "alerts"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "alerts"],
                   "query": [
                     {
                       "key": "$filter",
@@ -3493,14 +3322,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/security/secureScores?$top=5",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "security",
-                    "secureScores"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "security", "secureScores"],
                   "query": [
                     {
                       "key": "$top",
@@ -3546,14 +3369,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/secureScoreControlProfiles?$top=5",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "security",
-                    "secureScoreControlProfiles"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "security", "secureScoreControlProfiles"],
                   "query": [
                     {
                       "key": "$top",
@@ -3604,14 +3421,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/tiIndicators",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "security",
-                    "tiIndicators"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "security", "tiIndicators"]
                 }
               },
               "response": []
@@ -3651,9 +3462,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/tiIndicators/{{TIIndicatorId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "beta",
                     "security",
@@ -3704,14 +3513,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/securityActions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "security",
-                    "securityActions"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "security", "securityActions"]
                 }
               },
               "response": []
@@ -3756,9 +3559,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/securityActions/{{SecurityActionsId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "beta",
                     "security",
@@ -3809,15 +3610,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/security/labels/retentionLabels",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "security",
-                    "labels",
-                    "retentionLabels"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "security", "labels", "retentionLabels"]
                 }
               },
               "response": []
@@ -3905,18 +3699,14 @@
           "listen": "prerequest",
           "script": {
             "type": "text/javascript",
-            "exec": [
-              ""
-            ]
+            "exec": [""]
           }
         },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
-            "exec": [
-              ""
-            ]
+            "exec": [""]
           }
         }
       ]
@@ -3979,9 +3769,7 @@
                 },
                 "url": {
                   "raw": "{{RootSiteUrl}}/_api/v2.1/storageContainerTypes/{{ContainerTypeId}}/applicationPermissions",
-                  "host": [
-                    "{{RootSiteUrl}}"
-                  ],
+                  "host": ["{{RootSiteUrl}}"],
                   "path": [
                     "_api",
                     "v2.1",
@@ -4001,15 +3789,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "storage",
-                    "fileStorage",
-                    "containers"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "storage", "fileStorage", "containers"],
                   "query": [
                     {
                       "key": "$filter",
@@ -4055,15 +3836,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "storage",
-                    "fileStorage",
-                    "containers"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "storage", "fileStorage", "containers"]
                 }
               },
               "response": []
@@ -4089,9 +3863,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}?$select=id,displayName,containerTypeId,status,description,customProperties,itemMajorVersionLimit,isItemVersioningEnabled&$expand=permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4130,9 +3902,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4153,9 +3923,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/activate",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4190,9 +3958,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4239,9 +4005,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4271,9 +4035,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4310,9 +4072,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/permissions/{{PermissionId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4332,9 +4092,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -4345,9 +4103,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4394,9 +4150,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4415,9 +4169,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -4428,9 +4180,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4467,9 +4217,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/columns/{{ColumnId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4491,9 +4239,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4523,9 +4269,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/customProperties",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4544,9 +4288,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -4566,9 +4308,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4588,9 +4328,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers?$filter=containerTypeId eq {{ContainerTypeId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
@@ -4639,15 +4377,111 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/deletedContainers/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "storage",
                     "fileStorage",
                     "deletedContainers",
                     "{{ContainerId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List recycle bin items",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete recycle bin items",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"ids\": [\r\n    \"{{RecycleBinItemId}}\"\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items/delete",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items",
+                    "delete"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Restore recycle bin items",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"ids\": [\r\n    \"{{RecycleBinItemId}}\"\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containers/{{ContainerId}}/recycleBin/items/restore",
+                  "protocol": "https",
+                  "host": ["{{GraphHost}}"],
+                  "path": [
+                    "v1.0",
+                    "storage",
+                    "fileStorage",
+                    "containers",
+                    "{{ContainerId}}",
+                    "recycleBin",
+                    "items",
+                    "restore"
                   ]
                 }
               },
@@ -4659,18 +4493,14 @@
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  ""
-                ]
+                "exec": [""]
               }
             },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  ""
-                ]
+                "exec": [""]
               }
             }
           ]
@@ -4689,9 +4519,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4716,9 +4544,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4741,9 +4567,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4769,9 +4593,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4795,9 +4617,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypes/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4822,9 +4642,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4849,9 +4667,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4892,9 +4708,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4920,9 +4734,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4946,9 +4758,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -4989,9 +4799,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -5018,9 +4826,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -5063,9 +4869,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -5093,9 +4897,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -5121,9 +4923,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/storage/fileStorage/containerTypeRegistrations/{{ContainerTypeRegistrationId}}/applicationPermissionGrants/{{TargetAppId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "storage",
@@ -5153,9 +4953,7 @@
                     {
                       "listen": "test",
                       "script": {
-                        "exec": [
-                          ""
-                        ],
+                        "exec": [""],
                         "type": "text/javascript",
                         "packages": {}
                       }
@@ -5173,9 +4971,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -5222,9 +5018,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/invite",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -5271,9 +5065,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/createLink",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -5327,9 +5119,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -5372,9 +5162,7 @@
                     "url": {
                       "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/permissions/{{PermissionId}}",
                       "protocol": "https",
-                      "host": [
-                        "{{GraphHost}}"
-                      ],
+                      "host": ["{{GraphHost}}"],
                       "path": [
                         "v1.0",
                         "drives",
@@ -5431,14 +5219,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "drives",
-                    "{{ContainerId}}"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "drives", "{{ContainerId}}"]
                 }
               },
               "response": []
@@ -5485,9 +5267,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/root/children?$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5552,15 +5332,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items?$filter=startswith(listitem/fields/MyColumn, 'My Value')&$expand=listitem($expand=fields)",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "v1.0",
-                    "drives",
-                    "{{ContainerId}}",
-                    "items"
-                  ],
+                  "host": ["{{GraphHost}}"],
+                  "path": ["v1.0", "drives", "{{ContainerId}}", "items"],
                   "query": [
                     {
                       "key": "$filter",
@@ -5606,9 +5379,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root:/{{file_name_with_extension}}:/content",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5627,9 +5398,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -5641,9 +5410,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5661,9 +5428,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -5684,9 +5449,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5721,9 +5484,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5743,9 +5504,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5776,9 +5535,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/listitem/fields",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5798,9 +5555,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -5812,9 +5567,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/thumbnails",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5833,9 +5586,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -5847,9 +5598,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/versions",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5868,9 +5617,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript"
                   }
                 }
@@ -5890,9 +5637,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FileId}}/preview",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5940,9 +5685,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/children",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5960,9 +5703,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -5974,9 +5715,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -5994,9 +5733,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -6017,9 +5754,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -6037,9 +5772,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -6057,9 +5790,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}/children",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -6095,9 +5826,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/items/{{FolderId}}",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -6115,9 +5844,7 @@
                 {
                   "listen": "test",
                   "script": {
-                    "exec": [
-                      ""
-                    ],
+                    "exec": [""],
                     "type": "text/javascript",
                     "packages": {}
                   }
@@ -6135,9 +5862,7 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/v1.0/drives/{{ContainerId}}/root/search(q='{contoso}')",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
+                  "host": ["{{GraphHost}}"],
                   "path": [
                     "v1.0",
                     "drives",
@@ -6172,14 +5897,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "search",
-                    "query"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "search", "query"]
                 }
               },
               "response": []
@@ -6202,14 +5921,8 @@
                 "url": {
                   "raw": "{{GraphBaseUrl}}/beta/search/query",
                   "protocol": "https",
-                  "host": [
-                    "{{GraphHost}}"
-                  ],
-                  "path": [
-                    "beta",
-                    "search",
-                    "query"
-                  ]
+                  "host": ["{{GraphHost}}"],
+                  "path": ["beta", "search", "query"]
                 }
               },
               "response": []
@@ -6477,9 +6190,7 @@
           "listen": "test",
           "script": {
             "type": "text/javascript",
-            "exec": [
-              ""
-            ]
+            "exec": [""]
           }
         }
       ]
@@ -6546,9 +6257,7 @@
       "listen": "test",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     }
   ],
