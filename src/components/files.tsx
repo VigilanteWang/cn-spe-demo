@@ -124,6 +124,11 @@ interface IUploadProgress {
   isCompleted: boolean; // 上传是否已完成（用于显示完成提示）
 }
 
+/** 扩展 File 类型：文件夹上传时浏览器会提供 webkitRelativePath */
+interface IFileWithRelativePath extends File {
+  webkitRelativePath: string;
+}
+
 /**
  * ZIP 归档下载进度状态
  *
@@ -135,6 +140,8 @@ interface IDownloadProgress {
   isCompleted: boolean; // 是否下载完成
   errorMessage: string; // 错误信息（为空表示无错误）
 }
+
+/** 组件样式定义 */
 const useStyles = makeStyles({
   dialogInputControl: {
     width: "400px",
@@ -222,14 +229,13 @@ export const Files = (props: IFilesProps) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =
     useState<IDriveItemExtended | null>(null);
-  // BOOKMARK 1 - constants & hooks
 
   // =============== 副作用：容器变化时重新加载文件列表 ===============
   useEffect(() => {
     (async () => {
       loadItems();
     })();
-  }, [props]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props]);
 
   // =============== 工具函数 ===============
 
@@ -243,7 +249,7 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
-   * 从 FileList 中提取文件及其相对路径
+   * 这段代码的作用是将从本地计算机中选中的文件整理成一个包含“相对路径”的列表，以便后续上传时能够保留文件夹结构。
    * 对于文件夹上传（webkitdirectory），会保留完整的相对路径结构
    * 对于单文件上传，relativePath 就是文件名
    **/
@@ -253,8 +259,9 @@ export const Files = (props: IFilesProps) => {
     const result: Array<{ file: File; relativePath: string }> = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const fileWithRelativePath = file as IFileWithRelativePath;
       // Use webkitRelativePath for folder uploads or just the file name for single files
-      const relativePath = (file as any).webkitRelativePath || file.name;
+      const relativePath = fileWithRelativePath.webkitRelativePath || file.name;
       result.push({ file, relativePath });
     }
     return result;
