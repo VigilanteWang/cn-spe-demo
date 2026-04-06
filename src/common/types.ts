@@ -25,7 +25,7 @@ export interface IDriveItemExtended extends DriveItem {
   isFolder: boolean;
   modifiedByName: string;
   iconElement: JSX.Element;
-  downloadUrl: string;
+  downloadUrl?: string;
 }
 
 /**

@@ -129,6 +129,13 @@ interface IFileWithRelativePath extends File {
   webkitRelativePath: string;
 }
 
+/** 扩展 DriveItem 类型，增加 @microsoft.graph.downloadUrl 属性
+ * 在 SPA中需要这个属性，详见 https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0&tabs=http#downloading-files-in-javascript-apps
+ */
+interface DriveItemWithDownloadUrl extends DriveItem {
+  "@microsoft.graph.downloadUrl"?: string;
+}
+
 /**
  * ZIP 归档下载进度状态
  *
@@ -288,9 +295,9 @@ export const Files = (props: IFilesProps) => {
       const graphResponse = await graphClient
         .api(`/drives/${driveId}/items/${driveItemId}/children`)
         .get();
-      const containerItems: DriveItem[] = graphResponse.value as DriveItem[];
+      const containerItems = graphResponse.value as DriveItemWithDownloadUrl[];
       const items: IDriveItemExtended[] = [];
-      containerItems.forEach((driveItem: DriveItem) => {
+      containerItems.forEach((driveItem) => {
         items.push({
           ...driveItem,
           isFolder: driveItem.folder ? true : false,
@@ -302,7 +309,7 @@ export const Files = (props: IFilesProps) => {
           ) : (
             <DocumentRegular />
           ),
-          downloadUrl: (driveItem as any)["@microsoft.graph.downloadUrl"],
+          downloadUrl: driveItem["@microsoft.graph.downloadUrl"],
         });
       });
       setDriveItems(items);
@@ -326,7 +333,10 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
-   * 通过隐藏 <a> 标签触发单文件直链下载
+   * url是调用graph获得的短时downloadUrl，所以
+   * 点击下载按钮触发 onToolbarDownloadClick， 其中会调用此函数
+   * 通过 useRef 拿到 隐藏的 <a> 标签的真实 DOM 实例后（downloadLinkRef.current），替换href
+   * 然后调用原生的 .click() 方法
    * @param downloadUrl 文件的 @microsoft.graph.downloadUrl 直链
    **/
   const onDownloadItemClick = (downloadUrl: string) => {
@@ -936,10 +946,9 @@ export const Files = (props: IFilesProps) => {
         style={{ display: "none" }}
       />
       {/*
-        隐藏的下载锚点：单文件直链下载时，由 onDownloadItemClick 动态设置 href
-        后触发此元素的 click()，浏览器会在新标签页中静默下载文件
+        隐藏的下载 <a> ：单文件直链下载时，由 onDownloadItemClick 动态设置 href
+        后触发此元素的 click()，浏览器打开新tab，发现是attachment，就会关闭tab，静默下载文件
       */}
-      {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
       <a
         ref={downloadLinkRef}
         href="#"
