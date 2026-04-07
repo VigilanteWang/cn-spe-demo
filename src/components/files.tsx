@@ -244,6 +244,17 @@ export const Files = (props: IFilesProps) => {
     })();
   }, [props]);
 
+  // 组件卸载时清理下载轮询定时器，防止内存泄漏和对已卸载组件的状态更新
+  // useEffect 第一个参数为 setup 函数，可以返回一个函数作为清理函数
+  useEffect(() => {
+    return () => {
+      if (downloadPollRef.current) {
+        clearInterval(downloadPollRef.current);
+        downloadPollRef.current = null;
+      }
+    };
+  }, []);
+
   // =============== 工具函数 ===============
 
   /** 格式化文件大小为人类可读格式（如 "1.5 MB"） */
@@ -412,7 +423,8 @@ export const Files = (props: IFilesProps) => {
     downloadPollRef.current = setInterval(async () => {
       try {
         const progress = await spEmbedded.getDownloadProgress(jobId);
-
+        // 给set一个 Update function，确保拿到最新的状态值，因为下面会多次调用，而useState只会
+        // 在每次 render时更新 state，见useState 文档
         setDownloadProgress((prev) => ({
           ...prev,
           jobProgress: progress,
