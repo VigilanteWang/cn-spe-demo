@@ -13,7 +13,7 @@
  *
  * - Access Token 获取流程:
  *   1. 用户通过 <Login /> 组件登录 → globalProvider 状态变为 SignedIn
- *   2. 调用 provider.getAccessToken({ scopes }) 获取 API 专用 token
+ *   2. 调用 provider.getAccessToken({ scopes }) 获取 这个后端 API 专用 token，这里后端在AAD上设了一个 custom scope: Container.Manage
  *   3. token 的 scope 格式为 "api://{clientId}/{权限名}"，如 "api://xxx/Container.Manage"
  *   4. 此 token 发送给后端，后端通过 OBO 流程换取 Graph API token
  *
@@ -246,7 +246,8 @@ export default class SpEmbedded {
    * 完整下载流程：
    * 1. startDownloadArchive() → 获取 jobId
    * 2. 轮询 getDownloadProgress(jobId) → 等待 status === "ready"
-   * 3. triggerArchiveFileDownload(jobId) → 触发浏览器下载
+   * 3. 前端显示“可下载”状态，等待用户点击 Download now
+   * 4. triggerArchiveFileDownload(jobId, "SPE-<unixMs>.zip") → 触发浏览器下载
    **/
   async startDownloadArchive(
     containerId: string,
@@ -294,10 +295,12 @@ export default class SpEmbedded {
   /**
    * 触发浏览器下载 ZIP 归档文件
    *
-   * 当任务状态为 "ready" 时调用此方法，从后端获取 ZIP 文件并触发浏览器下载。
+   * 当任务状态为 "ready" 且用户点击下载按钮后调用此方法，
+   * 从后端获取 ZIP 文件并触发浏览器下载。
    *
    * @param jobId 任务 ID
-   * @param filename 下载文件名，默认为 "archive.zip"
+   * @param filename 下载文件名，默认值为 "archive.zip"。
+   *        当前页面调用方会传入 "SPE-<unixMs>.zip"。
    * @throws 请求失败时抛出错误
    *
    * 实现原理：
@@ -313,6 +316,11 @@ export default class SpEmbedded {
   ): Promise<void> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/file/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
+    if (!token) {
+      throw new Error("Unable to acquire API access token");
+    }
+
+    const startedAt = Date.now();
     const response = await fetch(api_endpoint, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
@@ -324,6 +332,12 @@ export default class SpEmbedded {
 
     // 步骤 1: 获取响应的二进制 Blob
     const blob = await response.blob();
+    console.info("Archive blob fetched", {
+      jobId,
+      filename,
+      blobSize: blob.size,
+      elapsedMs: Date.now() - startedAt,
+    });
     // 步骤 2: 创建临时的 Object URL（类似 blob:http://localhost:3000/xxx）
     const url = URL.createObjectURL(blob);
     // 步骤 3: 创建隐藏的 <a> 标签
@@ -331,10 +345,14 @@ export default class SpEmbedded {
     link.href = url;
     link.download = filename; // 设置下载文件名
     document.body.appendChild(link);
-    // 步骤 4: 模拟点击触发浏览器下载对话框
-    link.click();
-    // 步骤 5: 清理 - 移除 DOM 元素并释放 Object URL 占用的内存
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      // 步骤 4: 模拟点击触发浏览器下载对话框
+      link.click();
+    } finally {
+      // 步骤 5: 清理 - 移除 DOM 元素并释放 Object URL 占用的内存
+      document.body.removeChild(link);
+      // 延迟回收可以降低个别浏览器中下载尚未接管时立即 revoke 的风险
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
   }
 }

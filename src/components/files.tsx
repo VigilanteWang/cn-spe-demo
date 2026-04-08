@@ -139,11 +139,14 @@ interface DriveItemWithDownloadUrl extends DriveItem {
 /**
  * ZIP 归档下载进度状态
  *
- * 下载流程：启动任务 → 轮询进度 → 任务完成 → 触发浏览器下载
+ * 下载流程：启动任务 → 轮询进度 → 归档就绪 → 用户点击后触发浏览器下载
  **/
 interface IDownloadProgress {
   isActive: boolean; // 是否正在轮询进度
   jobProgress: IJobProgress | null; // 后端返回的任务进度详情
+  readyJobId: string | null; // 归档已就绪时可下载的任务 ID
+  isReadyToDownload: boolean; // 是否已就绪，等待用户触发下载
+  isTriggeringDownload: boolean; // 是否正在触发浏览器下载
   isCompleted: boolean; // 是否下载完成
   errorMessage: string; // 错误信息（为空表示无错误）
 }
@@ -225,6 +228,9 @@ export const Files = (props: IFilesProps) => {
   const [downloadProgress, setDownloadProgress] = useState<IDownloadProgress>({
     isActive: false,
     jobProgress: null,
+    readyJobId: null,
+    isReadyToDownload: false,
+    isTriggeringDownload: false,
     isCompleted: false,
     errorMessage: "",
   });
@@ -385,9 +391,10 @@ export const Files = (props: IFilesProps) => {
    * 完整流程：
    * 1. 调用 spEmbedded.startDownloadArchive() 启动后端任务
    * 2. 每 800ms 轮询 spEmbedded.getDownloadProgress() 查看进度
-   * 3. 当 status === "ready" 时，调用 triggerArchiveFileDownload() 触发浏览器下载
-   * 4. 下载完成后 4 秒自动清除完成提示
-   * 5. 如果任务失败，显示错误信息
+   * 3. 当 status === "ready" 时，仅更新 UI 为“可下载”状态，等待用户点击
+   * 4. 用户点击 Download now 后调用 triggerArchiveFileDownload() 触发浏览器下载
+   * 5. 下载触发后 4 秒自动清除完成提示
+   * 6. 如果任务失败，显示错误信息
    **/
   const startZipDownload = async (itemIds: string[]) => {
     // Clear any previous download progress
@@ -399,6 +406,9 @@ export const Files = (props: IFilesProps) => {
     setDownloadProgress({
       isActive: true,
       jobProgress: null,
+      readyJobId: null,
+      isReadyToDownload: false,
+      isTriggeringDownload: false,
       isCompleted: false,
       errorMessage: "",
     });
@@ -413,6 +423,9 @@ export const Files = (props: IFilesProps) => {
       setDownloadProgress({
         isActive: false,
         jobProgress: null,
+        readyJobId: null,
+        isReadyToDownload: false,
+        isTriggeringDownload: false,
         isCompleted: false,
         errorMessage: `Failed to start download: ${err.message}`,
       });
@@ -437,34 +450,20 @@ export const Files = (props: IFilesProps) => {
           setDownloadProgress((prev) => ({
             ...prev,
             isActive: false,
-            isCompleted: true,
+            readyJobId: jobId,
+            isReadyToDownload: true,
+            isCompleted: false,
+            errorMessage: "",
           }));
-
-          // Trigger the actual file download
-          try {
-            await spEmbedded.triggerArchiveFileDownload(jobId);
-          } catch (err: any) {
-            setDownloadProgress((prev) => ({
-              ...prev,
-              errorMessage: `Download failed: ${err.message}`,
-            }));
-          }
-
-          // Auto-clear the completed notice after 4 seconds
-          setTimeout(() => {
-            setDownloadProgress({
-              isActive: false,
-              jobProgress: null,
-              isCompleted: false,
-              errorMessage: "",
-            });
-          }, 4000);
         } else if (progress.status === "failed") {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
           setDownloadProgress({
             isActive: false,
             jobProgress: progress,
+            readyJobId: null,
+            isReadyToDownload: false,
+            isTriggeringDownload: false,
             isCompleted: false,
             errorMessage:
               progress.errors.length > 0
@@ -478,11 +477,59 @@ export const Files = (props: IFilesProps) => {
         setDownloadProgress({
           isActive: false,
           jobProgress: null,
+          readyJobId: null,
+          isReadyToDownload: false,
+          isTriggeringDownload: false,
           isCompleted: false,
           errorMessage: `Progress check failed: ${err.message}`,
         });
       }
     }, 800);
+  };
+
+  /**
+   * 用户在归档 ready 后手动触发浏览器下载
+   * 文件名规则：SPE-<unixMs>.zip
+   */
+  const onDownloadReadyClick = async () => {
+    if (!downloadProgress.readyJobId || downloadProgress.isTriggeringDownload) {
+      return;
+    }
+
+    const readyJobId = downloadProgress.readyJobId;
+    const filename = `SPE-${Date.now()}.zip`;
+
+    setDownloadProgress((prev) => ({
+      ...prev,
+      isTriggeringDownload: true,
+      errorMessage: "",
+    }));
+
+    try {
+      await spEmbedded.triggerArchiveFileDownload(readyJobId, filename);
+
+      setDownloadProgress((prev) => ({
+        ...prev,
+        isTriggeringDownload: false,
+        isReadyToDownload: false,
+        readyJobId: null,
+        isCompleted: true,
+      }));
+
+      setTimeout(() => {
+        setDownloadProgress((prev) => ({
+          ...prev,
+          isCompleted: false,
+          jobProgress: null,
+        }));
+      }, 4000);
+    } catch (err: any) {
+      setDownloadProgress((prev) => ({
+        ...prev,
+        isTriggeringDownload: false,
+        errorMessage: `Download failed: ${err.message}`,
+      }));
+    }
   };
 
   // ── 工具栏：删除选中项 ─────────────────────────────────────────────────────
@@ -1007,7 +1054,7 @@ export const Files = (props: IFilesProps) => {
         - New Folder: 打开创建文件夹对话框
         - Upload File: 弹出文件选择框，支持多文件上传
         - Upload Folder: 弹出文件夹选择框，保留完整目录结构上传
-        - Download: 无选中时禁用；ZIP 任务进行中时也禁用，防止重复提交
+        - Download: 无选中时禁用；ZIP 任务进行中、已就绪待下载、触发下载中也禁用，防止并发冲突
         - Delete: 无选中时禁用，点击后弹出确认对话框
       */}
       <div className={styles.toolbarContainer}>
@@ -1050,7 +1097,12 @@ export const Files = (props: IFilesProps) => {
             vertical
             icon={<ArrowDownloadRegular />}
             onClick={onToolbarDownloadClick}
-            disabled={selectedRows.size === 0 || downloadProgress.isActive}
+            disabled={
+              selectedRows.size === 0 ||
+              downloadProgress.isActive ||
+              downloadProgress.isReadyToDownload ||
+              downloadProgress.isTriggeringDownload
+            }
           >
             Download
           </ToolbarButton>
@@ -1094,15 +1146,19 @@ export const Files = (props: IFilesProps) => {
       )}
 
       {/*
-        ZIP 归档下载进度：在归档任务活跃、完成或失败时显示
+        ZIP 归档下载进度：在归档任务活跃、待点击下载、触发中、已触发或失败时显示
         - isActive=true: 显示 Spinner，文字根据后端 status 细分三个阶段：
             * 无 jobProgress（任务刚提交）: "Starting download job…"
             * status=="preparing": 正在遍历文件结构，显示当前文件名
             * status=="zipping": 正在压缩，显示 processedFiles/totalFiles 进度
-        - isCompleted=true: 显示绿色 Checkmark + "Archive ready" 提示（4 秒后自动清除）
+        - isReadyToDownload=true: 显示 "Archive ready" + "Download now"，等待用户明确触发
+        - isTriggeringDownload=true: 禁用按钮并显示小型 Spinner，防止重复点击
+        - isCompleted=true: 显示 "Download started" 提示（4 秒后自动清除）
         - errorMessage 非空: 以红色文字显示错误原因
       */}
       {(downloadProgress.isActive ||
+        downloadProgress.isReadyToDownload ||
+        downloadProgress.isTriggeringDownload ||
         downloadProgress.isCompleted ||
         downloadProgress.errorMessage) && (
         <div className={styles.progressContainer}>
@@ -1117,14 +1173,27 @@ export const Files = (props: IFilesProps) => {
                     : "Starting download job…"}
               </Text>
             </>
+          ) : downloadProgress.isReadyToDownload ? (
+            <>
+              <CheckmarkRegular
+                style={{ color: tokens.colorPaletteGreenForeground1 }}
+              />
+              <Text className={styles.progressCompleted}>Archive ready</Text>
+              <Button
+                appearance="primary"
+                onClick={onDownloadReadyClick}
+                disabled={downloadProgress.isTriggeringDownload}
+              >
+                Download now
+              </Button>
+              {downloadProgress.isTriggeringDownload && <Spinner size="tiny" />}
+            </>
           ) : downloadProgress.isCompleted ? (
             <>
               <CheckmarkRegular
                 style={{ color: tokens.colorPaletteGreenForeground1 }}
               />
-              <Text className={styles.progressCompleted}>
-                Archive ready – download started
-              </Text>
+              <Text className={styles.progressCompleted}>Download started</Text>
             </>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
