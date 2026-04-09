@@ -17,6 +17,7 @@ import archiver from "archiver";
 import { PassThrough } from "stream";
 import { createGraphClient, getGraphToken } from "./auth";
 import { v4 as uuidv4 } from "uuid";
+import type { DriveItem } from "@microsoft/microsoft-graph-types";
 
 // ─────────────────────────  常量区  ──────────────────────────────────────
 
@@ -113,23 +114,24 @@ async function expandItem(
   basePath: string,
   result: FlatFile[],
 ): Promise<void> {
-  const item = await graphClient
+  const item = (await graphClient
     .api(`/drives/${driveId}/items/${itemId}`)
     .select("id,name,folder,file,size")
-    .get();
+    .get()) as DriveItem;
 
+  const itemName = item.name ?? "";
   if (item.folder) {
     await expandFolder(
       graphClient,
       driveId,
       itemId,
-      basePath ? `${basePath}/${item.name}` : item.name,
+      basePath ? `${basePath}/${itemName}` : itemName,
       result,
     );
   } else {
     result.push({
       itemId,
-      zipPath: basePath ? `${basePath}/${item.name}` : item.name,
+      zipPath: basePath ? `${basePath}/${itemName}` : itemName,
     });
   }
 }
@@ -154,23 +156,25 @@ async function expandFolder(
   let endpoint: string | null = `/drives/${driveId}/items/${folderId}/children`;
 
   while (endpoint) {
-    const page: { value?: any[]; "@odata.nextLink"?: string } =
-      await graphClient.api(endpoint).select("id,name,folder,file,size").get(); // eslint-disable-line
-    const children: any[] = page.value ?? [];
+    const page: { value?: DriveItem[]; "@odata.nextLink"?: string } =
+      await graphClient.api(endpoint).select("id,name,folder,file,size").get();
+    const children: DriveItem[] = page.value ?? [];
 
     for (const child of children) {
+      const childId = child.id ?? "";
+      const childName = child.name ?? "";
       if (child.folder) {
         await expandFolder(
           graphClient,
           driveId,
-          child.id,
-          `${folderPath}/${child.name}`,
+          childId,
+          `${folderPath}/${childName}`,
           result,
         );
       } else {
         result.push({
-          itemId: child.id,
-          zipPath: `${folderPath}/${child.name}`,
+          itemId: childId,
+          zipPath: `${folderPath}/${childName}`,
         });
       }
     }
