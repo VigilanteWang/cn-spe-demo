@@ -1,26 +1,16 @@
 /**
- * 列表容器的 API 路由处理器
+ * 处理容器列表查询请求。
  *
- * 此模块处理 GET /api/listContainers 请求，执行以下步骤：
- * 1. 检查请求是否带有有效的 access token
- * 2. 检查 token 是否有 Container.Manage 权限
- * 3. 用 OBO 流程互换一个 Graph API token
- * 4. 用 Graph token 调用 Microsoft Graph API 查询容器
- * 5. 根据 containerTypeId 对应用户的所有容器过滤
- * 6. 返回容器列表或错误
+ * 这个模块对应 GET /api/listContainers 路由，负责把一个前端查询请求
+ * 转换成一次经过认证的 Microsoft Graph 容器列表查询。
  *
- * 请求示例：
- * ```bash
- * curl -X GET http://localhost:3001/api/listContainers \
- *   -H "Authorization: Bearer <access_token>"
- * ```
+ * 它本身不负责启动服务器或定义 URL，而是专注在单个业务动作上：
  *
- * 响应示例：
- * - 200: { value: [ { id: "...", displayName: "...", ... }, ... ] }
- * - 401: { message: "No access token provided." }
- * - 403: { message: "Access token is missing required scope..." }
- * - 500: { message: "Unable to list containers: ..." }
- **/
+ * 1. 校验当前用户是否具备容器管理权限。
+ * 2. 通过 OBO 流程换取可访问 Microsoft Graph 的令牌。
+ * 3. 按服务端配置过滤出当前应用关心的容器类型。
+ * 4. 把结果或错误转换成 HTTP 响应。
+ */
 
 import { Request, Response } from "restify";
 import {
@@ -31,54 +21,43 @@ import {
 import { serverConfig } from "./config";
 
 /**
- * GET /api/listContainers 路由处理函数
+ * 列出当前用户可访问的容器。
  *
- * @param req Restify Request 对象
- *   - req.headers.authorization: 需要是 "Bearer <token>" 格式
- * @param res Restify Response 对象，用于返回 HTTP 响应
+ * 前端通常会在页面初始化或刷新容器列表时调用这个函数对应的接口。
  *
- * 执行流程：
- * 1. 检查身份验证（token 有效 + 有 Container.Manage 权限）
- * 2. 如果验证失败，直接返回错误（401/403）
- * 3. 对验证成功的 token 执行 OBO （互换 Graph API token）
- * 4. 创建 Graph 客户端，调用 /storage/fileStorage/containers API
- * 5. 使用 OData 穾滤（filter）过滤：攵返整个 containerTypeId 匹配的容器
- * 6. 返回容器列表（椭轉数组）
- * 7. 如果任何步骤失败，返回 500 错误
- **/
+ * @param req Restify 请求对象。要求请求头中包含 Bearer Token。
+ * @param res Restify 响应对象。用于返回容器列表或错误信息。
+ * @returns Promise<void>
+ */
 export const listContainers = async (req: Request, res: Response) => {
-  // 步骤 1: 检查 token 验证
+  /** 先做权限校验，避免未授权请求访问下游服务。 */
   const authorizationResult = await authorizeContainerManageRequest(req);
 
-  // 步骤 2: 处理验证失败的情况
   if (!authorizationResult.ok) {
-    // ok === false 表示验证失败
     res.send(authorizationResult.status, authorizationResult.body);
     return;
   }
 
   try {
-    // 步骤 3: OBO 流程 - 悟换 Graph API token
+    /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
     const graphToken = await getGraphToken(authorizationResult.token);
 
-    // 步骤 4: 创建 Graph 客户端实例
+    /** Graph 客户端负责封装认证和请求链式调用。 */
     const graphClient = createGraphClient(graphToken);
 
-    // 步骤 5: 使用 OData 穾滤齦出结果
-    // OData 是一种查询语言（不是 SQL！）
-    // 例子：ト接返 containerTypeId 等于 "我们配置的 type"的容器
-    // 穾滤语法： "fieldName op value"，其中 op 是比较操作符（eq/ne/gt/lt 等）
+    /**
+     * 只返回当前应用所属的容器类型。
+     * 这里在 Graph 层过滤，能减少无关数据返回到服务端。
+     */
     const graphResponse = await graphClient
-      .api("/storage/fileStorage/containers") // SharePoint Embedded 容器 API
-      .version("v1.0") // 使用稳定 v1.0 API
-      .filter(`containerTypeId eq ${serverConfig.containerTypeId}`) // OData 筛选
-      .get(); // 发送 GET 请求
+      .api("/storage/fileStorage/containers")
+      .version("v1.0")
+      .filter(`containerTypeId eq ${serverConfig.containerTypeId}`)
+      .get();
 
-    // 步骤 6: 返回成功响应 (200 OK + 容器列表)
     res.send(200, graphResponse);
     return;
   } catch (error: any) {
-    // 步骤 7: 处理意外失败
     res.send(500, { message: `Unable to list containers: ${error.message}` });
     return;
   }

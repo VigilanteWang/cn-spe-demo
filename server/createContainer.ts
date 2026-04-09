@@ -1,31 +1,16 @@
 /**
- * 创建容器的 API 路由处理器
+ * 处理容器创建请求。
  *
- * 此模块处理 POST /api/createContainer 请求，执行以下步骤：
- * 1. 检查请求是否带有有效的 access token
- * 2. 检查 token 是否有 Container.Manage 权限
- * 3. 用 OBO 流程互换一个 Graph API token
- * 4. 用 Graph token 调用 Microsoft Graph API 创建容器
- * 5. 返回创建结果或错误
+ * 这个模块对应 POST /api/createContainer 路由。
+ * 当前端提交新建容器表单后，请求会进入这里。
  *
- * 请求示例：
- * ```bash
- * curl -X POST http://localhost:3001/api/createContainer \
- *   -H "Authorization: Bearer <access_token>" \
- *   -H "Content-Type: application/json" \
- *   -d '{
- *     "displayName": "My Container",
- *     "description": "A test container",
- *     "containerTypeId": "<type-id>"
- *   }'
- * ```
+ * 它的核心职责是把外部输入整理成一个受控的创建操作：
  *
- * 响应示例：
- * - 200: { id, createdDateTime, description, displayName, ... }
- * - 401: { message: "No access token provided." }
- * - 403: { message: "Access token is missing required scope..." }
- * - 500: { message: "Failed to create container: ..." }
- **/
+ * 1. 校验当前用户权限。
+ * 2. 换取可访问 Microsoft Graph 的令牌。
+ * 3. 使用服务端配置补全安全字段。
+ * 4. 调用 Graph 创建容器并返回结果。
+ */
 
 import { Request, Response } from "restify";
 import {
@@ -36,69 +21,49 @@ import {
 import { serverConfig } from "./config";
 
 /**
- * POST /api/createContainer 路由处理函数
+ * 创建一个新的 SharePoint Embedded 容器。
  *
- * @param req Restify Request 对象
- *   - req.headers.authorization: "需要是 "Bearer <token>" 格式
- *   - req.body: { displayName, description?, containerTypeId }
- * @param res Restify Response 对象，用于返回 HTTP 响应
+ * 这里不直接信任客户端提交的完整对象，而是只接收必要字段，
+ * 并由服务端强制写入 containerTypeId，避免前端越权创建错误类型的容器。
  *
- * 执行流程：
- * 1. 检查身份验证（token 有效 + 有 Container.Manage 权限）
- * 2. 如果验证失败，直接返回错误（401/403）
- * 3. 对验证成功的 token 执行 OBO （互换 Graph API token）
- * 4. 创建 Graph 客户端，调用 /storage/fileStorage/containers API
- * 5. 返回 API 响应（新容器信息）
- * 6. 如果任何步骤失败，返回 500 错误
- **/
+ * @param req Restify 请求对象。请求体中应包含 displayName，可选 description。
+ * @param res Restify 响应对象。用于返回创建结果或错误信息。
+ * @returns Promise<void>
+ */
 export const createContainer = async (req: Request, res: Response) => {
-  // 步骤 1: 检查 token 验证
+  /** 所有创建操作都先经过统一权限校验。 */
   const authorizationResult = await authorizeContainerManageRequest(req);
 
-  // 步骤 2: 处理验证失败的情况
   if (!authorizationResult.ok) {
-    // ok === false 表示验证失败
-    // status 是 HTTP 状态码（401 或 403）
-    // body 是不错信息
     res.send(authorizationResult.status, authorizationResult.body);
-    return; // 提前返回，不执行后面的代码
+    return;
   }
 
   try {
-    // 步骤 3: OBO 流程 - 操作成功的 token（authorizationResult.token）
-    // 勞换为 Graph API token，使用后端 API app 的身份
+    /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
     const graphToken = await getGraphToken(authorizationResult.token);
 
-    // 步骤 4: 创建 Graph 客户端实例并指定 token
+    /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
     const graphClient = createGraphClient(graphToken);
 
-    // 步骤 5: 构建请求体
-    // 来自客户端 POST 请求体，例如：{
-    //   displayName: "My Container",
-    //   description: "A test",
-    //   containerTypeId: "standard"
-    // }
+    /**
+     * 请求体只允许前端控制名称和描述。
+     * 容器类型由服务端配置决定，避免客户端绕过约束。
+     */
     const containerRequestData = {
-      displayName: req.body!.displayName, // ! 表示修正获取，error 提示应有 displayName
-      description: req.body?.description ? req.body.description : "", // 可选描述
-      containerTypeId: serverConfig.containerTypeId, // 来自执葛路网配置，表示容器类型
+      displayName: req.body!.displayName,
+      description: req.body?.description ? req.body.description : "",
+      containerTypeId: serverConfig.containerTypeId,
     };
 
-    // 步骤 6: 调用 Graph API 创建容器
-    // .api("/storage/fileStorage/containers"): 库上才学的 SharePoint Embedded API 路径
-    // .version("v1.0"): 使用 v1.0 稳定版，不用 beta
-    // .post(data): 发送 POST 请求，体体是 containerRequestData
     const graphResponse = await graphClient
       .api("/storage/fileStorage/containers")
       .version("v1.0")
       .post(containerRequestData);
 
-    // 步骤 7: 返回成功响应 (200 OK + 新容器信息)
     res.send(200, graphResponse);
     return;
   } catch (error: any) {
-    // 步骤 8: 处理意外失败
-    // 没有捕获到这里的错误即为服务器错误，返回 500
     res.send(500, { message: `Failed to create container: ${error.message}` });
     return;
   }

@@ -23,7 +23,8 @@
  *   * POST /api/deleteItems              - 批量删除文件/文件夹
  *   * POST /api/downloadArchive/start    - 启动 ZIP 归档任务
  *   * GET  /api/downloadArchive/progress - 查询归档进度
- *   * GET  /api/downloadArchive/file     - 下载归档文件
+ *   * POST /api/downloadArchive/ticket    - 申请一次性下载票据
+ *   * GET  /api/downloadArchive/fileByTicket - 使用票据下载归档文件
  **/
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
@@ -247,7 +248,7 @@ export default class SpEmbedded {
    * 1. startDownloadArchive() → 获取 jobId
    * 2. 轮询 getDownloadProgress(jobId) → 等待 status === "ready"
    * 3. 前端显示“可下载”状态，等待用户点击 Download now
-   * 4. triggerArchiveFileDownload(jobId, "SPE-<unixMs>.zip") → 触发浏览器下载
+   * 4. triggerArchiveFileDownload(jobId, "SPE-<unixMs>.zip") → 申请下载票据并触发浏览器原生下载
    **/
   async startDownloadArchive(
     containerId: string,
@@ -296,7 +297,7 @@ export default class SpEmbedded {
    * 触发浏览器下载 ZIP 归档文件
    *
    * 当任务状态为 "ready" 且用户点击下载按钮后调用此方法，
-   * 从后端获取 ZIP 文件并触发浏览器下载。
+   * 先向后端申请一次性下载票据，再将下载交给浏览器原生下载器。
    *
    * @param jobId 任务 ID
    * @param filename 下载文件名，默认值为 "archive.zip"。
@@ -304,55 +305,47 @@ export default class SpEmbedded {
    * @throws 请求失败时抛出错误
    *
    * 实现原理：
-   * 1. 从后端获取 ZIP 文件的二进制数据（Blob）
-   * 2. 创建临时的 Object URL（blob:// 协议）
-   * 3. 动态创建 <a> 标签并设置 download 属性
-   * 4. 模拟点击触发浏览器下载
-   * 5. 清理临时 DOM 元素和 Object URL（释放内存）
+   * 1. 调用票据接口生成一次性下载 URL（仍需 Authorization）
+   * 2. 使用 window.location.assign() 导航到下载 URL
+   * 3. 下载由浏览器原生下载器接管，避免前端 Blob 全量占用内存
    **/
   async triggerArchiveFileDownload(
     jobId: string,
     filename = "archive.zip",
   ): Promise<void> {
-    const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/file/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
     if (!token) {
       throw new Error("Unable to acquire API access token");
     }
 
-    const startedAt = Date.now();
-    const response = await fetch(api_endpoint, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
+    const ticketEndpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/ticket/${encodeURIComponent(jobId)}`;
+    const ticketResponse = await fetch(ticketEndpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ filename }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Archive download failed: ${response.status}`);
+    if (!ticketResponse.ok) {
+      throw new Error(
+        `Archive ticket request failed: ${ticketResponse.status}`,
+      );
     }
 
-    // 步骤 1: 获取响应的二进制 Blob
-    const blob = await response.blob();
-    console.info("Archive blob fetched", {
-      jobId,
-      filename,
-      blobSize: blob.size,
-      elapsedMs: Date.now() - startedAt,
-    });
-    // 步骤 2: 创建临时的 Object URL（类似 blob:http://localhost:3000/xxx）
-    const url = URL.createObjectURL(blob);
-    // 步骤 3: 创建隐藏的 <a> 标签
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename; // 设置下载文件名
-    document.body.appendChild(link);
-    try {
-      // 步骤 4: 模拟点击触发浏览器下载对话框
-      link.click();
-    } finally {
-      // 步骤 5: 清理 - 移除 DOM 元素并释放 Object URL 占用的内存
-      document.body.removeChild(link);
-      // 延迟回收可以降低个别浏览器中下载尚未接管时立即 revoke 的风险
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    const ticketData = (await ticketResponse.json()) as {
+      downloadUrl?: string;
+    };
+
+    if (!ticketData.downloadUrl) {
+      throw new Error("Archive ticket response missing downloadUrl");
     }
+
+    const downloadUrl = new URL(
+      ticketData.downloadUrl,
+      clientConfig.apiServerUrl,
+    ).toString();
+    window.location.assign(downloadUrl);
   }
 }

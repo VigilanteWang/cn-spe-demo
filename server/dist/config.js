@@ -35,9 +35,9 @@ exports.serverConfig = {
     tenantId,
     containerTypeId: required("CONTAINER_TYPE_ID"),
     port: (_a = process.env.PORT) !== null && _a !== void 0 ? _a : "3001",
-    // Derived from CLOUD_ENV + API_ENTRA_APP_TENANT_ID; override with API_ENTRA_APP_AUTHORITY if needed.
+    // 默认由 CLOUD_ENV 与 API_ENTRA_APP_TENANT_ID 组合生成；可用 API_ENTRA_APP_AUTHORITY 覆盖。
     authority: (_b = process.env.API_ENTRA_APP_AUTHORITY) !== null && _b !== void 0 ? _b : `${cloudEndpoints.aadAuthorityHost}/${tenantId}/`,
-    // Derived from CLOUD_ENV; override with GRAPH_BASE_URL if needed.
+    // 默认由 CLOUD_ENV 推导；可用 GRAPH_BASE_URL 覆盖。
     graphBaseUrl: (_c = process.env.GRAPH_BASE_URL) !== null && _c !== void 0 ? _c : cloudEndpoints.graphBaseUrl,
     cloudEnv,
 };

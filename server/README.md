@@ -15,7 +15,7 @@
 | 容器创建 | `createContainer.ts` | POST /api/createContainer                |
 | 容器列表 | `listContainers.ts`  | GET /api/listContainers                  |
 | 文件删除 | `deleteItems.ts`\*   | POST /api/deleteItems（批量删除）        |
-| 归档下载 | `downloadArchive.ts` | ZIP 归档任务（启动/进度/下载三个端点）   |
+| 归档下载 | `downloadArchive.ts` | ZIP 归档任务（启动/进度/票据下载端点）   |
 | 配置管理 | `config.ts`          | 环境变量读取、云环境选择                 |
 | 权限常量 | `common/scopes.ts`   | SPE 权限字符串常量                       |
 
@@ -23,14 +23,15 @@
 
 ## API 端点总览
 
-| 方法 | 路径                                   | 说明                   | 认证                            |
-| ---- | -------------------------------------- | ---------------------- | ------------------------------- |
-| GET  | `/api/listContainers`                  | 列出当前用户的所有容器 | Bearer Token + Container.Manage |
-| POST | `/api/createContainer`                 | 创建新容器             | Bearer Token + Container.Manage |
-| POST | `/api/deleteItems`                     | 批量删除文件/文件夹    | Bearer Token + Container.Manage |
-| POST | `/api/downloadArchive/start`           | 启动 ZIP 归档任务      | Bearer Token + Container.Manage |
-| GET  | `/api/downloadArchive/progress/:jobId` | 查询归档任务进度       | Bearer Token                    |
-| GET  | `/api/downloadArchive/file/:jobId`     | 下载 ZIP 归档文件      | Bearer Token                    |
+| 方法 | 路径                                        | 说明                   | 认证                            |
+| ---- | ------------------------------------------- | ---------------------- | ------------------------------- |
+| GET  | `/api/listContainers`                       | 列出当前用户的所有容器 | Bearer Token + Container.Manage |
+| POST | `/api/createContainer`                      | 创建新容器             | Bearer Token + Container.Manage |
+| POST | `/api/deleteItems`                          | 批量删除文件/文件夹    | Bearer Token + Container.Manage |
+| POST | `/api/downloadArchive/start`                | 启动 ZIP 归档任务      | Bearer Token + Container.Manage |
+| GET  | `/api/downloadArchive/progress/:jobId`      | 查询归档任务进度       | Bearer Token                    |
+| POST | `/api/downloadArchive/ticket/:jobId`        | 申请一次性下载票据     | Bearer Token + Container.Manage |
+| GET  | `/api/downloadArchive/fileByTicket/:ticket` | 使用票据下载 ZIP 归档  | 无（票据单次消费）              |
 
 ## config.ts - 配置管理
 
@@ -55,7 +56,8 @@
 
 1. 调用方通过 `startDownloadJob()` 启动任务，获取 jobId
 2. 轮询 `getJobProgress()` 查看进度（queued → preparing → zipping → ready）
-3. 状态为 ready 时，调用 `getJobBuffer()` 获取 ZIP 文件的 Buffer
+3. 状态为 ready 时，调用票据端点签发一次性 ticket
+4. 浏览器使用 `fileByTicket` 端点下载 ZIP（ticket 单次消费）
 
 **限制**: 最多 500 个文件或 500 MB，任务 10 分钟后自动清理。
 

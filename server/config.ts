@@ -40,11 +40,11 @@ export const serverConfig = {
   tenantId,
   containerTypeId: required("CONTAINER_TYPE_ID"),
   port: process.env.PORT ?? "3001",
-  // Derived from CLOUD_ENV + API_ENTRA_APP_TENANT_ID; override with API_ENTRA_APP_AUTHORITY if needed.
+  // 默认由 CLOUD_ENV 与 API_ENTRA_APP_TENANT_ID 组合生成；可用 API_ENTRA_APP_AUTHORITY 覆盖。
   authority:
     process.env.API_ENTRA_APP_AUTHORITY ??
     `${cloudEndpoints.aadAuthorityHost}/${tenantId}/`,
-  // Derived from CLOUD_ENV; override with GRAPH_BASE_URL if needed.
+  // 默认由 CLOUD_ENV 推导；可用 GRAPH_BASE_URL 覆盖。
   graphBaseUrl: process.env.GRAPH_BASE_URL ?? cloudEndpoints.graphBaseUrl,
   cloudEnv,
 };

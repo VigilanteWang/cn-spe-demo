@@ -50,6 +50,8 @@ const restify = __importStar(require("restify")); // HTTP 服务框架
 require("./config"); // 加载环境变量配置 (副作用导入)
 const listContainers_1 = require("./listContainers");
 const createContainer_1 = require("./createContainer");
+const downloadArchive_1 = require("./downloadArchive");
+const auth_1 = require("./auth");
 // =============== 服务器创建与中间件配置 ===============
 // 创建 Restify 服务器实例
 const server = restify.createServer();
@@ -74,6 +76,17 @@ server.pre((req, res, next) => {
     next();
 });
 // =============== API 路由定义 ===============
+function sanitizeDownloadFilename(filename) {
+    // 过滤 Windows/Unix 文件名非法字符与控制字符，避免响应头注入和文件名异常
+    const cleaned = filename
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!cleaned) {
+        return "archive.zip";
+    }
+    return cleaned;
+}
 /**
  * GET /api/listContainers 路由
  *
@@ -105,6 +118,188 @@ server.post("/api/createContainer", (req, res, next) => __awaiter(void 0, void 0
     }
     catch (error) {
         res.send(500, { message: `Error in API server: ${error.message}` });
+    }
+    next();
+}));
+// ── 批量删除项目 ────────────────────────────────────────────────────────────
+/**
+ * POST /api/deleteItems
+ * 请求体: { containerId: string, itemIds: string[] }
+ * 响应体: { successful: string[], failed: Array<{ id: string, reason: string }> }
+ */
+server.post("/api/deleteItems", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        if (!authResult.ok) {
+            res.send(authResult.status, authResult.body);
+            return next();
+        }
+        const { containerId, itemIds } = req.body;
+        if (!containerId || !Array.isArray(itemIds) || itemIds.length === 0) {
+            res.send(400, {
+                message: "containerId and a non-empty itemIds array are required.",
+            });
+            return next();
+        }
+        const graphToken = yield (0, auth_1.getGraphToken)(authResult.token);
+        const graphClient = (0, auth_1.createGraphClient)(graphToken);
+        const successful = [];
+        const failed = [];
+        // 顺序删除以降低 Graph 节流（throttling）风险
+        for (const itemId of itemIds) {
+            try {
+                yield graphClient
+                    .api(`/drives/${containerId}/items/${itemId}`)
+                    .delete();
+                successful.push(itemId);
+            }
+            catch (err) {
+                failed.push({ id: itemId, reason: (_a = err.message) !== null && _a !== void 0 ? _a : "Unknown error" });
+            }
+        }
+        res.send(200, { successful, failed });
+    }
+    catch (error) {
+        res.send(500, { message: `Error in deleteItems: ${error.message}` });
+    }
+    next();
+}));
+// ── 归档下载：启动任务 ──────────────────────────────────────────────────────
+/**
+ * POST /api/downloadArchive/start
+ * 请求体: { containerId: string, itemIds: string[] }
+ * 响应体: { jobId: string }
+ */
+server.post("/api/downloadArchive/start", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        if (!authResult.ok) {
+            res.send(authResult.status, authResult.body);
+            return next();
+        }
+        const { containerId, itemIds } = req.body;
+        if (!containerId || !Array.isArray(itemIds) || itemIds.length === 0) {
+            res.send(400, {
+                message: "containerId and a non-empty itemIds array are required.",
+            });
+            return next();
+        }
+        const jobId = yield (0, downloadArchive_1.startDownloadJob)(containerId, itemIds, authResult.token);
+        res.send(200, { jobId });
+    }
+    catch (error) {
+        res.send(500, { message: `Error starting archive job: ${error.message}` });
+    }
+    next();
+}));
+// ── 归档下载：查询进度 ─────────────────────────────────────────────────────
+/**
+ * GET /api/downloadArchive/progress/:jobId
+ * 响应: JobProgress | 404
+ */
+server.get("/api/downloadArchive/progress/:jobId", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { jobId } = req.params;
+        const progress = (0, downloadArchive_1.getJobProgress)(jobId);
+        if (!progress) {
+            res.send(404, { message: "Job not found or expired." });
+            return next();
+        }
+        res.send(200, progress);
+    }
+    catch (error) {
+        res.send(500, { message: `Error fetching progress: ${error.message}` });
+    }
+    next();
+}));
+// ── 归档下载：创建一次性票据 ───────────────────────────────────────────────
+/**
+ * POST /api/downloadArchive/ticket/:jobId
+ * 请求体: { filename?: string }
+ * 响应体: { downloadUrl: string }
+ */
+server.post("/api/downloadArchive/ticket/:jobId", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b;
+    try {
+        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        if (!authResult.ok) {
+            res.send(authResult.status, authResult.body);
+            return next();
+        }
+        const { jobId } = req.params;
+        const progress = (0, downloadArchive_1.getJobProgress)(jobId);
+        if (!progress) {
+            res.send(404, { message: "Job not found or expired." });
+            return next();
+        }
+        if (progress.status !== "ready") {
+            res.send(409, {
+                message: `Archive not ready yet. Status: ${progress.status}`,
+            });
+            return next();
+        }
+        const buffer = (0, downloadArchive_1.getJobBuffer)(jobId);
+        if (!buffer) {
+            res.send(404, { message: "Archive data not found." });
+            return next();
+        }
+        const body = ((_b = req.body) !== null && _b !== void 0 ? _b : {});
+        const requestedFilename = typeof body.filename === "string" && body.filename.trim().length > 0
+            ? body.filename
+            : "archive.zip";
+        const ticket = (0, downloadArchive_1.createDownloadTicket)(jobId, requestedFilename);
+        res.send(200, {
+            downloadUrl: `/api/downloadArchive/fileByTicket/${encodeURIComponent(ticket)}`,
+        });
+    }
+    catch (error) {
+        res.send(500, {
+            message: `Error creating download ticket: ${error.message}`,
+        });
+    }
+    next();
+}));
+// ── 归档下载：通过一次性票据下载 ZIP ──────────────────────────────────────
+/**
+ * GET /api/downloadArchive/fileByTicket/:ticket
+ * 响应: application/zip 附件流 | 404 | 409
+ */
+server.get("/api/downloadArchive/fileByTicket/:ticket", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ticket } = req.params;
+        const consumed = (0, downloadArchive_1.consumeDownloadTicket)(ticket);
+        if (!consumed) {
+            res.send(404, { message: "Invalid or expired download ticket." });
+            return next();
+        }
+        const { jobId, filename } = consumed;
+        const progress = (0, downloadArchive_1.getJobProgress)(jobId);
+        if (!progress) {
+            res.send(404, { message: "Job not found or expired." });
+            return next();
+        }
+        if (progress.status !== "ready") {
+            res.send(409, {
+                message: `Archive not ready yet. Status: ${progress.status}`,
+            });
+            return next();
+        }
+        const buffer = (0, downloadArchive_1.getJobBuffer)(jobId);
+        if (!buffer) {
+            res.send(404, { message: "Archive data not found." });
+            return next();
+        }
+        const safeFilename = sanitizeDownloadFilename(filename);
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+        res.setHeader("Content-Length", String(buffer.length));
+        res.sendRaw(200, buffer);
+    }
+    catch (error) {
+        res.send(500, {
+            message: `Error fetching archive by ticket: ${error.message}`,
+        });
     }
     next();
 }));

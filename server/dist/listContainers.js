@@ -3,11 +3,11 @@
  * 列表容器的 API 路由处理器
  *
  * 此模块处理 GET /api/listContainers 请求，执行以下步骤：
- * 1. 检查请求是否带有有效的 access token
- * 2. 检查 token 是否有 Container.Manage 权限
- * 3. 用 OBO 流程互换一个 Graph API token
- * 4. 用 Graph token 调用 Microsoft Graph API 查询容器
- * 5. 根据 containerTypeId 对应用户的所有容器过滤
+ * 1. 检查请求是否带有有效访问令牌
+ * 2. 检查令牌是否包含 Container.Manage 权限
+ * 3. 使用 OBO 流程换取 Graph API 令牌
+ * 4. 使用 Graph 令牌调用 Microsoft Graph API 查询容器
+ * 5. 按 containerTypeId 过滤当前用户可访问的容器
  * 6. 返回容器列表或错误
  *
  * 请求示例：
@@ -61,20 +61,20 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
         return;
     }
     try {
-        // 步骤 3: OBO 流程 - 悟换 Graph API token
+        // 步骤 3: OBO 流程 - 换取 Graph API 令牌
         const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
         // 步骤 4: 创建 Graph 客户端实例
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
-        // 步骤 5: 使用 OData 穾滤齦出结果
+        // 步骤 5: 使用 OData 过滤结果
         // OData 是一种查询语言（不是 SQL！）
-        // 例子：ト接返 containerTypeId 等于 "我们配置的 type"的容器
-        // 穾滤语法： "fieldName op value"，其中 op 是比较操作符（eq/ne/gt/lt 等）
+        // 这里筛选 containerTypeId 等于服务端配置值的容器
+        // 过滤语法："fieldName op value"，op 常见为 eq/ne/gt/lt
         const graphResponse = yield graphClient
             .api("/storage/fileStorage/containers") // SharePoint Embedded 容器 API
             .version("v1.0") // 使用稳定 v1.0 API
             .filter(`containerTypeId eq ${config_1.serverConfig.containerTypeId}`) // OData 筛选
             .get(); // 发送 GET 请求
-        // 步骤 6: 返回成功响应 (200 OK + 容器列表)
+        // 步骤 6: 返回成功响应 (200 + 容器列表)
         res.send(200, graphResponse);
         return;
     }

@@ -3,10 +3,10 @@
  * 创建容器的 API 路由处理器
  *
  * 此模块处理 POST /api/createContainer 请求，执行以下步骤：
- * 1. 检查请求是否带有有效的 access token
- * 2. 检查 token 是否有 Container.Manage 权限
- * 3. 用 OBO 流程互换一个 Graph API token
- * 4. 用 Graph token 调用 Microsoft Graph API 创建容器
+ * 1. 检查请求是否带有有效访问令牌
+ * 2. 检查令牌是否包含 Container.Manage 权限
+ * 3. 使用 OBO 流程换取 Graph API 令牌
+ * 4. 使用 Graph 令牌调用 Microsoft Graph API 创建容器
  * 5. 返回创建结果或错误
  *
  * 请求示例：
@@ -44,7 +44,7 @@ const config_1 = require("./config");
  * POST /api/createContainer 路由处理函数
  *
  * @param req Restify Request 对象
- *   - req.headers.authorization: "需要是 "Bearer <token>" 格式
+ *   - req.headers.authorization: 需要是 "Bearer <token>" 格式
  *   - req.body: { displayName, description?, containerTypeId }
  * @param res Restify Response 对象，用于返回 HTTP 响应
  *
@@ -64,18 +64,18 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
     if (!authorizationResult.ok) {
         // ok === false 表示验证失败
         // status 是 HTTP 状态码（401 或 403）
-        // body 是不错信息
+        // body 是错误信息
         res.send(authorizationResult.status, authorizationResult.body);
         return; // 提前返回，不执行后面的代码
     }
     try {
-        // 步骤 3: OBO 流程 - 操作成功的 token（authorizationResult.token）
-        // 勞换为 Graph API token，使用后端 API app 的身份
+        // 步骤 3: OBO 流程 - 用通过验证的用户令牌换取 Graph API 令牌
         const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
         // 步骤 4: 创建 Graph 客户端实例并指定 token
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
         // 步骤 5: 构建请求体
-        // 来自客户端 POST 请求体，例如：{
+        // displayName 来自客户端请求体，其他字段由后端补全控制
+        // 例如：{
         //   displayName: "My Container",
         //   description: "A test",
         //   containerTypeId: "standard"
@@ -83,12 +83,13 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
         const containerRequestData = {
             displayName: req.body.displayName,
             description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : "",
-            containerTypeId: config_1.serverConfig.containerTypeId, // 来自执葛路网配置，表示容器类型
+            // 统一以服务端配置为准，避免客户端随意指定容器类型
+            containerTypeId: config_1.serverConfig.containerTypeId,
         };
         // 步骤 6: 调用 Graph API 创建容器
-        // .api("/storage/fileStorage/containers"): 库上才学的 SharePoint Embedded API 路径
-        // .version("v1.0"): 使用 v1.0 稳定版，不用 beta
-        // .post(data): 发送 POST 请求，体体是 containerRequestData
+        // .api("/storage/fileStorage/containers"): SharePoint Embedded 容器 API 路径
+        // .version("v1.0"): 使用稳定版本
+        // .post(data): 发送 POST 请求，请求体为 containerRequestData
         const graphResponse = yield graphClient
             .api("/storage/fileStorage/containers")
             .version("v1.0")
