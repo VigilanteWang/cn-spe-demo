@@ -25,7 +25,7 @@
  *
  * - Scope: 权限标记，如 "Container.Manage" 表示能管理容器
  *   * Token 的 scp claim 包含拥有的所有权限，以空格分隔
- **/
+ */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -58,7 +58,7 @@ const graphHost = new URL(config_1.serverConfig.graphBaseUrl).hostname;
  * 1. 直接的客户端 ID（如 "23cde6e4-7c2b-4201-a46a-c62e01194b4b"）
  * 2. api:// 前缀格式（如 "api://23cde6e4-7c2b-4201-a46a-c62e01194b4b"）
  * 两种格式都表示这个 token 是为我们的 API 签发的
- **/
+ */
 const acceptedAudiences = [
     config_1.serverConfig.clientId,
     `api://${config_1.serverConfig.clientId}`,
@@ -75,7 +75,7 @@ const acceptedAudiences = [
  * - v2.0 tokens: 新格式，issuer 是 login.microsoftonline.com 或 login.partner.microsoftonline.cn
  *
  * discoveryHost: 用来获取公钥的地址，不同的 host 托管不同的密钥端点
- **/
+ */
 const identityEndpointsByCloud = {
     global: {
         v1IssuerHost: "https://sts.windows.net",
@@ -110,7 +110,7 @@ const identityEndpoints = identityEndpointsByCloud[config_1.serverConfig.cloudEn
  * - cache: true = 启用本地缓存，避免每次验证都网络请求
  * - cacheMaxAge: 10 分钟，10 分钟后缓存失效，重新获取最新密钥
  * - rateLimit: true = 防止密钥更新时的网络洪泛
- **/
+ */
 const jwksClients = {
     "1.0": (0, jwks_rsa_1.default)({
         // v1.0 token 的公钥端点
@@ -142,7 +142,7 @@ const jwksClients = {
  * system 日志配置：
  * - piiLoggingEnabled: false 防止日志中记录敏感信息
  * - logLevel: Warning 只记录警告和错误，减少日志噪音
- **/
+ */
 const msalConfig = {
     auth: {
         clientId: config_1.serverConfig.clientId,
@@ -177,7 +177,7 @@ const confidentialClient = new msal_node_1.ConfidentialClientApplication(msalCon
  *
  * @param tokenVersion token 的 ver claim，"1.0" 或 "2.0"
  * @returns 该版本应该拥有的 issuer 字符串
- **/
+ */
 const getExpectedIssuer = (tokenVersion) => {
     if (tokenVersion === "2.0") {
         // v2.0 token 的 issuer 包含 /v2.0 后缀
@@ -194,7 +194,7 @@ const getExpectedIssuer = (tokenVersion) => {
  *
  * @param tokenVersion "1.0" 或 "2.0"
  * @returns 该版本对应的 JWKS 客户端实例
- **/
+ */
 const getJwksClient = (tokenVersion) => {
     return tokenVersion === "2.0" ? jwksClients["2.0"] : jwksClients["1.0"];
 };
@@ -214,7 +214,7 @@ const getJwksClient = (tokenVersion) => {
  * @param token JWT token 字符串
  * @returns 解码后的 token claims（未验证）
  * @throws 如果 token 格式无效
- **/
+ */
 const decodeTokenClaims = (token) => {
     const decoded = (0, jsonwebtoken_1.decode)(token); // base64 解码，不验证签名
     if (!decoded || typeof decoded === "string") {
@@ -242,7 +242,7 @@ const decodeTokenClaims = (token) => {
  * @param tokenVersion "1.0" 或 "2.0"
  * @param header JWT header，包含 kid 和加密算法信息
  * @param callback Node.js 风格回调：(error, publicKey) => void
- **/
+ */
 const getSigningKey = (tokenVersion, header, callback) => {
     if (!header.kid) {
         // kid 缺失 = token 无效，无法验证签名
@@ -284,30 +284,23 @@ const getSigningKey = (tokenVersion, header, callback) => {
  * @param token JWT token 字符串
  * @returns 验证通过后的 token claims
  * @throws 如果任何验证步骤失败
- **/
+ */
 const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
-    // 步骤 1: 无验证解码，快速获取 ver 和 tid
+    /** 先做无验证解码，快速获取 ver 和 tid，用于选择对应的 JWKS 客户端和 issuer。 */
     const decodedClaims = decodeTokenClaims(token);
     const tokenVersion = decodedClaims.ver === "2.0" ? "2.0" : "1.0";
     const expectedIssuer = getExpectedIssuer(tokenVersion);
-    // 步骤 2: 租户隔离检查 - 防止其他租户的 token 被接受
-    // tid 是 token 中的租户 ID，必须与我们 API 配置的租户 ID 相同
+    /** 租户隔离：确保 token 归属于本服务的租户，防止跨租户访问。 */
     if (decodedClaims.tid !== config_1.serverConfig.tenantId) {
         throw new Error("Access token tenant does not match API tenant.");
     }
-    // 步骤 3-4: 使用 jsonwebtoken.verify() 进行完整的加密验证
+    /** jsonwebtoken.verify 执行完整的签名验证和 claims 校验。 */
     return new Promise((resolve, reject) => {
-        (0, jsonwebtoken_1.verify)(token, 
-        // 第二个参数：密钥提供者函数
-        // verify() 会调用这个函数来获取用于验证的公钥
-        (header, callback) => getSigningKey(tokenVersion, header, callback), {
-            // 验证配置
+        (0, jsonwebtoken_1.verify)(token, (header, callback) => getSigningKey(tokenVersion, header, callback), {
             algorithms: ["RS256"],
             audience: acceptedAudiences,
-            issuer: expectedIssuer, // token 的 iss 必须匹配（根据版本）
-        }, 
-        // 验证完成的回调
-        (error, decoded) => {
+            issuer: expectedIssuer,
+        }, (error, decoded) => {
             if (error) {
                 reject(error);
                 return;
@@ -316,7 +309,7 @@ const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function*
                 reject(new Error("Unable to decode access token claims."));
                 return;
             }
-            // 验证成功，返回 claims
+            /** 验证成功，返回已验证的 claims。 */
             resolve(decoded);
         });
     });
@@ -337,14 +330,12 @@ const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function*
  *
  * @param claims token 的声明
  * @returns true 如果有 Container.Manage 权限，否则 false
- **/
+ */
 const hasRequiredScope = (claims) => {
     var _a;
-    // claims.scp ?? "" 表示如果 scp 不存在则使用空字符串
-    // split(" ") 按空格分割
-    // filter(Boolean) 过滤掉空字符串元素（如果有多个连续空格）
+    /** 拆分权限列表并过滤多余空项。 */
     const scopes = ((_a = claims.scp) !== null && _a !== void 0 ? _a : "").split(" ").filter(Boolean);
-    // 检查数组中是否包含所需权限
+    /** 检查是否包含所需的 Container.Manage 权限。 */
     return scopes.includes(scopes_1.SPEMBEDDED_CONTAINER_MANAGE);
 };
 /**
@@ -373,11 +364,11 @@ const hasRequiredScope = (claims) => {
  * }
  * // result.token 和 result.claims 已验证，可以安全使用
  * ```
- **/
+ */
 const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 0, function* () {
-    // 步骤 1: 获取 Authorization header
+    /** 从请求头中提取 Authorization 字段。 */
     const authorizationHeader = req.headers.authorization;
-    // 步骤 2: 检查 header 是否存在
+    /** token 不存在则直接返回 401。 */
     if (!authorizationHeader) {
         return {
             ok: false,
@@ -385,15 +376,10 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
             body: { message: "No access token provided." },
         };
     }
-    // 步骤 3: 解析 "Bearer <token>" 格式
-    // 标准格式必须是："Bearer" (scheme) + token + 没有多余部分
+    /** 拆分 scheme 和 token，不允许多余部分，防止格式注入。 */
     const [scheme, token, ...extraParts] = authorizationHeader
-        .trim() // 移除前后空格
-        .split(/\s+/); // 用空格分割，支持多个空格
-    // 步骤 4: 严格检查格式
-    // - scheme 必须是 "Bearer"（HTTP 标准）
-    // - 必须有 token
-    // - 不能有多余部分（防止注入）
+        .trim()
+        .split(/\s+/);
     if (scheme !== "Bearer" || !token || extraParts.length > 0) {
         return {
             ok: false,
@@ -402,9 +388,9 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
         };
     }
     try {
-        // 步骤 5: 验证 token 签名和声明
+        /** 验证 token 签名和 claims。 */
         const claims = yield verifyAccessToken(token);
-        // 步骤 6: 检查权限
+        /** 签名有效后再校验权限，遵循最小权限验证顺序。 */
         if (!hasRequiredScope(claims)) {
             return {
                 ok: false,
@@ -414,7 +400,7 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
                 },
             };
         }
-        // 步骤 7: 验证和权限检查全部通过
+        /** 所有检查通过，返回带有已验证令牌和 claims 的成功结果。 */
         return {
             ok: true,
             token,
@@ -422,7 +408,7 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
         };
     }
     catch (error) {
-        // 步骤 8: 处理任何验证失败的情况
+        /** 任何验证异常都统一转为 401，避免向客户端泄露内部信息。 */
         return {
             ok: false,
             status: 401,
@@ -462,22 +448,18 @@ exports.authorizeContainerManageRequest = authorizeContainerManageRequest;
  * const graphClient = createGraphClient(graphToken);
  * // 现在可以用 graphClient 代表用户调用 Graph API
  * ```
- **/
+ */
 const getGraphToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // 构建 OBO 请求
+        /** 构建 OBO 请求体，声明代理用户访问 Graph 所需的权限范围。 */
         const graphTokenRequest = {
             oboAssertion: token,
             scopes: [
-                // 请求的权限范围
-                // FileStorageContainer.Selected 允许访问指定的容器
                 `${config_1.serverConfig.graphBaseUrl}/${scopes_1.SPEMBEDDED_FILESTORAGECONTAINER_SELECTED}`,
             ],
         };
-        // 使用 MSAL 的 confidentialClient（API app 身份）执行 OBO
-        // 这步会向 Entra ID 发送请求：
-        // "我是 API app，用户给了我这个 token，请给我一个 Graph token"
-        const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken; // ! 操作符表示忽略 null 检查（我们信任 MSAL 一定返回）
+        /** 通过 MSAL 机密客户端执行 OBO 令牌交换，得到 Graph 访问令牌。 */
+        const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
         return oboGraphToken;
     }
     catch (error) {
@@ -520,19 +502,16 @@ exports.getGraphToken = getGraphToken;
  *     containerTypeId: typeId,
  *   });
  * ```
- **/
+ */
 const createGraphClient = (accessToken) => {
     return microsoft_graph_client_1.Client.init({
-        // authProvider: 每次发送 API 请求前，Graph 客户端会调用这个函数获取 token
-        // callback(error, token) 的约定：
-        // - error = null 表示成功
-        // - token = access token 字符串
+        /** 每次发起 API 请求前回调以提供最新访问令牌。 */
         authProvider: (callback) => {
             callback(null, accessToken);
         },
         defaultVersion: "v1.0",
         baseUrl: config_1.serverConfig.graphBaseUrl,
-        customHosts: new Set([graphHost]), // 只允许访问该主机，防止 SSRF 攻击
+        customHosts: new Set([graphHost]),
     });
 };
 exports.createGraphClient = createGraphClient;

@@ -44,12 +44,22 @@ export interface JobProgress {
 /**
  * 内部任务对象。
  *
- * 除了对外暴露的进度字段外，还额外保存归档结果和创建时间，
- * 以便后续下载和过期清理。
+ * 除了对外暴露的进度字段外，还额外保存归档结果、创建时间、完成时间和所有者身份，
+ * 以便后续下载、过期清理和权限校验。
  */
 interface Job extends JobProgress {
   zipBuffer?: Buffer;
   createdAt: number;
+  /**
+   * 任务进入终态（ready 或 failed）的时间戳。
+   * 清理定时器使用此字段计算 TTL，确保用户在归档就绪后始终有完整的 10 分钟可用窗口。
+   */
+  completedAt?: number;
+  /**
+   * 启动本任务的用户的 Azure AD Object ID（来自 JWT oid claim）。
+   * 用于确保只有任务创建者才能查询进度或申请下载票据。
+   */
+  ownerOid: string;
 }
 
 /**
@@ -73,7 +83,7 @@ setInterval(
   () => {
     const now = Date.now();
     for (const [id, job] of jobs) {
-      if (now - job.createdAt > JOB_TTL_MS) {
+      if (now - (job.completedAt ?? job.createdAt) > JOB_TTL_MS) {
         jobs.delete(id);
       }
     }
@@ -194,12 +204,14 @@ async function expandFolder(
  * @param containerId SharePoint Embedded 容器对应的 Drive ID。
  * @param itemIds 要归档的项目 ID 列表，可以包含文件和文件夹。
  * @param userToken 已验证通过的用户访问令牌，用于后续 OBO 流程。
+ * @param ownerOid 发起请求的用户 Azure AD Object ID，用于后续鉴权。
  * @returns Promise<string> 新创建任务的 jobId。
  */
 export async function startDownloadJob(
   containerId: string,
   itemIds: string[],
   userToken: string,
+  ownerOid: string,
 ): Promise<string> {
   const jobId = uuidv4();
 
@@ -210,6 +222,7 @@ export async function startDownloadJob(
     currentItem: "",
     errors: [],
     createdAt: Date.now(),
+    ownerOid,
   };
   jobs.set(jobId, job);
 
@@ -218,6 +231,7 @@ export async function startDownloadJob(
     const j = jobs.get(jobId);
     if (j) {
       j.status = "failed";
+      j.completedAt = Date.now();
       j.errors.push(`Job failed: ${err.message}`);
     }
   });
@@ -229,12 +243,24 @@ export async function startDownloadJob(
  * 获取任务当前进度。
  *
  * @param jobId 任务 ID。
- * @returns JobProgress | null 当任务不存在或已过期时返回 null。
+ * @param requesterOid 请求者的 Azure AD Object ID。提供时会校验任务归属，
+ *   不匹配则返回 null（与任务不存在的响应相同，避免泄露任务存在信息）。
+ * @returns JobProgress | null 当任务不存在、已过期或请求者无权访问时返回 null。
  */
-export function getJobProgress(jobId: string): JobProgress | null {
+export function getJobProgress(
+  jobId: string,
+  requesterOid?: string,
+): JobProgress | null {
   const job = jobs.get(jobId);
   if (!job) return null;
-  const { zipBuffer: _ignored, createdAt: _c, ...progress } = job;
+  if (requesterOid !== undefined && job.ownerOid !== requesterOid) return null;
+  const {
+    zipBuffer: _ignored,
+    createdAt: _c,
+    completedAt: _ca,
+    ownerOid: _o,
+    ...progress
+  } = job;
   return progress;
 }
 
@@ -320,6 +346,7 @@ async function processJob(
     graphToken = await getGraphToken(userToken);
   } catch (err: any) {
     job.status = "failed";
+    job.completedAt = Date.now();
     job.errors.push(`Graph token error: ${err.message}`);
     return;
   }
@@ -341,11 +368,13 @@ async function processJob(
   /** 对空结果和超量结果提前失败，避免继续浪费资源。 */
   if (flatFiles.length === 0) {
     job.status = "failed";
+    job.completedAt = Date.now();
     job.errors.push("No files found to archive.");
     return;
   }
   if (flatFiles.length > MAX_FILES) {
     job.status = "failed";
+    job.completedAt = Date.now();
     job.errors.push(
       `Too many files (${flatFiles.length}). Maximum is ${MAX_FILES}.`,
     );
@@ -395,6 +424,7 @@ async function processJob(
       totalBytes += buffer.length;
       if (totalBytes > MAX_BYTES) {
         job.status = "failed";
+        job.completedAt = Date.now();
         job.errors.push(
           `Archive would exceed the ${MAX_BYTES / 1024 / 1024} MB size limit.`,
         );
@@ -420,4 +450,5 @@ async function processJob(
   job.zipBuffer = Buffer.concat(chunks);
   job.status = "ready";
   job.currentItem = "";
+  job.completedAt = Date.now();
 }

@@ -257,6 +257,7 @@ server.post("/api/downloadArchive/start", async (req, res, next) => {
       containerId,
       itemIds,
       authResult.token,
+      authResult.claims.oid ?? "",
     );
     res.send(200, { jobId });
   } catch (error: any) {
@@ -281,10 +282,17 @@ server.post("/api/downloadArchive/start", async (req, res, next) => {
  */
 server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
   try {
+    const authResult = await authorizeContainerManageRequest(req);
+    if (!authResult.ok) {
+      res.send(authResult.status, authResult.body);
+      return next();
+    }
+
     const { jobId } = req.params as { jobId: string };
-    const progress = getJobProgress(jobId);
+    const requesterOid = authResult.claims.oid ?? "";
+    const progress = getJobProgress(jobId, requesterOid);
     if (!progress) {
-      res.send(404, { message: "Job not found or expired." });
+      res.send(404, { message: "Job not found, expired, or access denied." });
       return next();
     }
     res.send(200, progress);
@@ -318,9 +326,10 @@ server.post("/api/downloadArchive/ticket/:jobId", async (req, res, next) => {
     }
 
     const { jobId } = req.params as { jobId: string };
-    const progress = getJobProgress(jobId);
+    const requesterOid = authResult.claims.oid ?? "";
+    const progress = getJobProgress(jobId, requesterOid);
     if (!progress) {
-      res.send(404, { message: "Job not found or expired." });
+      res.send(404, { message: "Job not found, expired, or access denied." });
       return next();
     }
 

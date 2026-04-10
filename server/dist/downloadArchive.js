@@ -1,23 +1,17 @@
 "use strict";
 /**
- * 归档下载模块
+ * 提供基于后台任务的 ZIP 归档能力。
  *
- * 提供基于任务的异步 ZIP 下载机制：
- * 1. 调用方通过 startDownloadJob() 启动任务
- * 2. 调用方通过 getJobProgress() 轮询进度
- * 3. 任务 ready 后，可通过票据端点下载归档（底层数据由 getJobBuffer() 读取）
+ * 当用户一次选择很多文件或文件夹下载时，服务端不适合在单个 HTTP 请求中
+ * 同步完成全部读取和压缩工作。这个模块通过“任务 + 轮询 + 一次性票据”的方式
+ * 把耗时操作拆成多个更稳定的阶段。
  *
- * 架构说明：
- * - 任务保存在内存 Map 中，按 TTL 定时清理
- * - Graph API 使用请求携带的用户令牌，经 OBO 流程换取 Graph Token
- * - 文件夹会递归展开，并处理 @odata.nextLink 分页
- * - 文件写入 archiver ZIP 流，归档完成后缓存在内存中
- * - 每个任务最多 500 个文件或 500 MB
+ * 整体流程如下：
  *
- * 使用到的 Graph 端点：
- *   GET /drives/{driveId}/items/{itemId}          - 查询项目元数据
- *   GET /drives/{driveId}/items/{itemId}/children - 列出文件夹子项
- *   GET /drives/{driveId}/items/{itemId}/content  - 下载文件内容流
+ * 1. 调用 startDownloadJob 创建后台任务并立即返回 jobId。
+ * 2. 前端通过进度接口轮询任务状态。
+ * 3. 任务完成后，调用方创建一次性下载票据。
+ * 4. 浏览器再使用票据请求最终 ZIP 文件。
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -56,11 +50,13 @@ const DOWNLOAD_TICKET_TTL_MS = 60 * 1000; // 1 分钟
 // ─────────────────────────  任务与票据存储  ─────────────────────────────────
 const jobs = new Map();
 const downloadTickets = new Map();
-// 定时清理过期任务与过期票据（每 2 分钟执行一次）
+/**
+ * 定时清理过期任务和票据，避免内存中的状态无限增长。
+ */
 setInterval(() => {
     const now = Date.now();
     for (const [id, job] of jobs) {
-        if (now - job.createdAt > JOB_TTL_MS) {
+        if (now - job.completedAt > JOB_TTL_MS) {
             jobs.delete(id);
         }
     }
@@ -70,84 +66,110 @@ setInterval(() => {
         }
     }
 }, 2 * 60 * 1000);
+function touchJob(job) {
+    job.completedAt = Date.now();
+}
 /**
- * 递归展开单个 drive item。
- * - 如果是文件，直接写入 result。
- * - 如果是文件夹，读取其子项（含分页）并继续递归。
+ * 递归展开单个 Drive Item。
+ *
+ * 如果当前项目是文件，就直接加入待打包列表；
+ * 如果是文件夹，就继续递归展开其子项。
+ *
+ * @param graphClient 已认证的 Microsoft Graph 客户端。
+ * @param driveId 当前容器对应的 Drive ID。
+ * @param itemId 当前要展开的项目 ID。
+ * @param basePath 当前项目在 ZIP 包中的父级路径。
+ * @param result 扁平化后的文件输出数组。
+ * @returns Promise<void>
  */
 function expandItem(graphClient, driveId, itemId, basePath, result) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        // 先查询项目元数据，判断是文件还是文件夹
-        const item = yield graphClient
+        const item = (yield graphClient
             .api(`/drives/${driveId}/items/${itemId}`)
             .select("id,name,folder,file,size")
-            .get();
+            .get());
+        const itemName = (_a = item.name) !== null && _a !== void 0 ? _a : "";
         if (item.folder) {
-            // 文件夹：继续展开其子项
-            yield expandFolder(graphClient, driveId, itemId, basePath ? `${basePath}/${item.name}` : item.name, result);
+            yield expandFolder(graphClient, driveId, itemId, basePath ? `${basePath}/${itemName}` : itemName, result);
         }
         else {
-            // 文件：直接加入待打包列表
             result.push({
                 itemId,
-                zipPath: basePath ? `${basePath}/${item.name}` : item.name,
+                zipPath: basePath ? `${basePath}/${itemName}` : itemName,
             });
         }
     });
 }
 /**
- * 枚举文件夹下所有子项（处理 @odata.nextLink 分页）。
+ * 枚举文件夹下所有子项，并处理 Graph 分页结果。
+ *
+ * @param graphClient 已认证的 Microsoft Graph 客户端。
+ * @param driveId 当前容器对应的 Drive ID。
+ * @param folderId 要展开的文件夹 ID。
+ * @param folderPath 当前文件夹在 ZIP 包中的路径。
+ * @param result 扁平化后的文件输出数组。
+ * @returns Promise<void>
  */
 function expandFolder(graphClient, driveId, folderId, folderPath, result) {
-    var _a, _b;
+    var _a, _b, _d, _e;
     return __awaiter(this, void 0, void 0, function* () {
         let endpoint = `/drives/${driveId}/items/${folderId}/children`;
         while (endpoint) {
-            const page = yield graphClient.api(endpoint).select("id,name,folder,file,size").get(); // eslint-disable-line
+            const page = yield graphClient.api(endpoint).select("id,name,folder,file,size").get();
             const children = (_a = page.value) !== null && _a !== void 0 ? _a : [];
             for (const child of children) {
+                const childId = (_b = child.id) !== null && _b !== void 0 ? _b : "";
+                const childName = (_d = child.name) !== null && _d !== void 0 ? _d : "";
                 if (child.folder) {
-                    yield expandFolder(graphClient, driveId, child.id, `${folderPath}/${child.name}`, result);
+                    yield expandFolder(graphClient, driveId, childId, `${folderPath}/${childName}`, result);
                 }
                 else {
                     result.push({
-                        itemId: child.id,
-                        zipPath: `${folderPath}/${child.name}`,
+                        itemId: childId,
+                        zipPath: `${folderPath}/${childName}`,
                     });
                 }
             }
-            // 如果存在下一页链接，继续拉取
-            endpoint = (_b = page["@odata.nextLink"]) !== null && _b !== void 0 ? _b : null;
+            endpoint = (_e = page["@odata.nextLink"]) !== null && _e !== void 0 ? _e : null;
         }
     });
 }
 // ─────────────────────────  对外 API  ───────────────────────────────────────
 /**
- * 启动新的归档下载任务。
+ * 启动一个新的归档任务。
  *
- * @param containerId SPE 容器（Drive）ID
- * @param itemIds 要归档的项目 ID 列表（文件或文件夹）
- * @param userToken 已验证通过的用户访问令牌（用于 OBO 换取 Graph Token）
- * @returns 任务 ID
+ * 这个函数只负责创建任务记录并返回 jobId，真正耗时的文件下载和压缩工作
+ * 会在后台异步执行。
+ *
+ * @param containerId SharePoint Embedded 容器对应的 Drive ID。
+ * @param itemIds 要归档的项目 ID 列表，可以包含文件和文件夹。
+ * @param userToken 已验证通过的用户访问令牌，用于后续 OBO 流程。
+ * @returns Promise<string> 新创建任务的 jobId。
  */
-function startDownloadJob(containerId, itemIds, userToken) {
+function startDownloadJob(containerId, itemIds, userToken, ownerOid, ownerUpn) {
     return __awaiter(this, void 0, void 0, function* () {
         const jobId = (0, uuid_1.v4)();
+        const now = Date.now();
         const job = {
             status: "queued",
             processedFiles: 0,
             totalFiles: 0,
             currentItem: "",
             errors: [],
-            createdAt: Date.now(),
+            createdAt: now,
+            completedAt: now,
+            ownerOid,
+            ownerUpn,
         };
         jobs.set(jobId, job);
-        // 异步后台执行，保证 HTTP 请求可以立即返回 jobId
+        /** 后台执行真正的归档工作，避免阻塞当前请求。 */
         processJob(jobId, containerId, itemIds, userToken).catch((err) => {
             const j = jobs.get(jobId);
             if (j) {
                 j.status = "failed";
                 j.errors.push(`Job failed: ${err.message}`);
+                touchJob(j);
             }
         });
         return jobId;
@@ -156,63 +178,96 @@ function startDownloadJob(containerId, itemIds, userToken) {
 exports.startDownloadJob = startDownloadJob;
 /**
  * 获取任务当前进度。
- * 如果 jobId 不存在或已过期，返回 null。
+ *
+ * @param jobId 任务 ID。
+ * @returns JobProgress | null 当任务不存在或已过期时返回 null。
  */
-function getJobProgress(jobId) {
+function getJobProgress(jobId, ownerOid) {
     const job = jobs.get(jobId);
     if (!job)
         return null;
-    const { zipBuffer: _ignored, createdAt: _c } = job, progress = __rest(job, ["zipBuffer", "createdAt"]);
+    if (ownerOid && job.ownerOid !== ownerOid)
+        return null;
+    const { zipBuffer: _ignored, createdAt: _c, completedAt: _done, ownerOid: _ownerOid, ownerUpn: _ownerUpn } = job, progress = __rest(job, ["zipBuffer", "createdAt", "completedAt", "ownerOid", "ownerUpn"]);
     return progress;
 }
 exports.getJobProgress = getJobProgress;
 /**
- * 读取 ready 任务的 ZIP Buffer。
- * 任务不存在、未 ready 或已过期时返回 null。
+ * 读取已完成任务的 ZIP 二进制内容。
+ *
+ * @param jobId 任务 ID。
+ * @returns Buffer | null 只有当任务状态为 ready 时才返回 ZIP Buffer。
  */
-function getJobBuffer(jobId) {
+function getJobBuffer(jobId, ownerOid) {
     const job = jobs.get(jobId);
+    if (ownerOid && (job === null || job === void 0 ? void 0 : job.ownerOid) !== ownerOid)
+        return null;
     if (!job || job.status !== "ready" || !job.zipBuffer)
         return null;
     return job.zipBuffer;
 }
 exports.getJobBuffer = getJobBuffer;
 /**
- * 创建短时有效、单次消费的下载票据（给浏览器原生下载器使用）。
+ * 创建一个短时有效、单次消费的下载票据。
+ *
+ * @param jobId 已完成归档任务的 ID。
+ * @param filename 下载时建议使用的文件名。
+ * @returns string 新生成的票据字符串。
  */
-function createDownloadTicket(jobId, filename) {
+function createDownloadTicket(jobId, filename, ownerOid, ownerUpn) {
     const ticket = (0, uuid_1.v4)();
     downloadTickets.set(ticket, {
         jobId,
         filename,
         expiresAt: Date.now() + DOWNLOAD_TICKET_TTL_MS,
+        ownerOid,
+        ownerUpn,
     });
     return ticket;
 }
 exports.createDownloadTicket = createDownloadTicket;
 /**
- * 消费并作废票据。
- * 票据无效或过期时返回 null。
+ * 消费并作废下载票据。
+ *
+ * 票据一旦被读取就会立刻删除，确保它只能使用一次。
+ *
+ * @param ticket 下载票据。
+ * @returns {{ jobId: string; filename: string } | null} 票据关联信息；无效或过期则返回 null。
  */
-function consumeDownloadTicket(ticket) {
+function consumeDownloadTicket(ticket, ownerOid) {
     const record = downloadTickets.get(ticket);
     if (!record)
-        return null;
-    // 先删除再校验有效期，确保票据永远只能被消费一次
+        return { ok: false, reason: "not_found" };
+    /** 先删除再校验，确保同一票据不会被重复利用。 */
     downloadTickets.delete(ticket);
     if (record.expiresAt <= Date.now()) {
-        return null;
+        return { ok: false, reason: "expired" };
     }
-    return { jobId: record.jobId, filename: record.filename };
+    if (record.ownerOid !== ownerOid) {
+        return { ok: false, reason: "forbidden" };
+    }
+    return { ok: true, jobId: record.jobId, filename: record.filename };
 }
 exports.consumeDownloadTicket = consumeDownloadTicket;
 // ─────────────────────────  后台处理流程  ───────────────────────────────────
+/**
+ * 在后台执行真实的归档处理流程。
+ *
+ * 这是整个模块的核心函数，负责准备 Graph 客户端、展开目录结构、
+ * 下载文件内容、构建 ZIP，并持续回写任务状态。
+ *
+ * @param jobId 当前任务 ID。
+ * @param containerId 当前容器对应的 Drive ID。
+ * @param itemIds 用户选择的项目 ID 列表。
+ * @param userToken 已验证通过的用户访问令牌。
+ * @returns Promise<void>
+ */
 function processJob(jobId, containerId, itemIds, userToken) {
     return __awaiter(this, void 0, void 0, function* () {
         const job = jobs.get(jobId);
-        // ── 1. 准备 Graph 客户端 ────────────────────────────────────────────────
         job.status = "preparing";
         job.currentItem = "Initialising…";
+        touchJob(job);
         let graphToken;
         try {
             graphToken = yield (0, auth_1.getGraphToken)(userToken);
@@ -220,11 +275,13 @@ function processJob(jobId, containerId, itemIds, userToken) {
         catch (err) {
             job.status = "failed";
             job.errors.push(`Graph token error: ${err.message}`);
+            touchJob(job);
             return;
         }
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
-        // ── 2. 将所选项展开为扁平文件列表 ───────────────────────────────────────
+        /** 先把文件夹递归展开为扁平文件列表，方便后续统一压缩。 */
         job.currentItem = "Expanding folder structure…";
+        touchJob(job);
         const flatFiles = [];
         for (const itemId of itemIds) {
             try {
@@ -234,20 +291,23 @@ function processJob(jobId, containerId, itemIds, userToken) {
                 job.errors.push(`Failed to expand item ${itemId}: ${err.message}`);
             }
         }
-        // 容量防护：空任务/文件数超限直接失败
+        /** 对空结果和超量结果提前失败，避免继续浪费资源。 */
         if (flatFiles.length === 0) {
             job.status = "failed";
             job.errors.push("No files found to archive.");
+            touchJob(job);
             return;
         }
         if (flatFiles.length > MAX_FILES) {
             job.status = "failed";
             job.errors.push(`Too many files (${flatFiles.length}). Maximum is ${MAX_FILES}.`);
+            touchJob(job);
             return;
         }
         job.totalFiles = flatFiles.length;
-        // ── 3. 构建 ZIP ──────────────────────────────────────────────────────────
+        /** 进入真正的 ZIP 构建阶段。 */
         job.status = "zipping";
+        touchJob(job);
         const chunks = [];
         const passThrough = new stream_1.PassThrough();
         passThrough.on("data", (chunk) => chunks.push(chunk));
@@ -258,11 +318,12 @@ function processJob(jobId, containerId, itemIds, userToken) {
             const { itemId, zipPath } = flatFiles[i];
             job.currentItem = zipPath;
             job.processedFiles = i;
+            touchJob(job);
             try {
-                // 通过 Graph /content 端点下载文件内容。
-                // 在 SPE 容器场景下，@microsoft.graph.downloadUrl 可靠性较差；
-                // 使用携带 Bearer Token 的 /content 能稳定覆盖不同 Drive 类型，
-                // 并自动跟随重定向到真实存储地址。
+                /**
+                 * 通过 Graph 的 /content 端点拉取文件内容。
+                 * 这种做法比依赖临时下载地址更稳定，也便于统一认证处理。
+                 */
                 const contentUrl = `https://graph.microsoft.com/v1.0/drives/${containerId}/items/${itemId}/content`;
                 const fileResponse = yield fetch(contentUrl, {
                     headers: { Authorization: `Bearer ${graphToken}` },
@@ -274,22 +335,25 @@ function processJob(jobId, containerId, itemIds, userToken) {
                 }
                 const arrayBuffer = yield fileResponse.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
-                // 按“真实已下载字节数”做总大小限制，避免打包过程失控
+                /** 按已下载字节累计总量，防止归档结果过大。 */
                 totalBytes += buffer.length;
                 if (totalBytes > MAX_BYTES) {
                     job.status = "failed";
                     job.errors.push(`Archive would exceed the ${MAX_BYTES / 1024 / 1024} MB size limit.`);
+                    touchJob(job);
                     archive.abort();
                     return;
                 }
                 archive.append(buffer, { name: zipPath });
                 job.processedFiles = i + 1;
+                touchJob(job);
             }
             catch (err) {
                 job.errors.push(`Error adding ${zipPath}: ${err.message}`);
+                touchJob(job);
             }
         }
-        // 归档收尾：等待流真正结束后再拼接 Buffer，避免拿到不完整数据
+        /** 等待 ZIP 流真正结束后再拼接 Buffer，避免拿到不完整数据。 */
         yield new Promise((resolve, reject) => {
             passThrough.on("finish", resolve);
             passThrough.on("error", reject);
@@ -299,6 +363,7 @@ function processJob(jobId, containerId, itemIds, userToken) {
         job.zipBuffer = Buffer.concat(chunks);
         job.status = "ready";
         job.currentItem = "";
+        touchJob(job);
     });
 }
 //# sourceMappingURL=downloadArchive.js.map

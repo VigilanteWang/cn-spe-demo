@@ -68,6 +68,7 @@ type ApiAccessTokenClaims = JwtPayload & {
   scp?: string; // 权限范围
   tid?: string; // 租户 ID
   ver?: string; // token 版本 ("1.0" 或 "2.0")
+  oid?: string; // Azure AD Object ID —— 稳定的用户身份标识符，不随会话变化
 };
 
 /**
