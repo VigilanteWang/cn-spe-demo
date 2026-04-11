@@ -588,6 +588,7 @@ export const Files = (props: IFilesProps) => {
 
     await loadItems(folderId || "root");
     setDeleteDialogOpen(false);
+    // 新引用来更新State，useState 会使用 Object.is 来比较新旧值，确保组件重新render
     setSelectedRows(new Set<TableRowId>());
   };
 
@@ -616,7 +617,7 @@ export const Files = (props: IFilesProps) => {
 
   /**
    * 输入框文件夹名称变化处理。
-   * @param data.value 最新输入内容，用于新建文件夹对话框输入框。
+   * @param data.value 最新输入内容，及时更新 FolderName state，用于立刻更新 UI。
    */
   const onHandleFolderNameChange: InputProps["onChange"] = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -896,7 +897,6 @@ export const Files = (props: IFilesProps) => {
 
   /** 仅保留非文件夹项用于预览导航（前/后切换时跳过文件夹） */
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
-  // 标记 2 - 处理函数区域。
 
   // =============== DataGrid 列定义 ===============
   const columns: TableColumnDefinition<IDriveItemExtended>[] = [
