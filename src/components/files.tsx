@@ -288,6 +288,19 @@ export const Files = (props: IFilesProps) => {
    * 这段代码的作用是将从本地计算机中选中的文件整理成一个包含“相对路径”的列表，以便后续上传时能够保留文件夹结构。
    * 对于文件夹上传（webkitdirectory），会保留完整的相对路径结构。
    * 对于单文件上传，relativePath 就是文件名。
+   *
+   * 示例：
+   * 输入 (伪表示 FileList 中的三项)：
+   *   files[0] => { name: "readme.txt", webkitRelativePath: "" }
+   *   files[1] => { name: "img1.jpg", webkitRelativePath: "photos/img1.jpg" }
+   *   files[2] => { name: "document.pdf", webkitRelativePath: "documents/reports/document.pdf" }
+   *
+   * 返回值（函数输出）：
+   *   [
+   *     { file: File(readme.txt), relativePath: "readme.txt" },
+   *     { file: File(img1.jpg), relativePath: "photos/img1.jpg" },
+   *     { file: File(document.pdf), relativePath: "documents/reports/document.pdf" }
+   *   ]
    */
   const getFolderStructure = (
     files: FileList,
@@ -689,6 +702,7 @@ export const Files = (props: IFilesProps) => {
    * 5. 完成后刷新文件列表。
    */
   const uploadFiles = async (files: FileList) => {
+    // 见getFolderStructure函数注释，有输入输出示例
     const fileStructure = getFolderStructure(files);
     const totalFiles = fileStructure.length;
 
@@ -719,7 +733,8 @@ export const Files = (props: IFilesProps) => {
         const pathParts = relativePath.split("/");
         let currentPath = folderId || "root";
 
-        // 必要时创建中间文件夹（最后一段是文件名，跳过）。
+        // 必要时创建中间文件夹，返回 新文件夹的id（最后一段是文件名，跳过）。
+        // SharePoint 文件系统是扁平化的，只要有父文件夹 id 就能定位并上传文件，不需要全路径。
         for (let j = 0; j < pathParts.length - 1; j++) {
           const folderName = pathParts[j];
           currentPath = await createFolderIfNotExists(
@@ -1025,6 +1040,13 @@ export const Files = (props: IFilesProps) => {
         onChange={onUploadFileSelected}
         style={{ display: "none" }}
       />
+      {/*
+        隐藏的文件夹上传 input：使用 webkitdirectory 属性允许选择整个文件夹，
+        因为 webkitdirectory 不是标准属性，TypeScript 可能会报错，
+        所以使用类型断言 any 绕过 (其实可以扩展interface)。
+        通过对象展开的方式注入属性。在某些 React 版本中，直接在组件上写未知的非标准属性可能会被 React 过滤掉。
+        通过展开对象的方式，可以确保属性最终成功挂载到真实的 DOM 元素上
+      */}
       <input
         ref={uploadFolderRef}
         type="file"
