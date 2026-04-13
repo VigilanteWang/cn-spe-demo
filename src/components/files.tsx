@@ -216,6 +216,8 @@ export const Files = (props: IFilesProps) => {
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
   // 由于下载归档需要轮询后端任务状态，我们使用 useRef 存储定时器 ID，以便在组件卸载时清理
   const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 记录 loadItems 的最新请求序号，避免旧请求，因为慢一步返回而覆盖新目录数据。
+  const loadItemsRequestSeqRef = useRef(0);
   // 用于创建新文件夹。
   const [folderId, setFolderId] = useState<string>("root");
   const [folderName, setFolderName] = useState<string>("");
@@ -332,11 +334,17 @@ export const Files = (props: IFilesProps) => {
       const graphClient = Providers.globalProvider.graph.client;
       const driveId = props.container.id;
       const driveItemId = itemId || "root";
+      // 为本次请求分配序号；仅允许最新一次请求落盘。
+      const requestSeq = ++loadItemsRequestSeqRef.current;
 
       // 获取当前层级的容器项目。
       const graphResponse = await graphClient
         .api(`/drives/${driveId}/items/${driveItemId}/children`)
         .get();
+      // 如果当前请求不是最新请求，直接丢弃结果，避免覆盖新目录状态。
+      if (requestSeq !== loadItemsRequestSeqRef.current) {
+        return;
+      }
       const containerItems = graphResponse.value as DriveItemWithDownloadUrl[];
       const items: IDriveItemExtended[] = [];
       containerItems.forEach((driveItem) => {
@@ -577,11 +585,17 @@ export const Files = (props: IFilesProps) => {
 
   /**
    * 确认删除：调用后端 API 批量删除选中的文件/文件夹。
-   * 删除后刷新文件列表并清空选择。
+   *
+   * 流程：
+   * 1. 收集当前选中项 ID。
+   * 2. 在异步删除前快照当前文件夹 ID，避免删除过程中用户导航导致刷新到错误目录。
+   * 3. 调用后端删除接口并记录失败项日志。
+   * 4. 删除完成后刷新快照目录，关闭对话框并清空选择状态。
    */
   const onDeleteItemClick = async () => {
     const selectedIds = Array.from(selectedRows) as string[];
     if (selectedIds.length === 0) return;
+    const currentFolderId = folderId || "root";
 
     try {
       const result = await spEmbedded.deleteItems(
@@ -598,8 +612,7 @@ export const Files = (props: IFilesProps) => {
     } catch (err: any) {
       console.error("Delete failed:", err.message);
     }
-
-    await loadItems(folderId || "root");
+    await loadItems(currentFolderId);
     setDeleteDialogOpen(false);
     // 新引用来更新State，useState 会使用 Object.is 来比较新旧值，确保组件重新render
     setSelectedRows(new Set<TableRowId>());
@@ -690,21 +703,22 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
-   * 上传文件核心逻辑
+   * 上传文件核心逻辑。
    *
-   * @param files 用户选择的文件列表（来自 <input type="file" />）
+   * @param files 用户选择的文件列表（来自 <input type="file" />）。
    *
    * 流程：
-   * 1. 解析文件列表及其相对路径（支持文件夹结构）
-   * 2. 遍历每个文件，按路径创建必要的中间文件夹
-   * 3. 使用 Graph API PUT 请求上传文件内容
-   * 4. 上传过程中实时更新进度状态
-   * 5. 完成后刷新文件列表。
+   * 1. 解析文件列表及其相对路径（支持文件夹结构）。
+   * 2. 在异步上传开始前快照当前文件夹 ID，确保整批上传及最终刷新基于同一目录上下文。
+   * 3. 遍历每个文件，按路径逐级确保中间文件夹存在。
+   * 4. 使用 Graph API PUT 请求上传文件内容，并实时更新上传进度状态。
+   * 5. 全部完成后展示完成提示，并刷新快照目录对应的文件列表。
    */
   const uploadFiles = async (files: FileList) => {
     // 见getFolderStructure函数注释，有输入输出示例
     const fileStructure = getFolderStructure(files);
     const totalFiles = fileStructure.length;
+    const currentFolderId = folderId || "root";
 
     setUploadProgress({
       isUploading: true,
@@ -731,7 +745,7 @@ export const Files = (props: IFilesProps) => {
       try {
         // 如果文件属于文件夹结构，先确保目标路径中的各级文件夹存在。
         const pathParts = relativePath.split("/");
-        let currentPath = folderId || "root";
+        let currentPath = currentFolderId;
 
         // 必要时创建中间文件夹，返回 新文件夹的id（最后一段是文件名，跳过）。
         // SharePoint 文件系统是扁平化的，只要有父文件夹 id 就能定位并上传文件，不需要全路径。
@@ -748,12 +762,7 @@ export const Files = (props: IFilesProps) => {
         const fileName = pathParts[pathParts.length - 1];
         const endpoint = `/drives/${props.container.id}/items/${currentPath}:/${fileName}:/content`;
 
-        const fileReader = new FileReader();
-        const fileData = await new Promise<ArrayBuffer>((resolve, reject) => {
-          fileReader.onload = () => resolve(fileReader.result as ArrayBuffer);
-          fileReader.onerror = reject;
-          fileReader.readAsArrayBuffer(file);
-        });
+        const fileData = await file.arrayBuffer();
 
         await graphClient.api(endpoint).putStream(fileData);
       } catch (error: any) {
@@ -779,7 +788,7 @@ export const Files = (props: IFilesProps) => {
     }, 3000);
 
     // 刷新文件列表。
-    await loadItems(folderId || "root");
+    await loadItems(currentFolderId);
   };
 
   /**
@@ -802,7 +811,7 @@ export const Files = (props: IFilesProps) => {
       const response = await graphClient.api(endpoint).get();
 
       const existingFolder = response.value.find(
-        (item: any) => item.name === folderName && item.folder,
+        (item: any) => item.folder && item.name === folderName,
       );
 
       if (existingFolder) {
@@ -828,9 +837,17 @@ export const Files = (props: IFilesProps) => {
 
   /**
    * 导航到指定文件夹。
-   * 加载目标文件夹内容并更新面包屑路径。
-   * - 如果目标文件夹已在面包屑中（后退导航），截断路径。
-   * - 如果是新文件夹（前进导航），追加到路径末尾。
+   *
+   * @param targetFolderId 目标文件夹 ID。
+   * @param targetFolderName 目标文件夹名称。
+   *
+   * 流程：
+   * 1. 清空当前行选择状态，避免跨目录保留选中项。
+   * 2. 异步加载目标目录内容并更新当前目录 ID。
+   * 3. 通过函数式 setState 更新面包屑，避免 await 之后读取到过期 breadcrumbPath：
+   *    - 目标为 root：重置为 Root 单节点。
+   *    - 目标已存在于路径：截断到目标节点（后退导航）。
+   *    - 目标不在路径中：追加到末尾（前进导航）。
    */
   const navigateToFolder = async (
     targetFolderId: string,
@@ -838,26 +855,22 @@ export const Files = (props: IFilesProps) => {
   ) => {
     setSelectedRows(new Set());
     await loadItems(targetFolderId, targetFolderName);
-
-    // 更新面包屑路径。
-    if (targetFolderId === "root") {
-      setBreadcrumbPath([{ id: "root", name: "Root" }]);
-    } else {
+    // 使用函数式更新，避免 await 之后读取到过期 breadcrumbPath。
+    setBreadcrumbPath((prevPath) => {
+      if (targetFolderId === "root") {
+        return [{ id: "root", name: "Root" }];
+      }
       // 判断该文件夹是否已在路径中（后退导航场景）。
-      const existingIndex = breadcrumbPath.findIndex(
+      const existingIndex = prevPath.findIndex(
         (item) => item.id === targetFolderId,
       );
       if (existingIndex !== -1) {
         // 后退导航：截断路径。
-        setBreadcrumbPath(breadcrumbPath.slice(0, existingIndex + 1));
-      } else {
-        // 前进导航：追加路径。
-        setBreadcrumbPath([
-          ...breadcrumbPath,
-          { id: targetFolderId, name: targetFolderName },
-        ]);
+        return prevPath.slice(0, existingIndex + 1);
       }
-    }
+      // 前进导航：追加路径。
+      return [...prevPath, { id: targetFolderId, name: targetFolderName }];
+    });
   };
 
   /** 返回上级文件夹（取面包屑倒数第二项） */
@@ -898,6 +911,8 @@ export const Files = (props: IFilesProps) => {
    */
   const handlePreviewDelete = async () => {
     if (currentPreviewFile?.id) {
+      // 在异步删除前快照当前目录，避免删除过程中导航导致刷新目录漂移。
+      const currentFolderId = folderId || "root";
       try {
         await spEmbedded.deleteItems(props.container.id, [
           currentPreviewFile.id as string,
@@ -905,7 +920,7 @@ export const Files = (props: IFilesProps) => {
       } catch (err: any) {
         console.error("Preview delete failed:", err.message);
       }
-      await loadItems(folderId || "root");
+      await loadItems(currentFolderId);
       setPreviewOpen(false);
     }
   };
