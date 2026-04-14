@@ -191,6 +191,11 @@ const useStyles = makeStyles({
     color: tokens.colorPaletteGreenForeground1,
     fontWeight: "600",
   },
+  actionsButtonGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
 });
 /**
  * 文件管理组件
@@ -895,7 +900,7 @@ export const Files = (props: IFilesProps) => {
   };
 
   // =============== 文件预览处理 ===============
-  /** 预览对话框中点击前/后导航时，更新当前预览文件 */
+  /** 预览对话框中点击左右箭头导航时，更新当前预览文件 */
   const handlePreviewNavigate = (file: IDriveItemExtended) => {
     setCurrentPreviewFile(file);
   };
@@ -927,6 +932,7 @@ export const Files = (props: IFilesProps) => {
 
   /** 仅保留非文件夹项用于预览导航（前/后切换时跳过文件夹） */
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
+  const styles = useStyles();
 
   // =============== DataGrid 列定义 ===============
   const columns: TableColumnDefinition<IDriveItemExtended>[] = [
@@ -951,7 +957,7 @@ export const Files = (props: IFilesProps) => {
             ) : (
               <Link
                 onClick={(e) => {
-                  e.stopPropagation(); // 防止事件冒泡到 DataGrid 行选中逻辑。
+                  e.stopPropagation(); // 防止事件冒泡到 DataGridRow 的选中逻辑，避免进入文件夹同时选中文件夹
                   navigateToFolder(
                     driveItem.id as string,
                     driveItem.name as string,
@@ -1000,7 +1006,7 @@ export const Files = (props: IFilesProps) => {
         };
 
         return (
-          <>
+          <div className={styles.actionsButtonGroup}>
             <Button
               aria-label="Versions"
               icon={<HistoryRegular />}
@@ -1015,7 +1021,7 @@ export const Files = (props: IFilesProps) => {
             >
               Permissions
             </Button>
-          </>
+          </div>
         );
       },
     }),
@@ -1044,8 +1050,7 @@ export const Files = (props: IFilesProps) => {
       defaultWidth: 320,
     },
   };
-  // 标记 3 - 组件渲染区域。
-  const styles = useStyles();
+  // 组件渲染区域。
   return (
     <div>
       <input
