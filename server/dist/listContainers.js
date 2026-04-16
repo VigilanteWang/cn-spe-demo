@@ -1,27 +1,17 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+/**
+ * 处理容器列表查询请求。
+ *
+ * 这个模块对应 GET /api/listContainers 路由，负责把一个前端查询请求
+ * 转换成一次经过认证的 Microsoft Graph 容器列表查询。
+ *
+ * 它本身不负责启动服务器或定义 URL，而是专注在单个业务动作上：
+ *
+ * 1. 校验当前用户是否具备容器管理权限。
+ * 2. 通过 OBO 流程换取可访问 Microsoft Graph 的令牌。
+ * 3. 按服务端配置过滤出当前应用关心的容器类型。
+ * 4. 把结果或错误转换成 HTTP 响应。
+ */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -33,47 +23,38 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listContainers = void 0;
-const MSAL = __importStar(require("@azure/msal-node"));
-require('isomorphic-fetch');
-const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
 const auth_1 = require("./auth");
-const msalConfig = {
-    auth: {
-        clientId: process.env['API_ENTRA_APP_CLIENT_ID'],
-        authority: process.env['API_ENTRA_APP_AUTHORITY'],
-        clientSecret: process.env['API_ENTRA_APP_CLIENT_SECRET']
-    },
-    system: {
-        loggerOptions: {
-            loggerCallback(loglevel, message, containsPii) {
-                //console.log(message);
-            },
-            piiLoggingEnabled: false,
-            logLevel: MSAL.LogLevel.Verbose,
-        }
-    }
-};
-const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
+const config_1 = require("./config");
+/**
+ * 列出当前用户可访问的容器。
+ *
+ * 前端通常会在页面初始化或刷新容器列表时调用这个函数对应的接口。
+ *
+ * @param req Restify 请求对象。要求请求头中包含 Bearer Token。
+ * @param res Restify 响应对象。用于返回容器列表或错误信息。
+ * @returns Promise<void>
+ */
 const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!req.headers.authorization) {
-        res.send(401, { message: 'No access token provided.' });
+    /** 先做权限校验，避免未授权请求访问下游服务。 */
+    const authorizationResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+    if (!authorizationResult.ok) {
+        res.send(authorizationResult.status, authorizationResult.body);
         return;
     }
-    const [bearer, token] = (req.headers.authorization || '').split(' ');
-    const [graphSuccess, oboGraphToken] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
-    if (!graphSuccess) {
-        res.send(200, oboGraphToken);
-        return;
-    }
-    const authProvider = (callback) => {
-        callback(null, oboGraphToken);
-    };
     try {
-        const graphClient = MSGraph.Client.init({
-            authProvider: authProvider,
-            defaultVersion: 'beta'
-        });
-        const graphResponse = yield graphClient.api(`storage/fileStorage/containers?$filter=containerTypeId eq ${process.env["CONTAINER_TYPE_ID"]}`).get();
+        /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
+        const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
+        /** Graph 客户端负责封装认证和请求链式调用。 */
+        const graphClient = (0, auth_1.createGraphClient)(graphToken);
+        /**
+         * 只返回当前应用所属的容器类型。
+         * 这里在 Graph 层过滤，能减少无关数据返回到服务端。
+         */
+        const graphResponse = yield graphClient
+            .api("/storage/fileStorage/containers")
+            .version("v1.0")
+            .filter(`containerTypeId eq ${config_1.serverConfig.containerTypeId}`)
+            .get();
         res.send(200, graphResponse);
         return;
     }
@@ -83,3 +64,4 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.listContainers = listContainers;
+//# sourceMappingURL=listContainers.js.map

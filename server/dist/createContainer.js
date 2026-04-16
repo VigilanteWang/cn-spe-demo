@@ -1,27 +1,17 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+/**
+ * 处理容器创建请求。
+ *
+ * 这个模块对应 POST /api/createContainer 路由。
+ * 当前端提交新建容器表单后，请求会进入这里。
+ *
+ * 它的核心职责是把外部输入整理成一个受控的创建操作：
+ *
+ * 1. 校验当前用户权限。
+ * 2. 换取可访问 Microsoft Graph 的令牌。
+ * 3. 使用服务端配置补全安全字段。
+ * 4. 调用 Graph 创建容器并返回结果。
+ */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -33,54 +23,43 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createContainer = void 0;
-const MSAL = __importStar(require("@azure/msal-node"));
-require("isomorphic-fetch");
-const MSGraph = __importStar(require("@microsoft/microsoft-graph-client"));
 const auth_1 = require("./auth");
-const msalConfig = {
-    auth: {
-        clientId: process.env["API_ENTRA_APP_CLIENT_ID"],
-        authority: process.env["API_ENTRA_APP_AUTHORITY"],
-        clientSecret: process.env["API_ENTRA_APP_CLIENT_SECRET"],
-    },
-    system: {
-        loggerOptions: {
-            loggerCallback(loglevel, message, containsPii) {
-                //console.log(message);
-            },
-            piiLoggingEnabled: false,
-            logLevel: MSAL.LogLevel.Verbose,
-        },
-    },
-};
-const confidentialClient = new MSAL.ConfidentialClientApplication(msalConfig);
+const config_1 = require("./config");
+/**
+ * 创建一个新的 SharePoint Embedded 容器。
+ *
+ * 这里不直接信任客户端提交的完整对象，而是只接收必要字段，
+ * 并由服务端强制写入 containerTypeId，避免前端越权创建错误类型的容器。
+ *
+ * @param req Restify 请求对象。请求体中应包含 displayName，可选 description。
+ * @param res Restify 响应对象。用于返回创建结果或错误信息。
+ * @returns Promise<void>
+ */
 const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    if (!req.headers.authorization) {
-        res.send(401, { message: "No access token provided." });
+    /** 所有创建操作都先经过统一权限校验。 */
+    const authorizationResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+    if (!authorizationResult.ok) {
+        res.send(authorizationResult.status, authorizationResult.body);
         return;
     }
-    const [bearer, token] = (req.headers.authorization || "").split(" ");
-    const [graphSuccess, graphTokenRequest] = yield (0, auth_1.getGraphToken)(confidentialClient, token);
-    if (!graphSuccess) {
-        res.send(200, graphTokenRequest);
-        return;
-    }
-    const authProvider = (callback) => {
-        callback(null, graphTokenRequest);
-    };
     try {
-        const graphClient = MSGraph.Client.init({
-            authProvider: authProvider,
-            defaultVersion: "beta",
-        });
+        /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
+        const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
+        /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
+        const graphClient = (0, auth_1.createGraphClient)(graphToken);
+        /**
+         * 请求体只允许前端控制名称和描述。
+         * 容器类型由服务端配置决定，避免客户端绕过约束。
+         */
         const containerRequestData = {
             displayName: req.body.displayName,
             description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : "",
-            containerTypeId: process.env["CONTAINER_TYPE_ID"],
+            containerTypeId: config_1.serverConfig.containerTypeId,
         };
         const graphResponse = yield graphClient
-            .api(`storage/fileStorage/containers`)
+            .api("/storage/fileStorage/containers")
+            .version("v1.0")
             .post(containerRequestData);
         res.send(200, graphResponse);
         return;
@@ -91,3 +70,4 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.createContainer = createContainer;
+//# sourceMappingURL=createContainer.js.map
