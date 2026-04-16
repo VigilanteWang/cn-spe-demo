@@ -36,7 +36,13 @@
  * - triggerArchiveFileDownload() → 触发归档文件下载
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Providers } from "@microsoft/mgt-element";
 import {
   AddRegular,
@@ -197,6 +203,33 @@ const useStyles = makeStyles({
     gap: "6px",
   },
 });
+
+/**
+ * 列宽预设配置——模块级常量，引用永远不变。
+ * idealWidth 用于初始期望宽度，实际宽度会被 resizableColumns 交互动态调整。
+ * 放在组件外部确保它永远是同一个对象引用，避免每次 render 产生新对象
+ * 触发 DataGrid 内部列宽初始化。
+ */
+const columnSizingOptions = {
+  driveItemName: {
+    minWidth: 150,
+    defaultWidth: 250,
+    idealWidth: 200,
+  },
+  lastModifiedTimestamp: {
+    minWidth: 150,
+    defaultWidth: 150,
+  },
+  lastModifiedBy: {
+    minWidth: 150,
+    defaultWidth: 150,
+  },
+  actions: {
+    minWidth: 300,
+    defaultWidth: 320,
+  },
+};
+
 /**
  * 文件管理组件
  *
@@ -261,13 +294,6 @@ export const Files = (props: IFilesProps) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =
     useState<IDriveItemExtended | null>(null);
-
-  // =============== 副作用：容器变化时重新加载文件列表 ===============
-  useEffect(() => {
-    (async () => {
-      loadItems();
-    })();
-  }, [props]);
 
   // 组件卸载时清理下载轮询定时器，防止内存泄漏和对已卸载组件的状态更新
   // useEffect 第一个参数为 setup 函数，可以返回一个函数作为清理函数
@@ -334,47 +360,65 @@ export const Files = (props: IFilesProps) => {
    * 2. 将 DriveItem 转换为 IDriveItemExtended（添加 UI 辅助属性）
    * 3. 更新 driveItems 状态和当前 folderId。
    */
-  const loadItems = async (itemId?: string, folderName?: string) => {
-    try {
-      const graphClient = Providers.globalProvider.graph.client;
-      const driveId = props.container.id;
-      const driveItemId = itemId || "root";
-      // 为本次请求分配序号；仅允许最新一次请求落盘。
-      const requestSeq = ++loadItemsRequestSeqRef.current;
+  // useCallback 保证：只要 props.container.id 不变，每次 render 拿到的都是
+  // 同一个函数引用，从而使依赖它的 useEffect / useCallback 不会无谓重跑。
+  const loadItems = useCallback(
+    async (itemId?: string, folderName?: string) => {
+      try {
+        const graphClient = Providers.globalProvider.graph.client;
+        const driveId = props.container.id;
+        const driveItemId = itemId || "root";
+        // 为本次请求分配序号；仅允许最新一次请求落盘。
+        const requestSeq = ++loadItemsRequestSeqRef.current;
 
-      // 获取当前层级的容器项目。
-      const graphResponse = await graphClient
-        .api(`/drives/${driveId}/items/${driveItemId}/children`)
-        .get();
-      // 如果当前请求不是最新请求，直接丢弃结果，避免覆盖新目录状态。
-      if (requestSeq !== loadItemsRequestSeqRef.current) {
-        return;
-      }
-      const containerItems = graphResponse.value as DriveItemWithDownloadUrl[];
-      const items: IDriveItemExtended[] = [];
-      containerItems.forEach((driveItem) => {
-        items.push({
-          ...driveItem,
-          isFolder: driveItem.folder ? true : false,
-          modifiedByName: driveItem.lastModifiedBy?.user?.displayName
-            ? driveItem.lastModifiedBy!.user!.displayName
-            : "unknown",
-          iconElement: driveItem.folder ? (
-            <FolderRegular />
-          ) : (
-            <DocumentRegular />
-          ),
-          downloadUrl: driveItem["@microsoft.graph.downloadUrl"],
+        // 获取当前层级的容器项目。
+        const graphResponse = await graphClient
+          .api(`/drives/${driveId}/items/${driveItemId}/children`)
+          .get();
+        // 如果当前请求不是最新请求，直接丢弃结果，避免覆盖新目录状态。
+        if (requestSeq !== loadItemsRequestSeqRef.current) {
+          return;
+        }
+        const containerItems =
+          graphResponse.value as DriveItemWithDownloadUrl[];
+        const items: IDriveItemExtended[] = [];
+        containerItems.forEach((driveItem) => {
+          items.push({
+            ...driveItem,
+            isFolder: driveItem.folder ? true : false,
+            modifiedByName: driveItem.lastModifiedBy?.user?.displayName
+              ? driveItem.lastModifiedBy!.user!.displayName
+              : "unknown",
+            iconElement: driveItem.folder ? (
+              <FolderRegular />
+            ) : (
+              <DocumentRegular />
+            ),
+            downloadUrl: driveItem["@microsoft.graph.downloadUrl"],
+          });
         });
-      });
-      setDriveItems(items);
+        setDriveItems(items);
 
-      // 更新当前文件夹 ID。
-      setFolderId(driveItemId);
-    } catch (error: any) {
-      console.error(`Failed to load items: ${error.message}`);
-    }
-  };
+        // 更新当前文件夹 ID。
+        setFolderId(driveItemId);
+      } catch (error: any) {
+        console.error(`Failed to load items: ${error.message}`);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [props.container.id],
+  );
+
+  // =============== 副作用：容器变化时重新加载文件列表 ===============
+  // 必须在 loadItems 声明之后，因为 useCallback 产生的是 const，存在TDZ。
+  // deps 写 loadItems 而非 props：loadItems 内部已封装"何时重载"的逻辑
+  //（props.container.id 变化 → 新引用），useEffect 只需跟随 loadItems，
+  // 避免父组件任意 re-render 时触发不必要的 Graph API 请求。
+  useEffect(() => {
+    (async () => {
+      loadItems();
+    })();
+  }, [loadItems]);
 
   /**
    * DataGrid 行选中状态变化处理。
@@ -854,29 +898,31 @@ export const Files = (props: IFilesProps) => {
    *    - 目标已存在于路径：截断到目标节点（后退导航）。
    *    - 目标不在路径中：追加到末尾（前进导航）。
    */
-  const navigateToFolder = async (
-    targetFolderId: string,
-    targetFolderName: string,
-  ) => {
-    setSelectedRows(new Set());
-    await loadItems(targetFolderId, targetFolderName);
-    // 使用函数式更新，避免 await 之后读取到过期 breadcrumbPath。
-    setBreadcrumbPath((prevPath) => {
-      if (targetFolderId === "root") {
-        return [{ id: "root", name: "Root" }];
-      }
-      // 判断该文件夹是否已在路径中（后退导航场景）。
-      const existingIndex = prevPath.findIndex(
-        (item) => item.id === targetFolderId,
-      );
-      if (existingIndex !== -1) {
-        // 后退导航：截断路径。
-        return prevPath.slice(0, existingIndex + 1);
-      }
-      // 前进导航：追加路径。
-      return [...prevPath, { id: targetFolderId, name: targetFolderName }];
-    });
-  };
+  // useCallback dep 为 loadItems：loadItems 只在容器切换时重建，
+  // navigateToFolder 随之重建，确保调用的始终是捕获最新 container.id 的版本。
+  const navigateToFolder = useCallback(
+    async (targetFolderId: string, targetFolderName: string) => {
+      setSelectedRows(new Set());
+      await loadItems(targetFolderId, targetFolderName);
+      // 使用函数式更新，避免 await 之后读取到过期 breadcrumbPath。
+      setBreadcrumbPath((prevPath) => {
+        if (targetFolderId === "root") {
+          return [{ id: "root", name: "Root" }];
+        }
+        // 判断该文件夹是否已在路径中（后退导航场景）。
+        const existingIndex = prevPath.findIndex(
+          (item) => item.id === targetFolderId,
+        );
+        if (existingIndex !== -1) {
+          // 后退导航：截断路径。
+          return prevPath.slice(0, existingIndex + 1);
+        }
+        // 前进导航：追加路径。
+        return [...prevPath, { id: targetFolderId, name: targetFolderName }];
+      });
+    },
+    [loadItems],
+  );
 
   /** 返回上级文件夹（取面包屑倒数第二项） */
   const navigateToParentFolder = async () => {
@@ -935,121 +981,104 @@ export const Files = (props: IFilesProps) => {
   const styles = useStyles();
 
   // =============== DataGrid 列定义 ===============
-  const columns: TableColumnDefinition<IDriveItemExtended>[] = [
-    createTableColumn({
-      columnId: "driveItemName",
-      renderHeaderCell: () => {
-        return "Name";
-      },
-      renderCell: (driveItem) => {
-        return (
-          // 文件点击弹出预览对话框；文件夹点击进入该层级。
-          <TableCellLayout media={driveItem.iconElement}>
-            {!driveItem.isFolder ? (
-              <Link
-                onClick={() => {
-                  setCurrentPreviewFile(driveItem);
-                  setPreviewOpen(true);
-                }}
-              >
-                {driveItem.name}
-              </Link>
-            ) : (
-              <Link
-                onClick={(e) => {
-                  e.stopPropagation(); // 防止事件冒泡到 DataGridRow 的选中逻辑，避免进入文件夹同时选中文件夹
-                  navigateToFolder(
-                    driveItem.id as string,
-                    driveItem.name as string,
-                  );
-                }}
-              >
-                {driveItem.name}
-              </Link>
-            )}
-          </TableCellLayout>
-        );
-      },
-    }),
-    createTableColumn({
-      columnId: "lastModifiedTimestamp",
-      renderHeaderCell: () => {
-        return "Last Modified";
-      },
-      renderCell: (driveItem) => {
-        return (
-          <TableCellLayout>{driveItem.lastModifiedDateTime}</TableCellLayout>
-        );
-      },
-    }),
-    createTableColumn({
-      columnId: "lastModifiedBy",
-      renderHeaderCell: () => {
-        return "Last Modified By";
-      },
-      renderCell: (driveItem) => {
-        return <TableCellLayout>{driveItem.modifiedByName}</TableCellLayout>;
-      },
-    }),
-    createTableColumn({
-      columnId: "actions",
-      renderHeaderCell: () => {
-        return "Actions";
-      },
-      renderCell: (driveItem) => {
-        // 占位处理函数：当前仅用于展示，不包含真实业务实现。
-        const onVersionsClick = () => {
-          console.log("Versions placeholder clicked for:", driveItem.id);
-        };
-        const onPermissionsClick = () => {
-          console.log("Permissions placeholder clicked for:", driveItem.id);
-        };
+  // useMemo 保证：只要 navigateToFolder 和 styles 引用不变，columns 数组就是同一个引用。
+  // DataGrid 内部用引用比较检测 columns 是否变化，引用不变则不重置列宽状态。
+  const columns = useMemo<TableColumnDefinition<IDriveItemExtended>[]>(
+    () => [
+      createTableColumn({
+        columnId: "driveItemName",
+        renderHeaderCell: () => {
+          return "Name";
+        },
+        renderCell: (driveItem) => {
+          return (
+            // 文件点击弹出预览对话框；文件夹点击进入该层级。
+            <TableCellLayout media={driveItem.iconElement}>
+              {!driveItem.isFolder ? (
+                <Link
+                  onClick={() => {
+                    setCurrentPreviewFile(driveItem);
+                    setPreviewOpen(true);
+                  }}
+                >
+                  {driveItem.name}
+                </Link>
+              ) : (
+                <Link
+                  onClick={(e) => {
+                    e.stopPropagation(); // 防止事件冒泡到 DataGridRow 的选中逻辑，避免进入文件夹同时选中文件夹
+                    navigateToFolder(
+                      driveItem.id as string,
+                      driveItem.name as string,
+                    );
+                  }}
+                >
+                  {driveItem.name}
+                </Link>
+              )}
+            </TableCellLayout>
+          );
+        },
+      }),
+      createTableColumn({
+        columnId: "lastModifiedTimestamp",
+        renderHeaderCell: () => {
+          return "Last Modified";
+        },
+        renderCell: (driveItem) => {
+          return (
+            <TableCellLayout>{driveItem.lastModifiedDateTime}</TableCellLayout>
+          );
+        },
+      }),
+      createTableColumn({
+        columnId: "lastModifiedBy",
+        renderHeaderCell: () => {
+          return "Last Modified By";
+        },
+        renderCell: (driveItem) => {
+          return <TableCellLayout>{driveItem.modifiedByName}</TableCellLayout>;
+        },
+      }),
+      createTableColumn({
+        columnId: "actions",
+        renderHeaderCell: () => {
+          return "Actions";
+        },
+        renderCell: (driveItem) => {
+          // 占位处理函数：当前仅用于展示，不包含真实业务实现。
+          const onVersionsClick = () => {
+            console.log("Versions placeholder clicked for:", driveItem.id);
+          };
+          const onPermissionsClick = () => {
+            console.log("Permissions placeholder clicked for:", driveItem.id);
+          };
 
-        return (
-          <div className={styles.actionsButtonGroup}>
-            <Button
-              aria-label="Versions"
-              icon={<HistoryRegular />}
-              onClick={onVersionsClick}
-            >
-              Versions
-            </Button>
-            <Button
-              aria-label="Permissions"
-              icon={<PeopleRegular />}
-              onClick={onPermissionsClick}
-            >
-              Permissions
-            </Button>
-          </div>
-        );
-      },
-    }),
-  ];
+          return (
+            <div className={styles.actionsButtonGroup}>
+              <Button
+                aria-label="Versions"
+                icon={<HistoryRegular />}
+                onClick={onVersionsClick}
+              >
+                Versions
+              </Button>
+              <Button
+                aria-label="Permissions"
+                icon={<PeopleRegular />}
+                onClick={onPermissionsClick}
+              >
+                Permissions
+              </Button>
+            </div>
+          );
+        },
+      }),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    ],
+    [navigateToFolder, styles],
+  );
 
-  /**
-   * 列宽预设配置。
-   * idealWidth 用于初始期望宽度，实际宽度会被 resizableColumns 交互动态调整。
-   */
-  const columnSizingOptions = {
-    driveItemName: {
-      minWidth: 150,
-      defaultWidth: 250,
-      idealWidth: 200,
-    },
-    lastModifiedTimestamp: {
-      minWidth: 150,
-      defaultWidth: 150,
-    },
-    lastModifiedBy: {
-      minWidth: 150,
-      defaultWidth: 150,
-    },
-    actions: {
-      minWidth: 300,
-      defaultWidth: 320,
-    },
-  };
   // 组件渲染区域。
   return (
     <div>
