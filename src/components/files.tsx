@@ -33,7 +33,8 @@
  * - deleteItems()            → 批量删除文件
  * - startDownloadArchive()   → 启动 ZIP 归档任务
  * - getDownloadProgress()    → 轮询归档进度
- * - triggerArchiveFileDownload() → 触发归档文件下载
+ * - getDownloadManifest()    → 获取归档清单
+ * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
 
 import React, {
@@ -59,7 +60,6 @@ import {
   ArrowDownloadRegular,
   HistoryRegular,
   PeopleRegular,
-  WarningRegular,
 } from "@fluentui/react-icons";
 import {
   Button,
@@ -100,10 +100,13 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { IContainer } from "../common/types";
+import { IArchiveClientProgress, IContainer } from "../common/types";
 import Preview from "./preview";
 import { IDriveItemExtended } from "../common/types";
-import SpEmbedded, { IJobProgress } from "../services/spembedded";
+import SpEmbedded, {
+  IArchiveSaveTarget,
+  IJobProgress,
+} from "../services/spembedded";
 require("isomorphic-fetch");
 
 /** SpEmbedded 服务实例（全局单例），用于调用后端 API（删除、下载归档） */
@@ -147,22 +150,15 @@ interface DriveItemWithDownloadUrl extends DriveItem {
 /**
  * ZIP 归档下载进度状态
  *
- * 下载流程：启动任务 -> 轮询进度 -> 归档就绪 -> 用户点击后触发浏览器下载。
+ * 下载流程：启动任务 -> 轮询后端准备进度 -> 前端流式下载+压缩 -> 自动触发下载。
  */
 interface IDownloadProgress {
-  isActive: boolean; // 是否正在轮询进度
-  jobProgress: IJobProgress | null; // 后端返回的任务进度详情
-  readyJobId: string | null; // 归档已就绪时可下载的任务 ID
-  isReadyToDownload: boolean; // 是否已就绪，等待用户触发下载
-  isTriggeringDownload: boolean; // 是否正在触发浏览器下载
-  isCompleted: boolean; // 是否下载完成
-  errorMessage: string; // 错误信息（为空表示无错误）
-  /**
-   * 下载触发失败（例如票据过期或网络抖动），可通过重新申请票据重试。
-   * 当此字段为 true 且 readyJobId 不为 null 时，UI 显示过期提示和
-   * "Request new link" 按钮。
-   */
-  needsTicketRefresh: boolean;
+  phase: "idle" | "preparing" | "downloading" | "zipping" | "done" | "failed";
+  isActive: boolean;
+  backendProgress: IJobProgress | null;
+  clientProgress: IArchiveClientProgress | null;
+  isCompleted: boolean;
+  errorMessage: string;
 }
 
 /** 组件样式定义 */
@@ -277,14 +273,12 @@ export const Files = (props: IFilesProps) => {
   });
   // 下载进度状态（用于 ZIP 任务）。
   const [downloadProgress, setDownloadProgress] = useState<IDownloadProgress>({
+    phase: "idle",
     isActive: false,
-    jobProgress: null,
-    readyJobId: null,
-    isReadyToDownload: false,
-    isTriggeringDownload: false,
+    backendProgress: null,
+    clientProgress: null,
     isCompleted: false,
     errorMessage: "",
-    needsTicketRefresh: false,
   });
   // 用于面包屑导航。
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
@@ -315,6 +309,15 @@ export const Files = (props: IFilesProps) => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  /** 计算百分比文本，避免出现 NaN% 或 Infinity%。 */
+  const formatPercent = (current: number, total: number): string => {
+    if (total <= 0) {
+      return "0%";
+    }
+    const value = Math.min(100, Math.max(0, (current / total) * 100));
+    return `${value.toFixed(0)}%`;
   };
 
   /**
@@ -464,21 +467,42 @@ export const Files = (props: IFilesProps) => {
     }
 
     // 多个项目或包含文件夹 -> 走后端 ZIP 任务。
-    await startZipDownload(selectedIds);
+    const defaultFilename = `SPE-${Date.now()}.zip`;
+    let saveTarget: IArchiveSaveTarget;
+    try {
+      // 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。
+      saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
+    } catch (err: any) {
+      setDownloadProgress({
+        phase: "failed",
+        isActive: false,
+        backendProgress: null,
+        clientProgress: null,
+        isCompleted: false,
+        errorMessage:
+          err.message === "Download cancelled by user."
+            ? "Download cancelled."
+            : `Failed to open save dialog: ${err.message}`,
+      });
+      return;
+    }
+
+    await startZipDownload(selectedIds, saveTarget);
   };
 
   /**
    * 启动 ZIP 归档下载
    *
    * 完整流程：
-   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端任务
-   * 2. 每 800ms 轮询 spEmbedded.getDownloadProgress() 查看进度
-   * 3. 当 status === "ready" 时，仅更新 UI 为“可下载”状态，等待用户点击
-   * 4. 用户点击 Download now 后调用 triggerArchiveFileDownload() 触发浏览器下载
-   * 5. 下载触发后 4 秒自动清除完成提示
-   * 6. 如果任务失败，显示错误信息。
+   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端准备任务
+   * 2. 轮询后端进度直到状态 ready
+   * 3. 获取 manifest 后在前端边下载边压缩
+   * 4. 压缩完成后自动触发浏览器下载
    */
-  const startZipDownload = async (itemIds: string[]) => {
+  const startZipDownload = async (
+    itemIds: string[],
+    saveTarget: IArchiveSaveTarget,
+  ) => {
     // 清理上一轮下载进度状态。
     if (downloadPollRef.current) {
       clearInterval(downloadPollRef.current);
@@ -486,14 +510,12 @@ export const Files = (props: IFilesProps) => {
     }
 
     setDownloadProgress({
+      phase: "preparing",
       isActive: true,
-      jobProgress: null,
-      readyJobId: null,
-      isReadyToDownload: false,
-      isTriggeringDownload: false,
+      backendProgress: null,
+      clientProgress: null,
       isCompleted: false,
       errorMessage: "",
-      needsTicketRefresh: false,
     });
 
     let jobId: string;
@@ -504,125 +526,107 @@ export const Files = (props: IFilesProps) => {
       );
     } catch (err: any) {
       setDownloadProgress({
+        phase: "failed",
         isActive: false,
-        jobProgress: null,
-        readyJobId: null,
-        isReadyToDownload: false,
-        isTriggeringDownload: false,
+        backendProgress: null,
+        clientProgress: null,
         isCompleted: false,
         errorMessage: `Failed to start download: ${err.message}`,
-        needsTicketRefresh: false,
       });
       return;
     }
 
+    let isPolling = false;
+
     // 每 800ms 轮询一次任务进度。
     downloadPollRef.current = setInterval(async () => {
+      if (isPolling) {
+        return;
+      }
+
       try {
+        isPolling = true;
         const progress = await spEmbedded.getDownloadProgress(jobId);
-        // 给set一个 Update function，确保拿到最新的状态值，因为下面会多次调用，而useState只会
-        // 在每次 render时更新 state，见useState 文档
+
         setDownloadProgress((prev) => ({
           ...prev,
-          jobProgress: progress,
+          phase: progress.status === "failed" ? "failed" : "preparing",
+          backendProgress: progress,
         }));
 
         if (progress.status === "ready") {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
 
+          const manifest = await spEmbedded.getDownloadManifest(jobId);
+          const finalSaveTarget: IArchiveSaveTarget = {
+            ...saveTarget,
+            filename: manifest.archiveName || saveTarget.filename,
+          };
+
+          await spEmbedded.downloadArchiveFromManifest(
+            manifest,
+            finalSaveTarget,
+            (clientProgress) => {
+              setDownloadProgress((prev) => ({
+                ...prev,
+                isActive: clientProgress.stage !== "done",
+                phase:
+                  clientProgress.stage === "done"
+                    ? "done"
+                    : clientProgress.stage,
+                clientProgress,
+              }));
+            },
+          );
+
           setDownloadProgress((prev) => ({
             ...prev,
+            phase: "done",
             isActive: false,
-            readyJobId: jobId,
-            isReadyToDownload: true,
-            isCompleted: false,
+            isCompleted: true,
             errorMessage: "",
           }));
+
+          setTimeout(() => {
+            setDownloadProgress((prev) => ({
+              ...prev,
+              phase: "idle",
+              isCompleted: false,
+              backendProgress: null,
+              clientProgress: null,
+            }));
+          }, 4000);
         } else if (progress.status === "failed") {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
           setDownloadProgress({
+            phase: "failed",
             isActive: false,
-            jobProgress: progress,
-            readyJobId: null,
-            isReadyToDownload: false,
-            isTriggeringDownload: false,
+            backendProgress: progress,
+            clientProgress: null,
             isCompleted: false,
             errorMessage:
               progress.errors.length > 0
                 ? progress.errors.join("; ")
                 : "Archive job failed.",
-            needsTicketRefresh: false,
           });
         }
       } catch (err: any) {
         clearInterval(downloadPollRef.current!);
         downloadPollRef.current = null;
         setDownloadProgress({
+          phase: "failed",
           isActive: false,
-          jobProgress: null,
-          readyJobId: null,
-          isReadyToDownload: false,
-          isTriggeringDownload: false,
+          backendProgress: null,
+          clientProgress: null,
           isCompleted: false,
-          errorMessage: `Progress check failed: ${err.message}`,
-          needsTicketRefresh: false,
+          errorMessage: `Download failed: ${err.message}`,
         });
+      } finally {
+        isPolling = false;
       }
     }, 800);
-  };
-
-  /**
-   * 用户在归档 ready 后手动触发浏览器下载
-   * 文件名规则：SPE-<unixMs>.zip
-   */
-  const onDownloadReadyClick = async () => {
-    if (!downloadProgress.readyJobId || downloadProgress.isTriggeringDownload) {
-      return;
-    }
-
-    const readyJobId = downloadProgress.readyJobId;
-    const filename = `SPE-${Date.now()}.zip`;
-
-    setDownloadProgress((prev) => ({
-      ...prev,
-      isTriggeringDownload: true,
-      needsTicketRefresh: false,
-      errorMessage: "",
-    }));
-
-    try {
-      await spEmbedded.triggerArchiveFileDownload(readyJobId, filename);
-
-      setDownloadProgress((prev) => ({
-        ...prev,
-        isTriggeringDownload: false,
-        isReadyToDownload: false,
-        readyJobId: null,
-        needsTicketRefresh: false,
-        isCompleted: true,
-      }));
-
-      setTimeout(() => {
-        setDownloadProgress((prev) => ({
-          ...prev,
-          isCompleted: false,
-          jobProgress: null,
-        }));
-      }, 4000);
-    } catch (err: any) {
-      // 即使 ticket 申请失败，job 仍可能存活（例如瞬时网络抖动，
-      // 或后端缓存仍可用）。这里展示重试按钮而不是终态错误，
-      // 让用户可以重新申请一个新的下载链接。
-      setDownloadProgress((prev) => ({
-        ...prev,
-        isTriggeringDownload: false,
-        isReadyToDownload: false,
-        needsTicketRefresh: true,
-        errorMessage: `Download failed: ${err.message}`,
-      }));
-    }
   };
 
   // ── 工具栏：删除选中项 ─────────────────────────────────────────────────────
@@ -1197,13 +1201,7 @@ export const Files = (props: IFilesProps) => {
             vertical
             icon={<ArrowDownloadRegular />}
             onClick={onToolbarDownloadClick}
-            disabled={
-              selectedRows.size === 0 ||
-              downloadProgress.isActive ||
-              downloadProgress.isReadyToDownload ||
-              downloadProgress.isTriggeringDownload ||
-              downloadProgress.needsTicketRefresh
-            }
+            disabled={selectedRows.size === 0 || downloadProgress.isActive}
           >
             Download
           </ToolbarButton>
@@ -1247,67 +1245,34 @@ export const Files = (props: IFilesProps) => {
       )}
 
       {/*
-        ZIP 归档下载进度：在归档任务活跃、待点击下载、触发中、已触发或失败时显示
-        - isActive=true: 显示 Spinner，文字根据后端 status 细分三个阶段：
-            * 无 jobProgress（任务刚提交）: "Starting download job…"
-            * status=="preparing": 正在遍历文件结构，显示当前文件名
-            * status=="zipping": 正在压缩，显示 processedFiles/totalFiles 进度
-        - isReadyToDownload=true: 显示 "Archive ready" + "Download now"，等待用户明确触发
-        - needsTicketRefresh=true: 显示 Warning 图标 + "Download failed" 提示，
-          并提供 "Request new link" 按钮让用户重新申请票据
-        - isTriggeringDownload=true: 禁用按钮并显示小型 Spinner，防止重复点击
-        - isCompleted=true: 显示 "Download started" 提示（4 秒后自动清除）
-        - errorMessage 非空: 以红色文字显示错误原因
+        ZIP 归档下载进度：展示三阶段进度
+        - 阶段 1：后端准备清单（preparing）
+        - 阶段 2：前端下载字节流（downloading）
+        - 阶段 3：前端压缩写入 ZIP（zipping）
       */}
       {(downloadProgress.isActive ||
-        downloadProgress.isReadyToDownload ||
-        downloadProgress.isTriggeringDownload ||
         downloadProgress.isCompleted ||
-        downloadProgress.needsTicketRefresh ||
         downloadProgress.errorMessage) && (
         <div className={styles.progressContainer}>
           {downloadProgress.isActive ? (
             <>
               <Spinner size="small" />
               <Text className={styles.progressText}>
-                {downloadProgress.jobProgress?.status === "preparing"
-                  ? `Preparing archive${downloadProgress.jobProgress.currentItem ? `: ${downloadProgress.jobProgress.currentItem}` : "…"}`
-                  : downloadProgress.jobProgress?.status === "zipping"
-                    ? `Compressing ${downloadProgress.jobProgress.processedFiles}/${downloadProgress.jobProgress.totalFiles}: ${downloadProgress.jobProgress.currentItem}`
-                    : "Starting download job…"}
+                {downloadProgress.phase === "preparing"
+                  ? `Stage 1/3 Preparing manifest: ${downloadProgress.backendProgress?.processedFiles ?? 0}/${downloadProgress.backendProgress?.totalFiles ?? 0} (${formatPercent(
+                      downloadProgress.backendProgress?.processedFiles ?? 0,
+                      downloadProgress.backendProgress?.totalFiles ?? 0,
+                    )})${downloadProgress.backendProgress?.currentItem ? ` - ${downloadProgress.backendProgress.currentItem}` : ""}`
+                  : downloadProgress.phase === "downloading"
+                    ? `Stage 2/3 Downloading: ${formatFileSize(downloadProgress.clientProgress?.downloadedBytes ?? 0)}/${formatFileSize(downloadProgress.clientProgress?.totalBytes ?? 0)} (${formatPercent(
+                        downloadProgress.clientProgress?.downloadedBytes ?? 0,
+                        downloadProgress.clientProgress?.totalBytes ?? 0,
+                      )})${downloadProgress.clientProgress?.currentItem ? ` - ${downloadProgress.clientProgress.currentItem}` : ""}`
+                    : `Stage 3/3 Zipping: ${downloadProgress.clientProgress?.processedFiles ?? 0}/${downloadProgress.clientProgress?.totalFiles ?? 0} (${formatPercent(
+                        downloadProgress.clientProgress?.processedFiles ?? 0,
+                        downloadProgress.clientProgress?.totalFiles ?? 0,
+                      )})`}
               </Text>
-            </>
-          ) : downloadProgress.isReadyToDownload ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>Archive ready</Text>
-              <Button
-                appearance="primary"
-                onClick={onDownloadReadyClick}
-                disabled={downloadProgress.isTriggeringDownload}
-              >
-                Download now
-              </Button>
-              {downloadProgress.isTriggeringDownload && <Spinner size="tiny" />}
-            </>
-          ) : downloadProgress.needsTicketRefresh ? (
-            <>
-              <WarningRegular
-                style={{ color: tokens.colorPaletteYellowForeground1 }}
-              />
-              <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
-                Download failed - please request a new link.
-              </Text>
-              <Button
-                appearance="primary"
-                onClick={onDownloadReadyClick}
-                disabled={downloadProgress.isTriggeringDownload}
-              >
-                Request new link
-              </Button>
-              {downloadProgress.isTriggeringDownload && <Spinner size="tiny" />}
             </>
           ) : downloadProgress.isCompleted ? (
             <>

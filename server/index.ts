@@ -15,7 +15,7 @@
  * 这个文件暴露的 API 主要分为三类：
  * - 容器管理：列出容器、创建容器
  * - 文件项管理：批量删除指定项目
- * - 归档下载：启动 ZIP 打包任务、查询进度、生成下载票据、实际下载 ZIP
+ * - 归档下载：启动归档准备任务、查询进度、返回下载清单（manifest）
  *
  * 对初级开发者来说，阅读顺序建议是：
  * 1. 先看中间件配置，理解每个请求进入服务器后的公共处理
@@ -30,9 +30,7 @@ import { createContainer } from "./createContainer";
 import {
   startDownloadJob,
   getJobProgress,
-  getJobBuffer,
-  createDownloadTicket,
-  consumeDownloadTicket,
+  getJobManifest,
 } from "./downloadArchive";
 import {
   authorizeContainerManageRequest,
@@ -78,29 +76,6 @@ server.pre((req, res, next) => {
 
   next();
 });
-
-// ─── 工具函数 ────────────────────────────────────────────────────────────────
-
-/**
- * 清理浏览器下载时使用的文件名。
- *
- * 这里的文件名最终会写进 Content-Disposition 响应头，
- * 如果不做过滤，可能出现两类问题：
- * 1. 文件名包含 Windows 或 Unix 不允许的字符，导致用户保存文件时报错
- * 2. 文件名包含控制字符，可能造成响应头注入或解析异常
- */
-function sanitizeDownloadFilename(filename: string): string {
-  const cleaned = filename
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleaned) {
-    return "archive.zip";
-  }
-
-  return cleaned;
-}
 
 /**
  * GET /api/listContainers 路由
@@ -222,16 +197,16 @@ server.post("/api/deleteItems", async (req, res, next) => {
 /**
  * POST /api/downloadArchive/start
  *
- * 这个接口用于“发起一个后台 ZIP 打包任务”，而不是直接把 ZIP 文件同步返回给浏览器。
- * 之所以分成异步任务，是因为当用户选择的文件较多时，打包过程可能持续数秒甚至更久，
+ * 这个接口用于“发起一个后台归档准备任务”，而不是直接把 ZIP 文件同步返回给浏览器。
+ * 之所以分成异步任务，是因为当用户选择的文件较多时，目录展开与链接解析可能持续数秒甚至更久，
  * 如果在一个 HTTP 请求里同步完成，体验会差，也更容易超时。
  *
  * 请求体: { containerId: string, itemIds: string[] }
  * 响应体: { jobId: string }
  *
  * 返回的 jobId 是后续整个下载流程的关键：
- * - 前端用它轮询进度
- * - 前端在任务完成后用它生成一次性下载票据
+ * - 前端用它轮询准备进度
+ * - 准备完成后通过 manifest 接口获取下载清单
  */
 server.post("/api/downloadArchive/start", async (req, res, next) => {
   try {
@@ -302,22 +277,14 @@ server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
   next();
 });
 
-// ── 归档下载：创建一次性票据 ───────────────────────────────────────────────
+// ── 归档下载：获取文件清单 ──────────────────────────────────────────────────
 /**
- * POST /api/downloadArchive/ticket/:jobId
+ * GET /api/downloadArchive/manifest/:jobId
  *
- * 这个接口用于在归档任务完成后，生成一个一次性下载票据。
- * 它的目的不是重复校验下载状态，而是把“能否下载”与“实际下载链接”解耦。
- *
- * 这样设计的好处包括：
- * 1. 真正的下载链接可以是短生命周期、一次性使用的，安全性更高
- * 2. 浏览器发起文件下载时不必再次携带复杂请求体
- * 3. 服务端可以在正式下载前再次确认任务状态和归档内容是否仍然可用
- *
- * 请求体: { filename?: string }
- * 响应体: { downloadUrl: string }
+ * 这个接口用于在任务准备完成后返回清单（manifest）。
+ * 后端会继续校验任务所有权，确保只有创建任务的用户能读取清单。
  */
-server.post("/api/downloadArchive/ticket/:jobId", async (req, res, next) => {
+server.get("/api/downloadArchive/manifest/:jobId", async (req, res, next) => {
   try {
     const authResult = await authorizeContainerManageRequest(req);
     if (!authResult.ok) {
@@ -335,99 +302,21 @@ server.post("/api/downloadArchive/ticket/:jobId", async (req, res, next) => {
 
     if (progress.status !== "ready") {
       res.send(409, {
-        message: `Archive not ready yet. Status: ${progress.status}`,
+        message: `Archive manifest not ready yet. Status: ${progress.status}`,
       });
       return next();
     }
 
-    const buffer = getJobBuffer(jobId);
-    if (!buffer) {
-      res.send(404, { message: "Archive data not found." });
+    const manifest = getJobManifest(jobId, requesterOid);
+    if (!manifest) {
+      res.send(404, { message: "Archive manifest not found." });
       return next();
     }
-
-    const body = (req.body ?? {}) as { filename?: string };
-    const requestedFilename =
-      typeof body.filename === "string" && body.filename.trim().length > 0
-        ? body.filename
-        : "archive.zip";
-
-    const ticket = createDownloadTicket(jobId, requestedFilename);
-    res.send(200, {
-      downloadUrl: `/api/downloadArchive/fileByTicket/${encodeURIComponent(ticket)}`,
-    });
+    res.send(200, manifest);
   } catch (error: any) {
     res.send(500, {
-      message: `Error creating download ticket: ${error.message}`,
+      message: `Error fetching archive manifest: ${error.message}`,
     });
   }
   next();
 });
-
-// ── 归档下载：通过一次性票据下载 ZIP ──────────────────────────────────────
-/**
- * GET /api/downloadArchive/fileByTicket/:ticket
- *
- * 这个接口是真正返回 ZIP 二进制内容的下载端点。
- * 浏览器访问这里后，服务端会设置合适的响应头，
- * 让浏览器把响应识别为“附件下载”而不是普通 JSON。
- *
- * 响应: application/zip 附件流 | 404 | 409
- *
- * 处理步骤：
- * 1. 消费一次性票据，确保同一个 ticket 不能被无限重复使用
- * 2. 检查对应 job 是否仍然存在且状态为 ready
- * 3. 读取打包好的 ZIP Buffer
- * 4. 清理文件名并写入响应头
- * 5. 使用 sendRaw 直接返回二进制内容
- *
- * 这里使用 sendRaw 而不是常见的 JSON 响应，
- * 是因为我们返回的是文件字节流，不是结构化对象。
- */
-server.get(
-  "/api/downloadArchive/fileByTicket/:ticket",
-  async (req, res, next) => {
-    try {
-      const { ticket } = req.params as { ticket: string };
-      const consumed = consumeDownloadTicket(ticket);
-      if (!consumed) {
-        res.send(404, { message: "Invalid or expired download ticket." });
-        return next();
-      }
-
-      const { jobId, filename } = consumed;
-      const progress = getJobProgress(jobId);
-      if (!progress) {
-        res.send(404, { message: "Job not found or expired." });
-        return next();
-      }
-
-      if (progress.status !== "ready") {
-        res.send(409, {
-          message: `Archive not ready yet. Status: ${progress.status}`,
-        });
-        return next();
-      }
-
-      const buffer = getJobBuffer(jobId);
-      if (!buffer) {
-        res.send(404, { message: "Archive data not found." });
-        return next();
-      }
-
-      const safeFilename = sanitizeDownloadFilename(filename);
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${safeFilename}"`,
-      );
-      res.setHeader("Content-Length", String(buffer.length));
-      res.sendRaw(200, buffer);
-    } catch (error: any) {
-      res.send(500, {
-        message: `Error fetching archive by ticket: ${error.message}`,
-      });
-    }
-    next();
-  },
-);

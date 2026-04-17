@@ -19,6 +19,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^18.3.21",
     "archiver": "^7.0.1",
+    "fflate": "^0.8.2",
     "isomorphic-fetch": "3.0.0",
     "jsonwebtoken": "9.0.2",
     "jwks-rsa": "3.2.0",

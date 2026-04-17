@@ -23,31 +23,70 @@
  *   * POST /api/deleteItems              - 批量删除文件/文件夹
  *   * POST /api/downloadArchive/start    - 启动 ZIP 归档任务
  *   * GET  /api/downloadArchive/progress - 查询归档进度
- *   * POST /api/downloadArchive/ticket    - 申请一次性下载票据
- *   * GET  /api/downloadArchive/fileByTicket - 使用票据下载归档文件
+ *   * GET  /api/downloadArchive/manifest - 获取归档清单（文件 URL + 路径）
  **/
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { clientConfig } from "./../common/config";
 import * as Scopes from "./../common/scopes";
-import { IContainer } from "../common/types";
+import {
+  IArchiveClientProgress,
+  IArchiveManifest,
+  IContainer,
+} from "../common/types";
+import { AsyncZipDeflate, Zip } from "fflate";
 
 /**
  * ZIP 归档任务的进度信息
  *
- * 任务有 5 个状态，按顺序流转：queued → preparing → zipping → ready/failed
+ * 任务有 4 个状态，按顺序流转：queued → preparing → ready/failed
  * - queued: 任务已创建，等待处理
- * - preparing: 正在遍历文件/文件夹结构
- * - zipping: 正在压缩文件到 ZIP
- * - ready: 压缩完成，可以下载
+ * - preparing: 正在遍历文件/文件夹结构并准备下载清单
+ * - ready: 清单准备完成，可由前端开始流式下载和压缩
  * - failed: 任务失败
  **/
 export interface IJobProgress {
-  status: "queued" | "preparing" | "zipping" | "ready" | "failed";
+  status: "queued" | "preparing" | "ready" | "failed";
   processedFiles: number; // 已处理的文件数
   totalFiles: number; // 总文件数
   currentItem: string; // 当前正在处理的文件名
+  preparedBytes: number; // 已准备字节（后端阶段）
+  totalBytes: number; // 总字节（后端阶段）
   errors: string[]; // 错误信息列表（部分文件可能失败）
+}
+
+interface IShowSaveFilePickerWindow extends Window {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    createWritable: () => Promise<{
+      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，
+      // 避免将 fflate 的 Uint8Array 误约束为 BlobPart 后触发类型不兼容。
+      write: (data: BufferSource | Blob | string) => Promise<void>;
+      close: () => Promise<void>;
+      abort: () => Promise<void>;
+    }>;
+  }>;
+}
+
+/**
+ * 前端归档输出目标。
+ *
+ * 如果 writable 存在，表示已经在用户手势上下文中获取了磁盘写入流。
+ * 如果 writable 为空，则回退到 Blob 下载模式。
+ */
+export interface IArchiveSaveTarget {
+  filename: string;
+  writable: {
+    // 与上面的 window 声明保持一致，统一写入类型，避免调用点发生赋值冲突。
+    write: (data: BufferSource | Blob | string) => Promise<void>;
+    close: () => Promise<void>;
+    abort: () => Promise<void>;
+  } | null;
 }
 
 /**
@@ -234,9 +273,10 @@ export default class SpEmbedded {
   }
 
   /**
-   * 启动 ZIP 归档下载任务
+   * 启动归档下载准备任务
    *
-   * 将指定的文件/文件夹打包为 ZIP 归档（后端异步处理）。
+   * 后端会异步展开目录并生成下载清单（manifest），
+   * 真正的 ZIP 压缩由前端在 downloadArchiveFromManifest() 中流式完成。
    * 返回 jobId 后需要轮询 getDownloadProgress() 查看进度。
    *
    * @param containerId 容器 ID（即 Drive ID）
@@ -247,8 +287,8 @@ export default class SpEmbedded {
    * 完整下载流程：
    * 1. startDownloadArchive() → 获取 jobId
    * 2. 轮询 getDownloadProgress(jobId) → 等待 status === "ready"
-   * 3. 前端显示“可下载”状态，等待用户点击 Download now
-   * 4. triggerArchiveFileDownload(jobId, "SPE-<unixMs>.zip") → 申请下载票据并触发浏览器原生下载
+   * 3. 调用 getDownloadManifest(jobId) 获取后端准备好的文件清单
+   * 4. 调用 downloadArchiveFromManifest() 在前端流式下载并压缩
    **/
   async startDownloadArchive(
     containerId: string,
@@ -294,58 +334,219 @@ export default class SpEmbedded {
   }
 
   /**
-   * 触发浏览器下载 ZIP 归档文件
+   * 获取归档下载清单。
    *
-   * 当任务状态为 "ready" 且用户点击下载按钮后调用此方法，
-   * 先向后端申请一次性下载票据，再将下载交给浏览器原生下载器。
-   *
-   * @param jobId 任务 ID
-   * @param filename 下载文件名，默认值为 "archive.zip"。
-   *        当前页面调用方会传入 "SPE-<unixMs>.zip"。
-   * @throws 请求失败时抛出错误
-   *
-   * 实现原理：
-   * 1. 调用票据接口生成一次性下载 URL（仍需 Authorization）
-   * 2. 使用 window.location.assign() 导航到下载 URL
-   * 3. 下载由浏览器原生下载器接管，避免前端 Blob 全量占用内存
-   **/
-  async triggerArchiveFileDownload(
-    jobId: string,
-    filename = "archive.zip",
-  ): Promise<void> {
+   * @param jobId 任务 ID。
+   * @returns Promise<IArchiveManifest> 后端准备好的下载清单。
+   * @throws 请求失败时抛出错误。
+   */
+  async getDownloadManifest(jobId: string): Promise<IArchiveManifest> {
+    const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/manifest/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
-    if (!token) {
-      throw new Error("Unable to acquire API access token");
-    }
-
-    const ticketEndpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/ticket/${encodeURIComponent(jobId)}`;
-    const ticketResponse = await fetch(ticketEndpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ filename }),
+    const response = await fetch(api_endpoint, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!ticketResponse.ok) {
-      throw new Error(
-        `Archive ticket request failed: ${ticketResponse.status}`,
-      );
+    if (response.ok) {
+      return (await response.json()) as IArchiveManifest;
+    }
+    throw new Error(`getDownloadManifest failed: ${response.status}`);
+  }
+
+  /**
+   * 在用户点击手势上下文中预先申请归档输出目标。
+   *
+   * 这样可以避免在异步轮询回调中调用 showSaveFilePicker 导致手势校验失败。
+   * @param filename 建议下载文件名。
+   * @returns Promise<IArchiveSaveTarget> 归档输出目标。
+   */
+  async selectArchiveSaveTarget(filename: string): Promise<IArchiveSaveTarget> {
+    const canWriteDirectly =
+      typeof window !== "undefined" &&
+      typeof (window as IShowSaveFilePickerWindow).showSaveFilePicker ===
+        "function";
+
+    if (!canWriteDirectly) {
+      return { filename, writable: null };
     }
 
-    const ticketData = (await ticketResponse.json()) as {
-      downloadUrl?: string;
+    const pickerWindow = window as IShowSaveFilePickerWindow;
+    const savePicker = pickerWindow.showSaveFilePicker;
+    if (!savePicker) {
+      return { filename, writable: null };
+    }
+
+    try {
+      const handle = await savePicker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "ZIP Archive",
+            accept: { "application/zip": [".zip"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      return { filename, writable };
+    } catch (error: any) {
+      // 用户取消保存对话框时，不应继续后续下载流程。
+      if (error?.name === "AbortError") {
+        throw new Error("Download cancelled by user.");
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 在前端流式下载并压缩归档，完成后自动触发浏览器下载。
+   *
+   * 该实现会边读取远程文件流边推入 ZIP 压缩器，避免把每个文件完整加载到内存中。
+   * 在支持 File System Access API 的浏览器中，ZIP 输出会直接写入磁盘流，进一步降低内存峰值。
+   *
+   * @param manifest 后端返回的下载清单。
+   * @param saveTarget 归档输出目标。
+   * @param onProgress 进度回调，用于更新下载与压缩进度。
+   * @returns Promise<void>
+   **/
+  async downloadArchiveFromManifest(
+    manifest: IArchiveManifest,
+    saveTarget: IArchiveSaveTarget,
+    onProgress: (progress: IArchiveClientProgress) => void,
+  ): Promise<void> {
+    const totalFiles = manifest.totalFiles;
+    const totalBytes = manifest.totalBytes;
+
+    let downloadedBytes = 0;
+    let zippedBytes = 0;
+    let processedFiles = 0;
+    // Blob 构造参数要求的是稳定的二进制片段类型；这里统一收集 ArrayBuffer。
+    const fallbackChunks: ArrayBuffer[] = [];
+
+    const toArrayBuffer = (chunk: Uint8Array): ArrayBuffer => {
+      // 报错根因：fflate 回调中的 data 在类型上可能携带 ArrayBufferLike，
+      // 直接传入 write/Blob 时会与严格类型定义冲突；这里拷贝为标准 ArrayBuffer。
+      const copy = new Uint8Array(chunk.byteLength);
+      copy.set(chunk);
+      return copy.buffer;
     };
 
-    if (!ticketData.downloadUrl) {
-      throw new Error("Archive ticket response missing downloadUrl");
-    }
+    const writable = saveTarget.writable;
 
-    const downloadUrl = new URL(
-      ticketData.downloadUrl,
-      clientConfig.apiServerUrl,
-    ).toString();
-    window.location.assign(downloadUrl);
+    const emitProgress = (
+      stage: IArchiveClientProgress["stage"],
+      currentItem: string,
+    ) => {
+      onProgress({
+        stage,
+        totalFiles,
+        processedFiles,
+        totalBytes,
+        downloadedBytes,
+        zippedBytes,
+        currentItem,
+      });
+    };
+
+    let writeChain: Promise<void> = Promise.resolve();
+
+    try {
+      await new Promise<void>(async (resolve, reject) => {
+        let resolved = false;
+
+        const zip = new Zip((error, data, final) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          writeChain = writeChain
+            .then(async () => {
+              zippedBytes += data.length;
+              emitProgress("zipping", "");
+              if (writable) {
+                // 先转成标准 ArrayBuffer，再写入磁盘流，规避 Uint8Array 泛型缓冲区差异。
+                await writable.write(toArrayBuffer(data));
+              } else {
+                // 回退路径同样存放 ArrayBuffer，确保 new Blob(...) 的参数类型稳定。
+                fallbackChunks.push(toArrayBuffer(data));
+              }
+            })
+            .catch(reject);
+
+          if (final && !resolved) {
+            resolved = true;
+            writeChain.then(resolve).catch(reject);
+          }
+        });
+
+        for (const item of manifest.items) {
+          emitProgress("downloading", item.relativePath);
+
+          const entry = new AsyncZipDeflate(item.relativePath, { level: 6 });
+          zip.add(entry);
+
+          const response = await fetch(item.downloadUrl, {
+            method: "GET",
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to download ${item.relativePath}. HTTP ${response.status}`,
+            );
+          }
+
+          if (!response.body) {
+            const buffer = new Uint8Array(await response.arrayBuffer());
+            downloadedBytes += buffer.length;
+            emitProgress("downloading", item.relativePath);
+            entry.push(buffer, true);
+            processedFiles += 1;
+            continue;
+          }
+
+          const reader = response.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            if (value) {
+              downloadedBytes += value.length;
+              emitProgress("downloading", item.relativePath);
+              entry.push(value, false);
+            }
+          }
+
+          entry.push(new Uint8Array(0), true);
+          processedFiles += 1;
+        }
+
+        zip.end();
+      });
+
+      if (writable) {
+        await writable.close();
+      } else {
+        const zipBlob = new Blob(fallbackChunks, { type: "application/zip" });
+        const blobUrl = URL.createObjectURL(zipBlob);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = saveTarget.filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(blobUrl);
+      }
+
+      emitProgress("done", "");
+    } catch (error) {
+      if (writable) {
+        await writable.abort();
+      }
+      throw error;
+    }
   }
 }

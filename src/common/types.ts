@@ -45,3 +45,41 @@ export interface IContainer {
   containerTypeId: string;
   createdDateTime: string;
 }
+
+/**
+ * 后端返回的单文件下载清单条目。
+ *
+ * relativePath 用于在前端 ZIP 中保留原始目录层级。
+ */
+export interface IArchiveManifestItem {
+  itemId: string;
+  name: string;
+  relativePath: string;
+  size: number;
+  mimeType: string;
+  downloadUrl: string;
+}
+
+/**
+ * 后端准备完成后返回的归档清单。
+ */
+export interface IArchiveManifest {
+  jobId: string;
+  archiveName: string;
+  totalFiles: number;
+  totalBytes: number;
+  items: IArchiveManifestItem[];
+}
+
+/**
+ * 前端流式下载和压缩过程的实时进度。
+ */
+export interface IArchiveClientProgress {
+  stage: "downloading" | "zipping" | "done";
+  totalFiles: number;
+  processedFiles: number;
+  totalBytes: number;
+  downloadedBytes: number;
+  zippedBytes: number;
+  currentItem: string;
+}
