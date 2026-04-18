@@ -63,6 +63,7 @@ interface IShowSaveFilePickerWindow extends Window {
       accept: Record<string, string[]>;
     }>;
   }) => Promise<{
+    name?: string;
     createWritable: () => Promise<{
       // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，
       // 避免将 fflate 的 Uint8Array 误约束为 BlobPart 后触发类型不兼容。
@@ -388,7 +389,8 @@ export default class SpEmbedded {
         ],
       });
       const writable = await handle.createWritable();
-      return { filename, writable };
+      // 统一用 filename 承载最终文件名：优先使用用户在保存对话框中确认的名称。
+      return { filename: handle.name || filename, writable };
     } catch (error: any) {
       // 用户取消保存对话框时，不应继续后续下载流程。
       if (error?.name === "AbortError") {

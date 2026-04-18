@@ -100,9 +100,12 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { IArchiveClientProgress, IContainer } from "../common/types";
+import {
+  IArchiveClientProgress,
+  IContainer,
+  IDriveItemExtended,
+} from "../common/types";
 import Preview from "./preview";
-import { IDriveItemExtended } from "../common/types";
 import SpEmbedded, {
   IArchiveSaveTarget,
   IJobProgress,
@@ -470,7 +473,9 @@ export const Files = (props: IFilesProps) => {
     const defaultFilename = `SPE-${Date.now()}.zip`;
     let saveTarget: IArchiveSaveTarget;
     try {
-      // 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。
+      /**用户手势限制 (User Gesture Restriction) 是浏览器的一种安全机制。
+       * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互（如点击或按键）触发
+       * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。*/
       saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
     } catch (err: any) {
       setDownloadProgress({
@@ -561,7 +566,8 @@ export const Files = (props: IFilesProps) => {
           const manifest = await spEmbedded.getDownloadManifest(jobId);
           const finalSaveTarget: IArchiveSaveTarget = {
             ...saveTarget,
-            filename: manifest.archiveName || saveTarget.filename,
+            // filename 优先级：用户定义名（若存在）> 前端建议默认名 > 后端默认名。
+            filename: saveTarget.filename || manifest.archiveName,
           };
 
           await spEmbedded.downloadArchiveFromManifest(
