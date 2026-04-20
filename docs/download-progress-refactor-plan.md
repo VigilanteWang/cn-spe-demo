@@ -5,6 +5,7 @@
 将下载进度体验改为"整体加权进度 + 进行中可中止 + 完成后手动关闭"，并修复前端进度事件发射节奏。
 
 **具体需求：**
+
 - 整体进度按 preparing 25%、downloading 65%、zipping 10% 计算
 - 阶段文案合并为 Downloading and zipping
 - 右侧并排显示 [中止/关闭链接] 与 [整体百分比 0-100%]（进行中显示 Abort，完成后显示 Dismiss）
@@ -20,6 +21,7 @@
 #### 1.1 在 `src/components/files.tsx` 定义整体进度映射规则
 
 **更新 `getArchiveProgressBarValue()` 函数，实现加权进度计算：**
+
 - `preparing` 阶段：占整体进度 0-25%
   - 公式：`0.25 * (processedFiles / totalFiles)`
 - `downloading` 阶段：占整体进度 25-90%（预留 10% 给 zipping）
@@ -31,6 +33,7 @@
 #### 1.2 在 `src/components/files.tsx` 调整下载状态字段
 
 **修改 `IDownloadProgress` 接口：**
+
 ```typescript
 interface IDownloadProgress {
   phase: "idle" | "preparing" | "downloading" | "zipping" | "done" | "failed";
@@ -46,12 +49,14 @@ interface IDownloadProgress {
 ```
 
 **调整 `startZipDownload()` 函数：**
+
 - 移除完成后 4 秒的 `setTimeout` 自动重置逻辑
 - 初始化 `shouldAutoHide: false`、`abortHandler: null`、`isAborted: false`
 
 #### 1.3 在 `src/services/spembedded.ts` 增加中止支持机制
 
 **修改 `downloadArchiveFromManifest()` 签名和实现：**
+
 ```typescript
 async downloadArchiveFromManifest(
   manifest: IArchiveManifest,
@@ -63,6 +68,7 @@ async downloadArchiveFromManifest(
 ```
 
 **在函数内新增中止机制：**
+
 - 添加 `shouldAbort` 标志（初始 false）
 - 定义 `abort()` 函数，设置 `shouldAbort = true`、清理所有定时器、中止流资源、重置回调
 - 在轮询循环（`downloadPollRef.setInterval`）检查 `shouldAbort`，如为 true 则 `clearInterval`
@@ -76,11 +82,13 @@ async downloadArchiveFromManifest(
 #### 2.1 在 `src/components/files.tsx` 改造进度文案生成
 
 **重写 `getArchiveProgressText()` 函数：**
+
 - 合并 `downloading` 与 `zipping` 阶段文案为 `"Downloading and zipping"`
 - 所有阶段的进度百分比需要基于整体进度计算（而非阶段内百分比）
 - 文件名显示需截断：仅保留前 32 字符，超出部分用 `"..."` 代替
 
 **示例输出：**
+
 ```
 Preparing manifest: 3/10 (30%)
 Downloading and zipping: [filename truncated to 32 chars]...
@@ -92,6 +100,7 @@ Downloading and zipping: [another file]...
 **修改进度区域的 JSX 结构（当前位置约 1376-1407 行）：**
 
 布局改为：
+
 ```
 [进度条]
 左侧文案区                              右侧链接 + 百分比区
@@ -99,6 +108,7 @@ Downloading and zipping: [another file]...
 ```
 
 **具体实现：**
+
 - 左侧：使用 `<Text>` 显示 `getArchiveProgressText()` 输出（文件名截断到 32 字符 + `...`）
 - 右侧：并排显示
   - **进行中**（`isActive=true`）：显示 `[Abort]` 链接
@@ -106,6 +116,7 @@ Downloading and zipping: [another file]...
   - 在链接右侧显示整体百分比（0-100），格式为 `XX%`
 
 **使用 Flexbox 布局：**
+
 ```typescript
 display: "flex",
 justifyContent: "space-between",
@@ -115,21 +126,23 @@ alignItems: "center"
 #### 2.3 新增 Abort 链接交互
 
 **在 `src/components/files.tsx` 中添加 `onAbortClick()` 函数：**
+
 ```typescript
 const onAbortClick = () => {
   if (downloadProgress.abortHandler) {
     downloadProgress.abortHandler();
-    setDownloadProgress(prev => ({
+    setDownloadProgress((prev) => ({
       ...prev,
       isActive: false,
       isAborted: true,
-      phase: "idle" // 或保留当前状态，之后消失
+      phase: "idle", // 或保留当前状态，之后消失
     }));
   }
 };
 ```
 
 **在进度区 JSX 中条件渲染 Abort 链接：**
+
 ```typescript
 {downloadProgress.isActive && (
   <Link onClick={onAbortClick} style={{ cursor: "pointer" }}>
@@ -141,6 +154,7 @@ const onAbortClick = () => {
 #### 2.4 新增 Dismiss 链接交互
 
 **在 `src/components/files.tsx` 中添加 `onDismissClick()` 函数：**
+
 ```typescript
 const onDismissClick = () => {
   setDownloadProgress({
@@ -158,6 +172,7 @@ const onDismissClick = () => {
 ```
 
 **在进度区 JSX 中条件渲染 Dismiss 链接：**
+
 ```typescript
 {downloadProgress.isCompleted && (
   <Link onClick={onDismissClick} style={{ cursor: "pointer" }}>
@@ -226,6 +241,7 @@ const emitProgress = (
 ```
 
 **关键修改：**
+
 - 明确 `itemChanged` 分支必须立即 flush 并清理 pending timer
 - 每次 `flushProgress()` 会更新 `lastProgressEmitAt`，确保下一次计时从 0 开始
 - 避免嵌套定时器或重复触发
@@ -233,6 +249,7 @@ const emitProgress = (
 #### 3.2 在 `src/services/spembedded.ts` 增加中止机制
 
 **在 `downloadArchiveFromManifest()` 开头添加中止相关变量：**
+
 ```typescript
 let shouldAbort = false;
 const abort = () => {
@@ -242,6 +259,7 @@ const abort = () => {
 ```
 
 **在轮询循环（约 520-570 行）检查中止：**
+
 ```typescript
 downloadPollRef.current = setInterval(async () => {
   if (shouldAbort) {
@@ -254,6 +272,7 @@ downloadPollRef.current = setInterval(async () => {
 ```
 
 **在流式下载循环中检查中止：**
+
 ```typescript
 for (const item of manifest.items) {
   if (shouldAbort) {
@@ -264,6 +283,7 @@ for (const item of manifest.items) {
 ```
 
 **在 `abort()` 函数中补充 cleanup 逻辑：**
+
 ```typescript
 const abort = () => {
   shouldAbort = true;
@@ -280,12 +300,13 @@ const abort = () => {
   }
   // 关闭磁盘写入流（如果存在）
   if (writable) {
-    writable.abort().catch(err => console.error("Stream abort error:", err));
+    writable.abort().catch((err) => console.error("Stream abort error:", err));
   }
 };
 ```
 
 **在函数末尾返回 abort 函数：**
+
 ```typescript
 return abort;
 ```
@@ -293,6 +314,7 @@ return abort;
 #### 3.3 在 `src/components/files.tsx` 中捕获并保存 abort 函数
 
 **在 `startZipDownload()` 中修改调用逻辑：**
+
 ```typescript
 const abortFn = await spEmbedded.downloadArchiveFromManifest(
   manifest,
@@ -307,7 +329,7 @@ const abortFn = await spEmbedded.downloadArchiveFromManifest(
 );
 
 // 或在初始化后立即保存
-setDownloadProgress(prev => ({
+setDownloadProgress((prev) => ({
   ...prev,
   abortHandler: abortFn,
 }));
@@ -316,6 +338,7 @@ setDownloadProgress(prev => ({
 #### 3.4 在 `src/services/spembedded.ts` 保持 finally 中定时器清理一致性
 
 **确保 finally 块包含所有必要的清理：**
+
 ```typescript
 finally {
   // 清理 pending timer
@@ -338,6 +361,7 @@ finally {
 #### 4.1 验证阶段切换与进度推进
 
 **测试用例：**
+
 1. 启动下载，观察进度从 0% 开始
 2. 准备阶段：进度在 0-25% 范围内推进，结束后应约为 25%
 3. 下载开始：进度从 25% 继续推进至 90%
@@ -347,6 +371,7 @@ finally {
 #### 4.2 验证节流节奏
 
 **测试用例：**
+
 1. 同一文件下载中，UI 进度条更新频率约为 1 次/秒
 2. 切换到新文件时，进度条应立即刷新显示新文件名
 3. 检查浏览器开发者工具网络面板，确认无无限频繁的 API 调用
@@ -354,6 +379,7 @@ finally {
 #### 4.3 验证中止功能
 
 **测试用例：**
+
 1. 下载进行中点击 Abort 链接
 2. 预期行为：
    - 下载立即停止（不再有新文件请求）
@@ -364,6 +390,7 @@ finally {
 #### 4.4 验证完成态与关闭行为
 
 **测试用例：**
+
 1. 下载完成，进度条显示 100%，文案为 "Download Completed"
 2. 等待 10+ 秒，进度条不应自动消失
 3. 点击 Dismiss 链接后，进度区立即消失
@@ -372,6 +399,7 @@ finally {
 #### 4.5 验证中止后新任务启动
 
 **测试用例：**
+
 1. 中止一个正在进行的下载
 2. 立即启动新的下载任务
 3. 预期：新任务状态清晰，无前一任务的干扰
@@ -381,7 +409,9 @@ finally {
 ## 相关文件
 
 ### 核心修改文件
+
 - **[src/components/files.tsx](src/components/files.tsx)**
+
   - 调整 `IDownloadProgress` 接口（新增 `shouldAutoHide`, `abortHandler`, `isAborted`）
   - 重写 `getArchiveProgressBarValue()` 实现加权进度
   - 改造 `getArchiveProgressText()` 合并文案、截断文件名
@@ -399,6 +429,7 @@ finally {
   - 保持 finally 块 cleanup 一致性
 
 ### 可选补充文件
+
 - **[src/common/types.ts](src/common/types.ts)**
   - 仅在需要时补充类型定义（预期本次可不改）
 
