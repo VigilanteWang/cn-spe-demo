@@ -201,6 +201,12 @@ const useStyles = makeStyles({
     alignItems: "center",
     gap: "6px",
   },
+  // Files 容器样式：100% 宽度、最大宽度限制并水平居中
+  filesContainer: {
+    width: "100%",
+    maxWidth: "min(1000px, 92%)",
+    margin: "0 auto",
+  },
 });
 
 /**
@@ -212,8 +218,8 @@ const useStyles = makeStyles({
 const columnSizingOptions = {
   driveItemName: {
     minWidth: 150,
-    defaultWidth: 250,
-    idealWidth: 200,
+    defaultWidth: 350,
+    idealWidth: 300,
   },
   lastModifiedTimestamp: {
     minWidth: 150,
@@ -1090,8 +1096,13 @@ export const Files = (props: IFilesProps) => {
   );
 
   // 组件渲染区域。
+  // width: "100%" 确保 DataGrid 的 useMeasureElement 初始即能测量到完整父容器宽度。
+  // 若省略，父容器 Containers 的 alignItems:"center" 会使本 div 收缩至内容宽度，
+  // 导致高 DPI 下（CSS 视口更窄）DataGrid 误判容器不足，把各列压缩至 minWidth。
+  // maxWidth 限制最大宽度，防止 DataGrid 的 autoFitColumns 把各列拉伸到视口宽度；
+  // 父容器 alignItems:"center" 会将本 div 在水平方向居中显示。
   return (
-    <div>
+    <div className={styles.filesContainer}>
       <input
         ref={uploadFileRef}
         type="file"
@@ -1285,7 +1296,9 @@ export const Files = (props: IFilesProps) => {
               <CheckmarkRegular
                 style={{ color: tokens.colorPaletteGreenForeground1 }}
               />
-              <Text className={styles.progressCompleted}>Download started</Text>
+              <Text className={styles.progressCompleted}>
+                Download Completed!
+              </Text>
             </>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
