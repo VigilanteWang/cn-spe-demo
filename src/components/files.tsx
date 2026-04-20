@@ -1382,9 +1382,13 @@ export const Files = (props: IFilesProps) => {
             />
           )}
           {downloadProgress.isActive ? (
-            <Text className={styles.progressText}>{getArchiveProgressText()}</Text>
+            <Text className={styles.progressText}>
+              {getArchiveProgressText()}
+            </Text>
           ) : downloadProgress.isCompleted ? (
-            <Text className={styles.progressCompleted}>Download Completed!</Text>
+            <Text className={styles.progressCompleted}>
+              Download Completed!
+            </Text>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
               {downloadProgress.errorMessage}

@@ -331,9 +331,7 @@ export default class SpEmbedded {
     if (response.ok) {
       return (await response.json()) as IJobProgress;
     }
-    throw new Error(
-      `getArchivePreparationProgress failed: ${response.status}`,
-    );
+    throw new Error(`getArchivePreparationProgress failed: ${response.status}`);
   }
 
   /**
