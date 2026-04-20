@@ -32,7 +32,7 @@
  * 后端 API 调用（通过 SpEmbedded 服务层）：
  * - deleteItems()            → 批量删除文件
  * - startDownloadArchive()   → 启动 ZIP 归档任务
- * - getDownloadProgress()    → 轮询归档进度
+ * - getArchivePreparationProgress() → 轮询归档准备进度
  * - getDownloadManifest()    → 获取归档清单
  * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
@@ -50,12 +50,10 @@ import {
   ArrowUploadRegular,
   FolderRegular,
   DocumentRegular,
-  SaveRegular,
   DeleteRegular,
   ArrowLeftRegular,
   ChevronRightRegular,
   HomeRegular,
-  CheckmarkRegular,
   FolderAddRegular,
   ArrowDownloadRegular,
   HistoryRegular,
@@ -66,6 +64,7 @@ import {
   Link,
   Label,
   Spinner,
+  ProgressBar,
   Input,
   InputProps,
   InputOnChangeData,
@@ -131,7 +130,9 @@ interface IBreadcrumbItem {
 interface IUploadProgress {
   isUploading: boolean; // 是否正在上传
   currentFile: string; // 当前上传的文件路径
-  currentIndex: number; // 当前文件序号（从 1 开始）
+  currentIndex: number; // 当前尝试上传的文件序号（从 1 开始）
+  successfulFiles: number; // 上传成功文件数
+  failedFiles: number; // 上传失败文件数
   totalFiles: number; // 总文件数
   fileSize: string; // 当前文件大小（格式化后，如 "1.5 MB"）
   isCompleted: boolean; // 上传是否已完成（用于显示完成提示）
@@ -184,9 +185,14 @@ const useStyles = makeStyles({
   },
   progressContainer: {
     marginBottom: "16px",
+    width: "100%",
     display: "flex",
-    alignItems: "center",
-    gap: "12px",
+    flexDirection: "column",
+    alignItems: "stretch",
+    rowGap: "8px",
+  },
+  progressBar: {
+    width: "100%",
   },
   progressText: {
     fontSize: "14px",
@@ -276,6 +282,8 @@ export const Files = (props: IFilesProps) => {
     isUploading: false,
     currentFile: "",
     currentIndex: 0,
+    successfulFiles: 0,
+    failedFiles: 0,
     totalFiles: 0,
     fileSize: "",
     isCompleted: false,
@@ -327,6 +335,77 @@ export const Files = (props: IFilesProps) => {
     }
     const value = Math.min(100, Math.max(0, (current / total) * 100));
     return `${value.toFixed(0)}%`;
+  };
+
+  /**
+   * 将进度转换为 ProgressBar 所需的 0-1 数值。
+   * @param current 当前进度值。
+   * @param total 总量。
+   * @returns 0 到 1 之间的进度值。
+   */
+  const toProgressValue = (current: number, total: number): number => {
+    if (total <= 0) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0, current / total));
+  };
+
+  /**
+   * 计算 ZIP 下载区域的进度条值。
+   * @returns 0 到 1 之间的进度值。
+   */
+  const getArchiveProgressBarValue = (): number => {
+    if (downloadProgress.phase === "preparing") {
+      const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
+      const total = downloadProgress.backendProgress?.totalFiles ?? 0;
+      return toProgressValue(processed, total);
+    }
+
+    if (downloadProgress.phase === "downloading") {
+      const downloaded = downloadProgress.clientProgress?.downloadedBytes ?? 0;
+      const total = downloadProgress.clientProgress?.totalBytes ?? 0;
+      return toProgressValue(downloaded, total);
+    }
+
+    if (downloadProgress.phase === "zipping") {
+      const processed = downloadProgress.clientProgress?.processedFiles ?? 0;
+      const total = downloadProgress.clientProgress?.totalFiles ?? 0;
+      return toProgressValue(processed, total);
+    }
+
+    if (downloadProgress.phase === "done" || downloadProgress.isCompleted) {
+      return 1;
+    }
+
+    return 0;
+  };
+
+  /**
+   * 生成 ZIP 下载区域的说明文案。
+   * @returns 当前进度文本。
+   */
+  const getArchiveProgressText = (): string => {
+    if (downloadProgress.phase === "preparing") {
+      const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
+      const total = downloadProgress.backendProgress?.totalFiles ?? 0;
+      const currentItem = downloadProgress.backendProgress?.currentItem;
+      return `Preparing manifest: ${processed}/${total} (${formatPercent(processed, total)})${currentItem ? ` - ${currentItem}` : ""}`;
+    }
+
+    if (downloadProgress.phase === "downloading") {
+      const downloaded = downloadProgress.clientProgress?.downloadedBytes ?? 0;
+      const total = downloadProgress.clientProgress?.totalBytes ?? 0;
+      const currentItem = downloadProgress.clientProgress?.currentItem;
+      return `Downloading: ${formatFileSize(downloaded)}/${formatFileSize(total)} (${formatPercent(downloaded, total)})${currentItem ? ` - ${currentItem}` : ""}`;
+    }
+
+    if (downloadProgress.phase === "zipping") {
+      const processed = downloadProgress.clientProgress?.processedFiles ?? 0;
+      const total = downloadProgress.clientProgress?.totalFiles ?? 0;
+      return `Zipping: ${processed}/${total} (${formatPercent(processed, total)})`;
+    }
+
+    return "Processing archive...";
   };
 
   /**
@@ -557,7 +636,7 @@ export const Files = (props: IFilesProps) => {
 
       try {
         isPolling = true;
-        const progress = await spEmbedded.getDownloadProgress(jobId);
+        const progress = await spEmbedded.getArchivePreparationProgress(jobId);
 
         setDownloadProgress((prev) => ({
           ...prev,
@@ -789,6 +868,8 @@ export const Files = (props: IFilesProps) => {
       isUploading: true,
       currentFile: "",
       currentIndex: 0,
+      successfulFiles: 0,
+      failedFiles: 0,
       totalFiles,
       fileSize: "",
       isCompleted: false,
@@ -830,7 +911,15 @@ export const Files = (props: IFilesProps) => {
         const fileData = await file.arrayBuffer();
 
         await graphClient.api(endpoint).putStream(fileData);
+        setUploadProgress((prev) => ({
+          ...prev,
+          successfulFiles: prev.successfulFiles + 1,
+        }));
       } catch (error: any) {
+        setUploadProgress((prev) => ({
+          ...prev,
+          failedFiles: prev.failedFiles + 1,
+        }));
         console.error(
           `Failed to upload file ${relativePath}: ${error.message}`,
         );
@@ -1236,70 +1325,66 @@ export const Files = (props: IFilesProps) => {
 
       {/*
         上传进度条：仅在上传进行中或刚完成时显示（完成后 3 秒自动隐藏）
-        - isUploading=true: 显示 Spinner + 当前文件名、序号和大小
-        - isCompleted=true: 显示绿色 Checkmark + "Upload completed" 提示
+        - 上传中：使用 ProgressBar，并按成功文件数推进
+        - 完成后：显示满进度条与完成提示
       */}
       {(uploadProgress.isUploading || uploadProgress.isCompleted) && (
         <div className={styles.progressContainer}>
+          <ProgressBar
+            className={styles.progressBar}
+            shape="rounded"
+            thickness="medium"
+            value={
+              uploadProgress.isCompleted
+                ? 1
+                : toProgressValue(
+                    uploadProgress.successfulFiles,
+                    uploadProgress.totalFiles,
+                  )
+            }
+          />
           {uploadProgress.isUploading ? (
-            <>
-              <Spinner size="small" />
-              <Text className={styles.progressText}>
-                Uploading {uploadProgress.currentFile} (
-                {uploadProgress.currentIndex}/{uploadProgress.totalFiles}) -{" "}
-                {uploadProgress.fileSize}
-              </Text>
-            </>
+            <Text className={styles.progressText}>
+              Uploading: {uploadProgress.successfulFiles}/
+              {uploadProgress.totalFiles} succeeded
+              {uploadProgress.failedFiles > 0
+                ? `, ${uploadProgress.failedFiles} failed`
+                : ""}
+              {uploadProgress.currentFile
+                ? ` - Current: ${uploadProgress.currentFile} (${uploadProgress.fileSize})`
+                : ""}
+            </Text>
           ) : uploadProgress.isCompleted ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>Upload completed</Text>
-            </>
+            <Text className={styles.progressCompleted}>
+              Upload completed: {uploadProgress.successfulFiles}/
+              {uploadProgress.totalFiles} succeeded
+              {uploadProgress.failedFiles > 0
+                ? `, ${uploadProgress.failedFiles} failed`
+                : ""}
+            </Text>
           ) : null}
         </div>
       )}
 
       {/*
-        ZIP 归档下载进度：展示三阶段进度
-        - 阶段 1：后端准备清单（preparing）
-        - 阶段 2：前端下载字节流（downloading）
-        - 阶段 3：前端压缩写入 ZIP（zipping）
+        ZIP 归档下载进度：使用 ProgressBar 展示当前阶段进度，文字放置在进度条下方。
       */}
       {(downloadProgress.isActive ||
         downloadProgress.isCompleted ||
         downloadProgress.errorMessage) && (
         <div className={styles.progressContainer}>
+          {(downloadProgress.isActive || downloadProgress.isCompleted) && (
+            <ProgressBar
+              className={styles.progressBar}
+              shape="rounded"
+              thickness="medium"
+              value={getArchiveProgressBarValue()}
+            />
+          )}
           {downloadProgress.isActive ? (
-            <>
-              <Spinner size="small" />
-              <Text className={styles.progressText}>
-                {downloadProgress.phase === "preparing"
-                  ? `Stage 1/3 Preparing manifest: ${downloadProgress.backendProgress?.processedFiles ?? 0}/${downloadProgress.backendProgress?.totalFiles ?? 0} (${formatPercent(
-                      downloadProgress.backendProgress?.processedFiles ?? 0,
-                      downloadProgress.backendProgress?.totalFiles ?? 0,
-                    )})${downloadProgress.backendProgress?.currentItem ? ` - ${downloadProgress.backendProgress.currentItem}` : ""}`
-                  : downloadProgress.phase === "downloading"
-                    ? `Stage 2/3 Downloading: ${formatFileSize(downloadProgress.clientProgress?.downloadedBytes ?? 0)}/${formatFileSize(downloadProgress.clientProgress?.totalBytes ?? 0)} (${formatPercent(
-                        downloadProgress.clientProgress?.downloadedBytes ?? 0,
-                        downloadProgress.clientProgress?.totalBytes ?? 0,
-                      )})${downloadProgress.clientProgress?.currentItem ? ` - ${downloadProgress.clientProgress.currentItem}` : ""}`
-                    : `Stage 3/3 Zipping: ${downloadProgress.clientProgress?.processedFiles ?? 0}/${downloadProgress.clientProgress?.totalFiles ?? 0} (${formatPercent(
-                        downloadProgress.clientProgress?.processedFiles ?? 0,
-                        downloadProgress.clientProgress?.totalFiles ?? 0,
-                      )})`}
-              </Text>
-            </>
+            <Text className={styles.progressText}>{getArchiveProgressText()}</Text>
           ) : downloadProgress.isCompleted ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>
-                Download Completed!
-              </Text>
-            </>
+            <Text className={styles.progressCompleted}>Download Completed!</Text>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
               {downloadProgress.errorMessage}

@@ -278,7 +278,7 @@ export default class SpEmbedded {
    *
    * 后端会异步展开目录并生成下载清单（manifest），
    * 真正的 ZIP 压缩由前端在 downloadArchiveFromManifest() 中流式完成。
-   * 返回 jobId 后需要轮询 getDownloadProgress() 查看进度。
+   * 返回 jobId 后需要轮询 getArchivePreparationProgress() 查看进度。
    *
    * @param containerId 容器 ID（即 Drive ID）
    * @param itemIds 要打包的文件/文件夹 ID 数组
@@ -287,7 +287,7 @@ export default class SpEmbedded {
    *
    * 完整下载流程：
    * 1. startDownloadArchive() → 获取 jobId
-   * 2. 轮询 getDownloadProgress(jobId) → 等待 status === "ready"
+   * 2. 轮询 getArchivePreparationProgress(jobId) → 等待 status === "ready"
    * 3. 调用 getDownloadManifest(jobId) 获取后端准备好的文件清单
    * 4. 调用 downloadArchiveFromManifest() 在前端流式下载并压缩
    **/
@@ -320,7 +320,7 @@ export default class SpEmbedded {
    * @returns 任务进度信息，包含状态、已处理文件数、当前处理项等
    * @throws 请求失败时抛出错误
    **/
-  async getDownloadProgress(jobId: string): Promise<IJobProgress> {
+  async getArchivePreparationProgress(jobId: string): Promise<IJobProgress> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/progress/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
     const response = await fetch(api_endpoint, {
@@ -331,7 +331,9 @@ export default class SpEmbedded {
     if (response.ok) {
       return (await response.json()) as IJobProgress;
     }
-    throw new Error(`getDownloadProgress failed: ${response.status}`);
+    throw new Error(
+      `getArchivePreparationProgress failed: ${response.status}`,
+    );
   }
 
   /**
@@ -435,11 +437,27 @@ export default class SpEmbedded {
 
     const writable = saveTarget.writable;
 
+    const PROGRESS_EMIT_INTERVAL_MS = 300;
+    let lastProgressEmitAt = 0;
+    let pendingProgress: IArchiveClientProgress | null = null;
+    let pendingProgressTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastCurrentItem = "";
+
+    const flushProgress = () => {
+      if (!pendingProgress) {
+        return;
+      }
+      onProgress(pendingProgress);
+      pendingProgress = null;
+      lastProgressEmitAt = Date.now();
+    };
+
     const emitProgress = (
       stage: IArchiveClientProgress["stage"],
       currentItem: string,
+      force = false,
     ) => {
-      onProgress({
+      pendingProgress = {
         stage,
         totalFiles,
         processedFiles,
@@ -447,7 +465,38 @@ export default class SpEmbedded {
         downloadedBytes,
         zippedBytes,
         currentItem,
-      });
+      };
+
+      const now = Date.now();
+      const itemChanged = currentItem !== lastCurrentItem;
+      lastCurrentItem = currentItem;
+
+      // 当前文件发生切换时立即刷新，避免用户观察到文件名延迟。
+      if (force || itemChanged) {
+        if (pendingProgressTimer) {
+          clearTimeout(pendingProgressTimer);
+          pendingProgressTimer = null;
+        }
+        flushProgress();
+        return;
+      }
+
+      const elapsed = now - lastProgressEmitAt;
+      if (elapsed >= PROGRESS_EMIT_INTERVAL_MS) {
+        if (pendingProgressTimer) {
+          clearTimeout(pendingProgressTimer);
+          pendingProgressTimer = null;
+        }
+        flushProgress();
+        return;
+      }
+
+      if (!pendingProgressTimer) {
+        pendingProgressTimer = setTimeout(() => {
+          pendingProgressTimer = null;
+          flushProgress();
+        }, PROGRESS_EMIT_INTERVAL_MS - elapsed);
+      }
     };
 
     let writeChain: Promise<void> = Promise.resolve();
@@ -543,12 +592,18 @@ export default class SpEmbedded {
         URL.revokeObjectURL(blobUrl);
       }
 
-      emitProgress("done", "");
+      emitProgress("done", "", true);
     } catch (error) {
       if (writable) {
         await writable.abort();
       }
       throw error;
+    } finally {
+      // 清理节流定时器，避免组件卸载后仍有延迟回调。
+      if (pendingProgressTimer) {
+        clearTimeout(pendingProgressTimer);
+        pendingProgressTimer = null;
+      }
     }
   }
 }
