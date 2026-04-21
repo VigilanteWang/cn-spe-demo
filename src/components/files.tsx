@@ -163,6 +163,9 @@ interface IDownloadProgress {
   clientProgress: IArchiveClientProgress | null;
   isCompleted: boolean;
   errorMessage: string;
+  shouldAutoHide: boolean;
+  abortHandler: (() => void) | null;
+  isAborted: boolean;
 }
 
 /** 组件样式定义 */
@@ -200,6 +203,28 @@ const useStyles = makeStyles({
   },
   progressCompleted: {
     color: tokens.colorPaletteGreenForeground1,
+    fontWeight: "600",
+  },
+  progressStatusRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    columnGap: "12px",
+  },
+  progressStatusText: {
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  progressStatusRight: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "10px",
+    flexShrink: 0,
+  },
+  progressPercent: {
     fontWeight: "600",
   },
   actionsButtonGroup: {
@@ -265,6 +290,10 @@ export const Files = (props: IFilesProps) => {
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
   // 由于下载归档需要轮询后端任务状态，我们使用 useRef 存储定时器 ID，以便在组件卸载时清理
   const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 记录当前可用的下载中止函数，确保点击 Abort 或组件卸载时都能安全清理。
+  const downloadAbortHandlerRef = useRef<(() => void) | null>(null);
+  // 标记当前下载是否由用户主动中止，用于避免将中止误判为失败。
+  const downloadAbortRequestedRef = useRef(false);
   // 记录 loadItems 的最新请求序号，避免旧请求，因为慢一步返回而覆盖新目录数据。
   const loadItemsRequestSeqRef = useRef(0);
   // 用于创建新文件夹。
@@ -296,6 +325,9 @@ export const Files = (props: IFilesProps) => {
     clientProgress: null,
     isCompleted: false,
     errorMessage: "",
+    shouldAutoHide: false,
+    abortHandler: null,
+    isAborted: false,
   });
   // 用于面包屑导航。
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
@@ -313,6 +345,11 @@ export const Files = (props: IFilesProps) => {
       if (downloadPollRef.current) {
         clearInterval(downloadPollRef.current);
         downloadPollRef.current = null;
+      }
+
+      if (downloadAbortHandlerRef.current) {
+        downloadAbortHandlerRef.current();
+        downloadAbortHandlerRef.current = null;
       }
     };
   }, []);
@@ -351,6 +388,39 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
+   * 创建下载进度默认状态，并允许按需覆盖字段。
+   * @param overrides 需要覆盖的状态字段。
+   * @returns 完整的下载进度状态对象。
+   */
+  const createDownloadProgressState = (
+    overrides: Partial<IDownloadProgress> = {},
+  ): IDownloadProgress => ({
+    phase: "idle",
+    isActive: false,
+    backendProgress: null,
+    clientProgress: null,
+    isCompleted: false,
+    errorMessage: "",
+    shouldAutoHide: false,
+    abortHandler: null,
+    isAborted: false,
+    ...overrides,
+  });
+
+  /**
+   * 截断进度文案中的文件名，避免超长文件名破坏布局。
+   * @param fileName 原始文件名或相对路径。
+   * @returns 最多 32 个字符的文件名，超出部分追加省略号。
+   */
+  const truncateProgressFileName = (fileName: string): string => {
+    const maxLength = 32;
+    if (fileName.length <= maxLength) {
+      return fileName;
+    }
+    return `${fileName.slice(0, maxLength)}...`;
+  };
+
+  /**
    * 计算 ZIP 下载区域的进度条值。
    * @returns 0 到 1 之间的进度值。
    */
@@ -358,19 +428,13 @@ export const Files = (props: IFilesProps) => {
     if (downloadProgress.phase === "preparing") {
       const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
       const total = downloadProgress.backendProgress?.totalFiles ?? 0;
-      return toProgressValue(processed, total);
+      return 0.25 * toProgressValue(processed, total);
     }
 
     if (downloadProgress.phase === "downloading") {
       const downloaded = downloadProgress.clientProgress?.downloadedBytes ?? 0;
       const total = downloadProgress.clientProgress?.totalBytes ?? 0;
-      return toProgressValue(downloaded, total);
-    }
-
-    if (downloadProgress.phase === "zipping") {
-      const processed = downloadProgress.clientProgress?.processedFiles ?? 0;
-      const total = downloadProgress.clientProgress?.totalFiles ?? 0;
-      return toProgressValue(processed, total);
+      return 0.25 + 0.65 * toProgressValue(downloaded, total);
     }
 
     if (downloadProgress.phase === "done" || downloadProgress.isCompleted) {
@@ -381,6 +445,15 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
+   * 获取归档任务的整体百分比文本（0-100%）。
+   * @returns 百分比字符串，如 50%。
+   */
+  const getArchiveProgressPercentText = (): string => {
+    const percent = Math.round(getArchiveProgressBarValue() * 100);
+    return `${percent}%`;
+  };
+
+  /**
    * 生成 ZIP 下载区域的说明文案。
    * @returns 当前进度文本。
    */
@@ -388,24 +461,63 @@ export const Files = (props: IFilesProps) => {
     if (downloadProgress.phase === "preparing") {
       const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
       const total = downloadProgress.backendProgress?.totalFiles ?? 0;
-      const currentItem = downloadProgress.backendProgress?.currentItem;
-      return `Preparing manifest: ${processed}/${total} (${formatPercent(processed, total)})${currentItem ? ` - ${currentItem}` : ""}`;
+      return `Preparing manifest: ${processed}/${total} (${getArchiveProgressPercentText()})`;
     }
 
-    if (downloadProgress.phase === "downloading") {
-      const downloaded = downloadProgress.clientProgress?.downloadedBytes ?? 0;
-      const total = downloadProgress.clientProgress?.totalBytes ?? 0;
-      const currentItem = downloadProgress.clientProgress?.currentItem;
-      return `Downloading: ${formatFileSize(downloaded)}/${formatFileSize(total)} (${formatPercent(downloaded, total)})${currentItem ? ` - ${currentItem}` : ""}`;
+    if (
+      downloadProgress.phase === "downloading" ||
+      downloadProgress.phase === "zipping"
+    ) {
+      const currentItem =
+        downloadProgress.clientProgress?.currentItem?.trim() ?? "";
+      if (currentItem) {
+        return `Downloading and zipping: ${truncateProgressFileName(currentItem)}`;
+      }
+      return "Downloading and zipping";
     }
 
-    if (downloadProgress.phase === "zipping") {
-      const processed = downloadProgress.clientProgress?.processedFiles ?? 0;
-      const total = downloadProgress.clientProgress?.totalFiles ?? 0;
-      return `Zipping: ${processed}/${total} (${formatPercent(processed, total)})`;
+    if (downloadProgress.phase === "done" || downloadProgress.isCompleted) {
+      return "Download Completed";
     }
 
     return "Processing archive...";
+  };
+
+  /**
+   * 用户点击 Abort 时中止当前下载流程，并立即重置可视状态。
+   * @returns void
+   */
+  const onAbortClick = () => {
+    downloadAbortRequestedRef.current = true;
+
+    if (downloadPollRef.current) {
+      clearInterval(downloadPollRef.current);
+      downloadPollRef.current = null;
+    }
+
+    if (downloadAbortHandlerRef.current) {
+      downloadAbortHandlerRef.current();
+      downloadAbortHandlerRef.current = null;
+    }
+
+    setDownloadProgress((prev) =>
+      createDownloadProgressState({
+        isAborted: true,
+        shouldAutoHide: false,
+        backendProgress: prev.backendProgress,
+        clientProgress: prev.clientProgress,
+      }),
+    );
+  };
+
+  /**
+   * 用户点击 Dismiss 后手动关闭下载进度区域。
+   * @returns void
+   */
+  const onDismissClick = () => {
+    downloadAbortRequestedRef.current = false;
+    downloadAbortHandlerRef.current = null;
+    setDownloadProgress(createDownloadProgressState());
   };
 
   /**
@@ -563,17 +675,15 @@ export const Files = (props: IFilesProps) => {
        * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。*/
       saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
     } catch (err: any) {
-      setDownloadProgress({
-        phase: "failed",
-        isActive: false,
-        backendProgress: null,
-        clientProgress: null,
-        isCompleted: false,
-        errorMessage:
-          err.message === "Download cancelled by user."
-            ? "Download cancelled."
-            : `Failed to open save dialog: ${err.message}`,
-      });
+      setDownloadProgress(
+        createDownloadProgressState({
+          phase: "failed",
+          errorMessage:
+            err.message === "Download cancelled by user."
+              ? "Download cancelled."
+              : `Failed to open save dialog: ${err.message}`,
+        }),
+      );
       return;
     }
 
@@ -599,14 +709,15 @@ export const Files = (props: IFilesProps) => {
       downloadPollRef.current = null;
     }
 
-    setDownloadProgress({
-      phase: "preparing",
-      isActive: true,
-      backendProgress: null,
-      clientProgress: null,
-      isCompleted: false,
-      errorMessage: "",
-    });
+    downloadAbortRequestedRef.current = false;
+    downloadAbortHandlerRef.current = null;
+
+    setDownloadProgress(
+      createDownloadProgressState({
+        phase: "preparing",
+        isActive: true,
+      }),
+    );
 
     let jobId: string;
     try {
@@ -615,14 +726,12 @@ export const Files = (props: IFilesProps) => {
         itemIds,
       );
     } catch (err: any) {
-      setDownloadProgress({
-        phase: "failed",
-        isActive: false,
-        backendProgress: null,
-        clientProgress: null,
-        isCompleted: false,
-        errorMessage: `Failed to start download: ${err.message}`,
-      });
+      setDownloadProgress(
+        createDownloadProgressState({
+          phase: "failed",
+          errorMessage: `Failed to start download: ${err.message}`,
+        }),
+      );
       return;
     }
 
@@ -630,13 +739,17 @@ export const Files = (props: IFilesProps) => {
 
     // 每 800ms 轮询一次任务进度。
     downloadPollRef.current = setInterval(async () => {
-      if (isPolling) {
+      if (isPolling || downloadAbortRequestedRef.current) {
         return;
       }
 
       try {
         isPolling = true;
         const progress = await spEmbedded.getArchivePreparationProgress(jobId);
+
+        if (downloadAbortRequestedRef.current) {
+          return;
+        }
 
         setDownloadProgress((prev) => ({
           ...prev,
@@ -648,17 +761,30 @@ export const Files = (props: IFilesProps) => {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
 
+          if (downloadAbortRequestedRef.current) {
+            return;
+          }
+
           const manifest = await spEmbedded.getDownloadManifest(jobId);
+
+          if (downloadAbortRequestedRef.current) {
+            return;
+          }
+
           const finalSaveTarget: IArchiveSaveTarget = {
             ...saveTarget,
             // filename 优先级：用户定义名（若存在）> 前端建议默认名 > 后端默认名。
             filename: saveTarget.filename || manifest.archiveName,
           };
 
-          await spEmbedded.downloadArchiveFromManifest(
+          const downloadSession = spEmbedded.downloadArchiveFromManifest(
             manifest,
             finalSaveTarget,
             (clientProgress) => {
+              if (downloadAbortRequestedRef.current) {
+                return;
+              }
+
               setDownloadProgress((prev) => ({
                 ...prev,
                 isActive: clientProgress.stage !== "done",
@@ -671,49 +797,54 @@ export const Files = (props: IFilesProps) => {
             },
           );
 
+          downloadAbortHandlerRef.current = downloadSession.abort;
+          setDownloadProgress((prev) => ({
+            ...prev,
+            abortHandler: downloadSession.abort,
+          }));
+
+          await downloadSession.completion;
+
+          if (downloadAbortRequestedRef.current) {
+            return;
+          }
+
           setDownloadProgress((prev) => ({
             ...prev,
             phase: "done",
             isActive: false,
             isCompleted: true,
             errorMessage: "",
+            shouldAutoHide: false,
+            abortHandler: null,
+            isAborted: false,
           }));
-
-          setTimeout(() => {
-            setDownloadProgress((prev) => ({
-              ...prev,
-              phase: "idle",
-              isCompleted: false,
-              backendProgress: null,
-              clientProgress: null,
-            }));
-          }, 4000);
         } else if (progress.status === "failed") {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
-          setDownloadProgress({
-            phase: "failed",
-            isActive: false,
-            backendProgress: progress,
-            clientProgress: null,
-            isCompleted: false,
-            errorMessage:
-              progress.errors.length > 0
-                ? progress.errors.join("; ")
-                : "Archive job failed.",
-          });
+          setDownloadProgress(
+            createDownloadProgressState({
+              phase: "failed",
+              backendProgress: progress,
+              errorMessage:
+                progress.errors.length > 0
+                  ? progress.errors.join("; ")
+                  : "Archive job failed.",
+            }),
+          );
         }
       } catch (err: any) {
         clearInterval(downloadPollRef.current!);
         downloadPollRef.current = null;
-        setDownloadProgress({
-          phase: "failed",
-          isActive: false,
-          backendProgress: null,
-          clientProgress: null,
-          isCompleted: false,
-          errorMessage: `Download failed: ${err.message}`,
-        });
+
+        if (!downloadAbortRequestedRef.current) {
+          setDownloadProgress(
+            createDownloadProgressState({
+              phase: "failed",
+              errorMessage: `Download failed: ${err.message}`,
+            }),
+          );
+        }
       } finally {
         isPolling = false;
       }
@@ -1381,14 +1512,30 @@ export const Files = (props: IFilesProps) => {
               value={getArchiveProgressBarValue()}
             />
           )}
-          {downloadProgress.isActive ? (
-            <Text className={styles.progressText}>
-              {getArchiveProgressText()}
-            </Text>
-          ) : downloadProgress.isCompleted ? (
-            <Text className={styles.progressCompleted}>
-              Download Completed!
-            </Text>
+          {downloadProgress.isActive || downloadProgress.isCompleted ? (
+            <div className={styles.progressStatusRow}>
+              <Text
+                className={
+                  downloadProgress.isCompleted
+                    ? styles.progressCompleted
+                    : styles.progressText
+                }
+                block
+                truncate
+              >
+                {getArchiveProgressText()}
+              </Text>
+              <div className={styles.progressStatusRight}>
+                {downloadProgress.isActive ? (
+                  <Link onClick={onAbortClick}>Abort</Link>
+                ) : downloadProgress.isCompleted ? (
+                  <Link onClick={onDismissClick}>Dismiss</Link>
+                ) : null}
+                <Text className={styles.progressPercent}>
+                  {getArchiveProgressPercentText()}
+                </Text>
+              </div>
+            </div>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
               {downloadProgress.errorMessage}

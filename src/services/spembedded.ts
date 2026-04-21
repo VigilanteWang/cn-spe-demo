@@ -91,6 +91,17 @@ export interface IArchiveSaveTarget {
 }
 
 /**
+ * 归档下载会话。
+ *
+ * - abort: 立即中止当前下载任务
+ * - completion: 下载任务完成 Promise（成功完成或主动中止后结束）
+ */
+export interface IArchiveDownloadSession {
+  abort: () => void;
+  completion: Promise<void>;
+}
+
+/**
  * 批量删除操作的返回结果
  *
  * 删除操作支持部分成功：即使某些文件删除失败，已成功的不会回滚
@@ -409,15 +420,16 @@ export default class SpEmbedded {
    * @param manifest 后端返回的下载清单。
    * @param saveTarget 归档输出目标。
    * @param onProgress 进度回调，用于更新下载与压缩进度。
-   * @returns Promise<void>
+   * @returns IArchiveDownloadSession 可中止的下载会话。
    **/
-  async downloadArchiveFromManifest(
+  downloadArchiveFromManifest(
     manifest: IArchiveManifest,
     saveTarget: IArchiveSaveTarget,
     onProgress: (progress: IArchiveClientProgress) => void,
-  ): Promise<void> {
+  ): IArchiveDownloadSession {
     const totalFiles = manifest.totalFiles;
     const totalBytes = manifest.totalBytes;
+    const ABORT_ERROR_MESSAGE = "Archive download aborted.";
 
     let downloadedBytes = 0;
     let zippedBytes = 0;
@@ -435,11 +447,16 @@ export default class SpEmbedded {
 
     const writable = saveTarget.writable;
 
-    const PROGRESS_EMIT_INTERVAL_MS = 300;
+    const PROGRESS_EMIT_INTERVAL_MS = 1000;
     let lastProgressEmitAt = 0;
     let pendingProgress: IArchiveClientProgress | null = null;
     let pendingProgressTimer: ReturnType<typeof setTimeout> | null = null;
     let lastCurrentItem = "";
+    let shouldAbort = false;
+    let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let activeFetchController: AbortController | null = null;
+    let hasWritableClosed = false;
+    let hasWritableAborted = false;
 
     const flushProgress = () => {
       if (!pendingProgress) {
@@ -497,111 +514,226 @@ export default class SpEmbedded {
       }
     };
 
-    let writeChain: Promise<void> = Promise.resolve();
-
-    try {
-      await new Promise<void>(async (resolve, reject) => {
-        let resolved = false;
-
-        const zip = new Zip((error, data, final) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          writeChain = writeChain
-            .then(async () => {
-              zippedBytes += data.length;
-              emitProgress("zipping", "");
-              if (writable) {
-                // 先转成标准 ArrayBuffer，再写入磁盘流，规避 Uint8Array 泛型缓冲区差异。
-                await writable.write(toArrayBuffer(data));
-              } else {
-                // 回退路径同样存放 ArrayBuffer，确保 new Blob(...) 的参数类型稳定。
-                fallbackChunks.push(toArrayBuffer(data));
-              }
-            })
-            .catch(reject);
-
-          if (final && !resolved) {
-            resolved = true;
-            writeChain.then(resolve).catch(reject);
-          }
-        });
-
-        for (const item of manifest.items) {
-          emitProgress("downloading", item.relativePath);
-
-          const entry = new AsyncZipDeflate(item.relativePath, { level: 6 });
-          zip.add(entry);
-
-          const response = await fetch(item.downloadUrl, {
-            method: "GET",
-          });
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to download ${item.relativePath}. HTTP ${response.status}`,
-            );
-          }
-
-          if (!response.body) {
-            const buffer = new Uint8Array(await response.arrayBuffer());
-            downloadedBytes += buffer.length;
-            emitProgress("downloading", item.relativePath);
-            entry.push(buffer, true);
-            processedFiles += 1;
-            continue;
-          }
-
-          const reader = response.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              break;
-            }
-
-            if (value) {
-              downloadedBytes += value.length;
-              emitProgress("downloading", item.relativePath);
-              entry.push(value, false);
-            }
-          }
-
-          entry.push(new Uint8Array(0), true);
-          processedFiles += 1;
-        }
-
-        zip.end();
-      });
-
-      if (writable) {
-        await writable.close();
-      } else {
-        const zipBlob = new Blob(fallbackChunks, { type: "application/zip" });
-        const blobUrl = URL.createObjectURL(zipBlob);
-        const anchor = document.createElement("a");
-        anchor.href = blobUrl;
-        anchor.download = saveTarget.filename;
-        anchor.style.display = "none";
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(blobUrl);
+    const abort = () => {
+      if (shouldAbort) {
+        return;
       }
 
-      emitProgress("done", "", true);
-    } catch (error) {
-      if (writable) {
-        await writable.abort();
-      }
-      throw error;
-    } finally {
-      // 清理节流定时器，避免组件卸载后仍有延迟回调。
+      shouldAbort = true;
+
       if (pendingProgressTimer) {
         clearTimeout(pendingProgressTimer);
         pendingProgressTimer = null;
       }
-    }
+
+      if (activeFetchController) {
+        activeFetchController.abort();
+        activeFetchController = null;
+      }
+
+      if (activeReader) {
+        void activeReader.cancel().catch((error) => {
+          console.error("Reader cancel error:", error);
+        });
+        activeReader = null;
+      }
+
+      if (writable && !hasWritableClosed && !hasWritableAborted) {
+        hasWritableAborted = true;
+        void writable.abort().catch((error) => {
+          console.error("Writable abort error:", error);
+        });
+      }
+    };
+
+    let writeChain: Promise<void> = Promise.resolve();
+
+    const completion = (async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          let isSettled = false;
+
+          const resolveOnce = () => {
+            if (isSettled) {
+              return;
+            }
+            isSettled = true;
+            resolve();
+          };
+
+          const rejectOnce = (error: unknown) => {
+            if (isSettled) {
+              return;
+            }
+            isSettled = true;
+            reject(error);
+          };
+
+          const zip = new Zip((error, data, final) => {
+            if (error) {
+              if (!shouldAbort) {
+                rejectOnce(error);
+              }
+              return;
+            }
+
+            if (shouldAbort) {
+              return;
+            }
+
+            writeChain = writeChain
+              .then(async () => {
+                zippedBytes += data.length;
+                if (writable) {
+                  // 先转成标准 ArrayBuffer，再写入磁盘流，规避 Uint8Array 泛型缓冲区差异。
+                  await writable.write(toArrayBuffer(data));
+                } else {
+                  // 回退路径同样存放 ArrayBuffer，确保 new Blob(...) 的参数类型稳定。
+                  fallbackChunks.push(toArrayBuffer(data));
+                }
+              })
+              .catch(rejectOnce);
+
+            if (final) {
+              writeChain.then(resolveOnce).catch(rejectOnce);
+            }
+          });
+
+          const run = async () => {
+            try {
+              for (const item of manifest.items) {
+                if (shouldAbort) {
+                  throw new Error(ABORT_ERROR_MESSAGE);
+                }
+
+                emitProgress("downloading", item.relativePath);
+
+                const entry = new AsyncZipDeflate(item.relativePath, {
+                  level: 6,
+                });
+                zip.add(entry);
+
+                activeFetchController = new AbortController();
+                const response = await fetch(item.downloadUrl, {
+                  method: "GET",
+                  signal: activeFetchController.signal,
+                });
+                activeFetchController = null;
+
+                if (!response.ok) {
+                  throw new Error(
+                    `Failed to download ${item.relativePath}. HTTP ${response.status}`,
+                  );
+                }
+
+                if (!response.body) {
+                  if (shouldAbort) {
+                    throw new Error(ABORT_ERROR_MESSAGE);
+                  }
+
+                  const buffer = new Uint8Array(await response.arrayBuffer());
+                  downloadedBytes += buffer.length;
+                  emitProgress("downloading", item.relativePath);
+                  entry.push(buffer, true);
+                  processedFiles += 1;
+                  continue;
+                }
+
+                activeReader = response.body.getReader();
+                try {
+                  while (true) {
+                    if (shouldAbort) {
+                      throw new Error(ABORT_ERROR_MESSAGE);
+                    }
+
+                    const { done, value } = await activeReader.read();
+                    if (done) {
+                      break;
+                    }
+
+                    if (value) {
+                      downloadedBytes += value.length;
+                      emitProgress("downloading", item.relativePath);
+                      entry.push(value, false);
+                    }
+                  }
+                } finally {
+                  activeReader = null;
+                }
+
+                if (shouldAbort) {
+                  throw new Error(ABORT_ERROR_MESSAGE);
+                }
+
+                entry.push(new Uint8Array(0), true);
+                processedFiles += 1;
+              }
+
+              if (shouldAbort) {
+                throw new Error(ABORT_ERROR_MESSAGE);
+              }
+
+              zip.end();
+            } catch (error) {
+              rejectOnce(error);
+            }
+          };
+
+          void run();
+        });
+
+        if (shouldAbort) {
+          return;
+        }
+
+        if (writable) {
+          await writable.close();
+          hasWritableClosed = true;
+        } else {
+          const zipBlob = new Blob(fallbackChunks, { type: "application/zip" });
+          const blobUrl = URL.createObjectURL(zipBlob);
+          const anchor = document.createElement("a");
+          anchor.href = blobUrl;
+          anchor.download = saveTarget.filename;
+          anchor.style.display = "none";
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          URL.revokeObjectURL(blobUrl);
+        }
+
+        emitProgress("done", "", true);
+      } catch (error: unknown) {
+        if (
+          shouldAbort ||
+          (error instanceof Error && error.message === ABORT_ERROR_MESSAGE)
+        ) {
+          return;
+        }
+
+        if (writable && !hasWritableClosed && !hasWritableAborted) {
+          hasWritableAborted = true;
+          await writable.abort().catch((abortError) => {
+            console.error("Writable abort error:", abortError);
+          });
+        }
+
+        throw error;
+      } finally {
+        // 清理节流定时器，避免组件卸载后仍有延迟回调。
+        if (pendingProgressTimer) {
+          clearTimeout(pendingProgressTimer);
+          pendingProgressTimer = null;
+        }
+
+        activeFetchController = null;
+        activeReader = null;
+      }
+    })();
+
+    return {
+      abort,
+      completion,
+    };
   }
 }
