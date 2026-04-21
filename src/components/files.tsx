@@ -388,7 +388,7 @@ export const Files = (props: IFilesProps) => {
   };
 
   /**
-   * 创建下载进度默认状态，并允许按需覆盖字段。
+   * 默认值工厂，允许以部分字段创建完整IDownloadProgress。
    * @param overrides 需要覆盖的状态字段。
    * @returns 完整的下载进度状态对象。
    */
@@ -461,7 +461,7 @@ export const Files = (props: IFilesProps) => {
     if (downloadProgress.phase === "preparing") {
       const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
       const total = downloadProgress.backendProgress?.totalFiles ?? 0;
-      return `Preparing manifest: ${processed}/${total} (${getArchiveProgressPercentText()})`;
+      return `Preparing manifest: ${processed}/${total}`;
     }
 
     if (
