@@ -101,6 +101,11 @@ export interface IArchiveDownloadSession {
   completion: Promise<void>;
 }
 
+/** 可选请求参数：用于透传 AbortSignal 到 fetch，支持统一取消链路。 */
+interface IAbortRequestOptions {
+  requestAbortSignal?: AbortSignal;
+}
+
 /**
  * 批量删除操作的返回结果
  *
@@ -305,6 +310,7 @@ export default class SpEmbedded {
   async startDownloadArchive(
     containerId: string,
     itemIds: string[],
+    abortOptions?: IAbortRequestOptions,
   ): Promise<string> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/start`;
     const token = await this.getApiAccessToken();
@@ -315,6 +321,7 @@ export default class SpEmbedded {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ containerId, itemIds }),
+      signal: abortOptions?.requestAbortSignal,
     });
 
     if (response.ok) {
@@ -331,12 +338,16 @@ export default class SpEmbedded {
    * @returns 任务进度信息，包含状态、已处理文件数、当前处理项等
    * @throws 请求失败时抛出错误
    **/
-  async getArchivePreparationProgress(jobId: string): Promise<IJobProgress> {
+  async getArchivePreparationProgress(
+    jobId: string,
+    abortOptions?: IAbortRequestOptions,
+  ): Promise<IJobProgress> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/progress/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
     const response = await fetch(api_endpoint, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
+      signal: abortOptions?.requestAbortSignal,
     });
 
     if (response.ok) {
@@ -352,12 +363,16 @@ export default class SpEmbedded {
    * @returns Promise<IArchiveManifest> 后端准备好的下载清单。
    * @throws 请求失败时抛出错误。
    */
-  async getDownloadManifest(jobId: string): Promise<IArchiveManifest> {
+  async getDownloadManifest(
+    jobId: string,
+    abortOptions?: IAbortRequestOptions,
+  ): Promise<IArchiveManifest> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/manifest/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
     const response = await fetch(api_endpoint, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
+      signal: abortOptions?.requestAbortSignal,
     });
 
     if (response.ok) {
@@ -367,7 +382,7 @@ export default class SpEmbedded {
   }
 
   /**
-   * 在用户点击手势上下文中预先申请归档输出目标。
+   * 在用户点击手势上下文中预先弹出保存窗口。
    *
    * 这样可以避免在异步轮询回调中调用 showSaveFilePicker 导致手势校验失败。
    * @param filename 建议下载文件名。
@@ -426,6 +441,7 @@ export default class SpEmbedded {
     manifest: IArchiveManifest,
     saveTarget: IArchiveSaveTarget,
     onProgress: (progress: IArchiveClientProgress) => void,
+    abortOptions?: IAbortRequestOptions,
   ): IArchiveDownloadSession {
     const totalFiles = manifest.totalFiles;
     const totalBytes = manifest.totalBytes;
@@ -452,11 +468,52 @@ export default class SpEmbedded {
     let pendingProgress: IArchiveClientProgress | null = null;
     let pendingProgressTimer: ReturnType<typeof setTimeout> | null = null;
     let lastCurrentItem = "";
-    let shouldAbort = false;
+    // 统一使用内部控制器管理下载执行层取消，避免散落的布尔状态。
+    const streamAbortController = new AbortController();
+    const streamAbortSignal = streamAbortController.signal;
     let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let activeFetchController: AbortController | null = null;
     let hasWritableClosed = false;
     let hasWritableAborted = false;
+    const requestAbortSignal = abortOptions?.requestAbortSignal;
+
+    const getAbortError = (): Error => {
+      const abortReason = streamAbortSignal.reason;
+      if (abortReason instanceof Error) {
+        return abortReason;
+      }
+      return new Error(ABORT_ERROR_MESSAGE);
+    };
+
+    const isStreamAborted = () => streamAbortSignal.aborted;
+
+    const throwIfStreamAborted = () => {
+      if (isStreamAborted()) {
+        throw getAbortError();
+      }
+    };
+
+    let removeRequestAbortListener: (() => void) | null = null;
+
+    // 上层若传入取消信号，这里桥接到内部控制器，统一执行层的取消来源。
+    if (requestAbortSignal) {
+      if (requestAbortSignal.aborted) {
+        streamAbortController.abort(
+          requestAbortSignal.reason ?? new Error(ABORT_ERROR_MESSAGE),
+        );
+      } else {
+        const onRequestAbort = () => {
+          streamAbortController.abort(
+            requestAbortSignal.reason ?? new Error(ABORT_ERROR_MESSAGE),
+          );
+        };
+        requestAbortSignal.addEventListener("abort", onRequestAbort, {
+          once: true,
+        });
+        removeRequestAbortListener = () => {
+          requestAbortSignal.removeEventListener("abort", onRequestAbort);
+        };
+      }
+    }
 
     const flushProgress = () => {
       if (!pendingProgress) {
@@ -515,20 +572,15 @@ export default class SpEmbedded {
     };
 
     const abort = () => {
-      if (shouldAbort) {
+      if (isStreamAborted()) {
         return;
       }
 
-      shouldAbort = true;
+      streamAbortController.abort(new Error(ABORT_ERROR_MESSAGE));
 
       if (pendingProgressTimer) {
         clearTimeout(pendingProgressTimer);
         pendingProgressTimer = null;
-      }
-
-      if (activeFetchController) {
-        activeFetchController.abort();
-        activeFetchController = null;
       }
 
       if (activeReader) {
@@ -571,13 +623,13 @@ export default class SpEmbedded {
 
           const zip = new Zip((error, data, final) => {
             if (error) {
-              if (!shouldAbort) {
+              if (!isStreamAborted()) {
                 rejectOnce(error);
               }
               return;
             }
 
-            if (shouldAbort) {
+            if (isStreamAborted()) {
               return;
             }
 
@@ -602,9 +654,7 @@ export default class SpEmbedded {
           const run = async () => {
             try {
               for (const item of manifest.items) {
-                if (shouldAbort) {
-                  throw new Error(ABORT_ERROR_MESSAGE);
-                }
+                throwIfStreamAborted();
 
                 emitProgress("downloading", item.relativePath);
 
@@ -613,12 +663,11 @@ export default class SpEmbedded {
                 });
                 zip.add(entry);
 
-                activeFetchController = new AbortController();
                 const response = await fetch(item.downloadUrl, {
                   method: "GET",
-                  signal: activeFetchController.signal,
+                  // 将统一的取消信号透传给 fetch，实现真正 I/O 级别中止。
+                  signal: streamAbortSignal,
                 });
-                activeFetchController = null;
 
                 if (!response.ok) {
                   throw new Error(
@@ -627,9 +676,7 @@ export default class SpEmbedded {
                 }
 
                 if (!response.body) {
-                  if (shouldAbort) {
-                    throw new Error(ABORT_ERROR_MESSAGE);
-                  }
+                  throwIfStreamAborted();
 
                   const buffer = new Uint8Array(await response.arrayBuffer());
                   downloadedBytes += buffer.length;
@@ -642,9 +689,8 @@ export default class SpEmbedded {
                 activeReader = response.body.getReader();
                 try {
                   while (true) {
-                    if (shouldAbort) {
-                      throw new Error(ABORT_ERROR_MESSAGE);
-                    }
+                    // 流式读取循环必须每轮检查取消，确保 Abort 能快速生效。
+                    throwIfStreamAborted();
 
                     const { done, value } = await activeReader.read();
                     if (done) {
@@ -661,17 +707,13 @@ export default class SpEmbedded {
                   activeReader = null;
                 }
 
-                if (shouldAbort) {
-                  throw new Error(ABORT_ERROR_MESSAGE);
-                }
+                throwIfStreamAborted();
 
                 entry.push(new Uint8Array(0), true);
                 processedFiles += 1;
               }
 
-              if (shouldAbort) {
-                throw new Error(ABORT_ERROR_MESSAGE);
-              }
+              throwIfStreamAborted();
 
               zip.end();
             } catch (error) {
@@ -682,7 +724,7 @@ export default class SpEmbedded {
           void run();
         });
 
-        if (shouldAbort) {
+        if (isStreamAborted()) {
           return;
         }
 
@@ -704,10 +746,7 @@ export default class SpEmbedded {
 
         emitProgress("done", "", true);
       } catch (error: unknown) {
-        if (
-          shouldAbort ||
-          (error instanceof Error && error.message === ABORT_ERROR_MESSAGE)
-        ) {
+        if (isStreamAborted()) {
           return;
         }
 
@@ -726,7 +765,11 @@ export default class SpEmbedded {
           pendingProgressTimer = null;
         }
 
-        activeFetchController = null;
+        if (removeRequestAbortListener) {
+          removeRequestAbortListener();
+          removeRequestAbortListener = null;
+        }
+
         activeReader = null;
       }
     })();

@@ -164,7 +164,6 @@ interface IDownloadProgress {
   isCompleted: boolean;
   errorMessage: string;
   shouldAutoHide: boolean;
-  abortHandler: (() => void) | null;
   isAborted: boolean;
 }
 
@@ -290,10 +289,8 @@ export const Files = (props: IFilesProps) => {
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
   // 由于下载归档需要轮询后端任务状态，我们使用 useRef 存储定时器 ID，以便在组件卸载时清理
   const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // 记录当前可用的下载中止函数，确保点击 Abort 或组件卸载时都能安全清理。
-  const downloadAbortHandlerRef = useRef<(() => void) | null>(null);
-  // 标记当前下载是否由用户主动中止，用于避免将中止误判为失败。
-  const downloadAbortRequestedRef = useRef(false);
+  // 当前 ZIP 下载流程的统一取消控制器：轮询、manifest 请求和流式下载都共享该信号。
+  const downloadAbortControllerRef = useRef<AbortController | null>(null);
   // 记录 loadItems 的最新请求序号，避免旧请求，因为慢一步返回而覆盖新目录数据。
   const loadItemsRequestSeqRef = useRef(0);
   // 用于创建新文件夹。
@@ -326,7 +323,6 @@ export const Files = (props: IFilesProps) => {
     isCompleted: false,
     errorMessage: "",
     shouldAutoHide: false,
-    abortHandler: null,
     isAborted: false,
   });
   // 用于面包屑导航。
@@ -347,9 +343,10 @@ export const Files = (props: IFilesProps) => {
         downloadPollRef.current = null;
       }
 
-      if (downloadAbortHandlerRef.current) {
-        downloadAbortHandlerRef.current();
-        downloadAbortHandlerRef.current = null;
+      if (downloadAbortControllerRef.current) {
+        // 组件卸载时统一中止仍在进行的异步任务，避免卸载后继续更新状态。
+        downloadAbortControllerRef.current.abort();
+        downloadAbortControllerRef.current = null;
       }
     };
   }, []);
@@ -402,7 +399,6 @@ export const Files = (props: IFilesProps) => {
     isCompleted: false,
     errorMessage: "",
     shouldAutoHide: false,
-    abortHandler: null,
     isAborted: false,
     ...overrides,
   });
@@ -488,16 +484,15 @@ export const Files = (props: IFilesProps) => {
    * @returns void
    */
   const onAbortClick = () => {
-    downloadAbortRequestedRef.current = true;
+    if (downloadAbortControllerRef.current) {
+      // 触发统一取消信号，让所有依赖该信号的异步流程尽快停止。
+      downloadAbortControllerRef.current.abort();
+      downloadAbortControllerRef.current = null;
+    }
 
     if (downloadPollRef.current) {
       clearInterval(downloadPollRef.current);
       downloadPollRef.current = null;
-    }
-
-    if (downloadAbortHandlerRef.current) {
-      downloadAbortHandlerRef.current();
-      downloadAbortHandlerRef.current = null;
     }
 
     setDownloadProgress((prev) =>
@@ -515,8 +510,7 @@ export const Files = (props: IFilesProps) => {
    * @returns void
    */
   const onDismissClick = () => {
-    downloadAbortRequestedRef.current = false;
-    downloadAbortHandlerRef.current = null;
+    downloadAbortControllerRef.current = null;
     setDownloadProgress(createDownloadProgressState());
   };
 
@@ -709,8 +703,13 @@ export const Files = (props: IFilesProps) => {
       downloadPollRef.current = null;
     }
 
-    downloadAbortRequestedRef.current = false;
-    downloadAbortHandlerRef.current = null;
+    if (downloadAbortControllerRef.current) {
+      // 新任务开始前先取消旧任务，避免两条下载流程并发争用同一组 UI 状态。
+      downloadAbortControllerRef.current.abort();
+    }
+    const runController = new AbortController();
+    downloadAbortControllerRef.current = runController;
+    const downloadAbortSignal = runController.signal;
 
     setDownloadProgress(
       createDownloadProgressState({
@@ -724,14 +723,22 @@ export const Files = (props: IFilesProps) => {
       jobId = await spEmbedded.startDownloadArchive(
         props.container.id,
         itemIds,
+        { requestAbortSignal: downloadAbortSignal },
       );
     } catch (err: any) {
+      if (downloadAbortSignal.aborted) {
+        return;
+      }
+
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
           errorMessage: `Failed to start download: ${err.message}`,
         }),
       );
+      if (downloadAbortControllerRef.current === runController) {
+        downloadAbortControllerRef.current = null;
+      }
       return;
     }
 
@@ -739,15 +746,19 @@ export const Files = (props: IFilesProps) => {
 
     // 每 800ms 轮询一次任务进度。
     downloadPollRef.current = setInterval(async () => {
-      if (isPolling || downloadAbortRequestedRef.current) {
+      // 轮询入口做并发与取消双重保护：避免重叠请求和取消后继续推进流程。
+      if (isPolling || downloadAbortSignal.aborted) {
         return;
       }
 
       try {
         isPolling = true;
-        const progress = await spEmbedded.getArchivePreparationProgress(jobId);
+        const progress = await spEmbedded.getArchivePreparationProgress(jobId, {
+          requestAbortSignal: downloadAbortSignal,
+        });
 
-        if (downloadAbortRequestedRef.current) {
+        // await 返回后再次检查：用户可能在请求进行中点击 Abort。
+        if (downloadAbortSignal.aborted) {
           return;
         }
 
@@ -761,13 +772,17 @@ export const Files = (props: IFilesProps) => {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
 
-          if (downloadAbortRequestedRef.current) {
+          // 进入 manifest 阶段前检查一次，避免取消后继续触发下游下载。
+          if (downloadAbortSignal.aborted) {
             return;
           }
 
-          const manifest = await spEmbedded.getDownloadManifest(jobId);
+          const manifest = await spEmbedded.getDownloadManifest(jobId, {
+            requestAbortSignal: downloadAbortSignal,
+          });
 
-          if (downloadAbortRequestedRef.current) {
+          // manifest 获取后再次检查，防止取消后仍创建下载会话。
+          if (downloadAbortSignal.aborted) {
             return;
           }
 
@@ -781,7 +796,7 @@ export const Files = (props: IFilesProps) => {
             manifest,
             finalSaveTarget,
             (clientProgress) => {
-              if (downloadAbortRequestedRef.current) {
+              if (downloadAbortSignal.aborted) {
                 return;
               }
 
@@ -795,17 +810,12 @@ export const Files = (props: IFilesProps) => {
                 clientProgress,
               }));
             },
+            { requestAbortSignal: downloadAbortSignal },
           );
-
-          downloadAbortHandlerRef.current = downloadSession.abort;
-          setDownloadProgress((prev) => ({
-            ...prev,
-            abortHandler: downloadSession.abort,
-          }));
 
           await downloadSession.completion;
 
-          if (downloadAbortRequestedRef.current) {
+          if (downloadAbortSignal.aborted) {
             return;
           }
 
@@ -816,9 +826,11 @@ export const Files = (props: IFilesProps) => {
             isCompleted: true,
             errorMessage: "",
             shouldAutoHide: false,
-            abortHandler: null,
             isAborted: false,
           }));
+          if (downloadAbortControllerRef.current === runController) {
+            downloadAbortControllerRef.current = null;
+          }
         } else if (progress.status === "failed") {
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
@@ -832,18 +844,24 @@ export const Files = (props: IFilesProps) => {
                   : "Archive job failed.",
             }),
           );
+          if (downloadAbortControllerRef.current === runController) {
+            downloadAbortControllerRef.current = null;
+          }
         }
       } catch (err: any) {
         clearInterval(downloadPollRef.current!);
         downloadPollRef.current = null;
 
-        if (!downloadAbortRequestedRef.current) {
+        if (!downloadAbortSignal.aborted) {
           setDownloadProgress(
             createDownloadProgressState({
               phase: "failed",
               errorMessage: `Download failed: ${err.message}`,
             }),
           );
+        }
+        if (downloadAbortControllerRef.current === runController) {
+          downloadAbortControllerRef.current = null;
         }
       } finally {
         isPolling = false;
