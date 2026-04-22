@@ -697,20 +697,30 @@ export const Files = (props: IFilesProps) => {
     itemIds: string[],
     saveTarget: IArchiveSaveTarget,
   ) => {
-    // 清理上一轮下载进度状态。
+    // ── 第一步：清理上一轮残留的轮询定时器 ──────────────────────────────────
+    // 如果上一次下载还留有定时器未清除（例如用户快速连续点击），先停掉它。
+    // 否则两个定时器会同时运行，同时更新同一个 UI 状态，导致进度条跳跃或状态混乱。
     if (downloadPollRef.current) {
       clearInterval(downloadPollRef.current);
       downloadPollRef.current = null;
     }
 
+    // ── 第二步：为本次下载创建一个新的取消控制器（AbortController）──────────
+    // AbortController 是浏览器内置 API，用于"取消"异步操作（fetch 请求、流式读取等）。
+    // 调用 runController.abort() 后，所有传入了 downloadAbortSignal 的异步操作都会收到
+    // 取消信号并提前结束，避免已取消的任务继续消耗资源或更新已卸载组件的状态。
     if (downloadAbortControllerRef.current) {
       // 新任务开始前先取消旧任务，避免两条下载流程并发争用同一组 UI 状态。
       downloadAbortControllerRef.current.abort();
     }
     const runController = new AbortController();
+    // 将新控制器保存到 ref，方便用户点击 Abort 时从外部调用 abort()。
     downloadAbortControllerRef.current = runController;
+    // signal 是一个只读标志对象，传给每个异步调用，当 abort() 被触发时 signal.aborted 变为 true。
     const downloadAbortSignal = runController.signal;
 
+    // ── 第三步：将 UI 进度状态切换为"准备中" ────────────────────────────────
+    // 让进度条和提示文字立刻出现在界面上，给用户即时反馈。
     setDownloadProgress(
       createDownloadProgressState({
         phase: "preparing",
@@ -718,6 +728,9 @@ export const Files = (props: IFilesProps) => {
       }),
     );
 
+    // ── 第四步：调用后端接口，启动归档任务，获取任务 ID ─────────────────────
+    // 后端会异步地将所选文件打包成 ZIP manifest（文件清单），这里只是"提交任务"，
+    // 并不等待打包完成——打包结果需要后续轮询获取。
     let jobId: string;
     try {
       jobId = await spEmbedded.startDownloadArchive(
@@ -726,10 +739,11 @@ export const Files = (props: IFilesProps) => {
         { requestAbortSignal: downloadAbortSignal },
       );
     } catch (err: any) {
+      // 如果错误是因为用户主动取消（signal.aborted），则静默退出，不展示错误 UI。
       if (downloadAbortSignal.aborted) {
         return;
       }
-
+      // 其他真实错误（网络问题、鉴权失败等）才展示错误状态。
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
@@ -742,9 +756,13 @@ export const Files = (props: IFilesProps) => {
       return;
     }
 
+    // ── 第五步：启动轮询，每 800ms 查询一次后端任务进度 ─────────────────────
+    // 因为后端打包是异步的，无法立刻拿到结果，所以用 setInterval 定期询问：
+    // "你打包好了吗？当前打包了多少个文件？"
+    // isPolling 是一个本地互斥锁，防止上一次请求还未返回时，新的轮询又开始请求，
+    // 造成多个并发请求同时修改 UI 状态。
     let isPolling = false;
 
-    // 每 800ms 轮询一次任务进度。
     downloadPollRef.current = setInterval(async () => {
       // 轮询入口做并发与取消双重保护：避免重叠请求和取消后继续推进流程。
       if (isPolling || downloadAbortSignal.aborted) {
@@ -753,22 +771,27 @@ export const Files = (props: IFilesProps) => {
 
       try {
         isPolling = true;
+        // 查询后端当前的打包进度（已处理文件数、总文件数、状态等）。
         const progress = await spEmbedded.getArchivePreparationProgress(jobId, {
           requestAbortSignal: downloadAbortSignal,
         });
 
         // await 返回后再次检查：用户可能在请求进行中点击 Abort。
+        // 因为 await 期间 JS 会交出控制权，用户有机会触发取消操作。
         if (downloadAbortSignal.aborted) {
           return;
         }
 
+        // 将最新的后端进度同步到 UI，进度条会根据 backendProgress 计算填充比例。
         setDownloadProgress((prev) => ({
           ...prev,
           phase: progress.status === "failed" ? "failed" : "preparing",
           backendProgress: progress,
         }));
 
+        // ── 分支 A：后端打包完成（status === "ready"）──────────────────────
         if (progress.status === "ready") {
+          // 打包已完成，不再需要轮询，立刻清除定时器。
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
 
@@ -777,6 +800,8 @@ export const Files = (props: IFilesProps) => {
             return;
           }
 
+          // 获取文件清单（manifest）：包含每个待下载文件的 URL 和元数据。
+          // 前端将根据这份清单逐个下载文件并在本地实时压缩成 ZIP。
           const manifest = await spEmbedded.getDownloadManifest(jobId, {
             requestAbortSignal: downloadAbortSignal,
           });
@@ -786,22 +811,32 @@ export const Files = (props: IFilesProps) => {
             return;
           }
 
+          // 确定最终保存的文件名：优先用用户指定名，其次用后端建议名。
           const finalSaveTarget: IArchiveSaveTarget = {
             ...saveTarget,
             // filename 优先级：用户定义名（若存在）> 前端建议默认名 > 后端默认名。
             filename: saveTarget.filename || manifest.archiveName,
           };
 
+          // 启动前端流式下载 + 实时压缩会话：
+          // downloadArchiveFromManifest 会按清单逐个下载文件，边下载边用 zip.js 压缩，
+          // 全部完成后直接保存到 finalSaveTarget 指定路径。
+          // 第三个参数是进度回调（callback），每压缩完一个文件就会被调用一次，
+          // 我们在这里把最新的客户端进度同步到 UI。
           const downloadSession = spEmbedded.downloadArchiveFromManifest(
             manifest,
             finalSaveTarget,
             (clientProgress) => {
+              // 回调内先检查取消标志，避免取消后仍触发 setState（会导致 React 警告）。
               if (downloadAbortSignal.aborted) {
                 return;
               }
 
+              // 属性简写：clientProgress 等价于 clientProgress: clientProgress（ES6 语法）。
+              // 后写的属性会覆盖 ...prev 中同名的 clientProgress，从而刷新进度数据。
               setDownloadProgress((prev) => ({
                 ...prev,
+                // stage === "done" 时表示压缩全部完成，isActive 置 false 隐藏进度条操作按钮。
                 isActive: clientProgress.stage !== "done",
                 phase:
                   clientProgress.stage === "done"
@@ -813,12 +848,15 @@ export const Files = (props: IFilesProps) => {
             { requestAbortSignal: downloadAbortSignal },
           );
 
+          // 等待整个流式下载 + 压缩流程结束（completion 是一个 Promise）。
           await downloadSession.completion;
 
+          // completion resolve 后再检查一次：用户可能在最后一刻点击 Abort。
           if (downloadAbortSignal.aborted) {
             return;
           }
 
+          // 下载全部完成，将 UI 切换为"已完成"状态，进度条显示 100%。
           setDownloadProgress((prev) => ({
             ...prev,
             phase: "done",
@@ -828,16 +866,21 @@ export const Files = (props: IFilesProps) => {
             shouldAutoHide: false,
             isAborted: false,
           }));
+          // 清理控制器引用，表示本次任务已结束，无需再持有取消能力。
           if (downloadAbortControllerRef.current === runController) {
             downloadAbortControllerRef.current = null;
           }
+
+          // ── 分支 B：后端打包失败（status === "failed"）─────────────────────
         } else if (progress.status === "failed") {
+          // 后端打包出错，停止轮询并将错误信息展示给用户。
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
           setDownloadProgress(
             createDownloadProgressState({
               phase: "failed",
               backendProgress: progress,
+              // 如果后端返回了具体错误列表，将其拼接展示；否则显示通用提示。
               errorMessage:
                 progress.errors.length > 0
                   ? progress.errors.join("; ")
@@ -848,10 +891,14 @@ export const Files = (props: IFilesProps) => {
             downloadAbortControllerRef.current = null;
           }
         }
+        // 分支 C（隐式）：status 仍为 "pending"/"processing"，什么都不做，等下一次轮询。
       } catch (err: any) {
+        // ── 异常处理：轮询或下载过程中抛出未预期的错误 ──────────────────────
+        // 例如：网络中断、服务器 500、流式写入失败等。
         clearInterval(downloadPollRef.current!);
         downloadPollRef.current = null;
 
+        // 取消操作本身也会导致 fetch 抛出 AbortError，此时不应展示错误 UI。
         if (!downloadAbortSignal.aborted) {
           setDownloadProgress(
             createDownloadProgressState({
@@ -864,6 +911,8 @@ export const Files = (props: IFilesProps) => {
           downloadAbortControllerRef.current = null;
         }
       } finally {
+        // finally 块无论成功、失败还是取消都会执行，确保互斥锁被释放，
+        // 否则 isPolling 永远为 true，后续所有轮询都会被跳过。
         isPolling = false;
       }
     }, 800);
