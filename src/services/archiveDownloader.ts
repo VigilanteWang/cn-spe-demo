@@ -136,43 +136,22 @@ const createProgressEmitter = (
 };
 
 /**
- * 将外部取消信号桥接到内部控制器，统一下载执行层的取消来源。
+ * 组合外部与内部取消信号，统一形成单一的执行取消源。
  * @param requestAbortSignal 上层传入的可选取消信号。
- * @param streamAbortController 内部下载控制器。
- * @param abortErrorMessage 统一中止错误文案。
- * @returns 清理监听器的方法。
+ * @param internalAbortSignal 内部会话控制器的取消信号。
+ * @returns 组合后的可取消信号。
  */
-const bridgeExternalAbortSignal = (
+const composeAbortSignal = (
   requestAbortSignal: AbortSignal | undefined,
-  streamAbortController: AbortController,
-  abortErrorMessage: string,
-): (() => void) | null => {
-  // 调用方未传入取消信号时，模块内部仍可通过自身控制器取消。
+  internalAbortSignal: AbortSignal,
+): AbortSignal => {
+  // 调用方未传入取消信号时，直接使用内部会话信号。
   if (!requestAbortSignal) {
-    return null;
+    return internalAbortSignal;
   }
 
-  if (requestAbortSignal.aborted) {
-    // 如果上层在进入函数前已取消，这里立即同步内部状态。
-    streamAbortController.abort(
-      requestAbortSignal.reason ?? new Error(abortErrorMessage),
-    );
-    return null;
-  }
-
-  const onRequestAbort = () => {
-    streamAbortController.abort(
-      requestAbortSignal.reason ?? new Error(abortErrorMessage),
-    );
-  };
-
-  requestAbortSignal.addEventListener("abort", onRequestAbort, {
-    once: true,
-  });
-
-  return () => {
-    requestAbortSignal.removeEventListener("abort", onRequestAbort);
-  };
+  // 现代组合方式：任一信号取消都会立即中止整条执行链路。
+  return AbortSignal.any([requestAbortSignal, internalAbortSignal]);
 };
 
 /**
@@ -184,7 +163,7 @@ const bridgeExternalAbortSignal = (
  * @param manifest 后端返回的下载清单。
  * @param saveTarget 归档输出目标。
  * @param onProgress 进度回调，用于更新下载与压缩进度。
- * @param abortOptions 可选中止参数，用于桥接外层 AbortSignal。
+ * @param abortOptions 可选中止参数，用于接入外层 AbortSignal 并与内部信号合并。
  * @returns IArchiveDownloadSession 可中止的下载会话。
  */
 export const downloadArchiveFromManifest = (
@@ -207,35 +186,19 @@ export const downloadArchiveFromManifest = (
 
   const writable = saveTarget.writable;
 
-  // ── 第一步：创建内部取消控制器，并与上层信号桥接 ─────────────────────
+  // ── 第一步：创建内部取消控制器，并与上层信号合成为统一取消源 ───────────
   // 这样组件层点击 Abort 后，fetch/reader/writable 都能收到同一取消信号。
   const streamAbortController = new AbortController();
-  const streamAbortSignal = streamAbortController.signal;
-  const removeRequestAbortListener = bridgeExternalAbortSignal(
+  const streamAbortSignal = composeAbortSignal(
     abortOptions?.requestAbortSignal,
-    streamAbortController,
-    ABORT_ERROR_MESSAGE,
+    streamAbortController.signal,
   );
 
   let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   let hasWritableClosed = false;
   let hasWritableAborted = false;
 
-  const getAbortError = (): Error => {
-    const abortReason = streamAbortSignal.reason;
-    if (abortReason instanceof Error) {
-      return abortReason;
-    }
-    return new Error(ABORT_ERROR_MESSAGE);
-  };
-
   const isStreamAborted = () => streamAbortSignal.aborted;
-
-  const throwIfStreamAborted = () => {
-    if (isStreamAborted()) {
-      throw getAbortError();
-    }
-  };
 
   // ── 第二步：创建进度发射器，统一管理节流与即时刷新逻辑 ───────────────
   // 组件无需关心节流细节，只订阅结构化进度对象即可。
@@ -336,7 +299,7 @@ export const downloadArchiveFromManifest = (
           try {
             // ── 第五步：遍历 manifest，逐文件下载并推送到 ZIP ────────────────
             for (const item of manifest.items) {
-              throwIfStreamAborted();
+              streamAbortSignal.throwIfAborted();
 
               // 第五步：每个文件开始时先通知当前处理项，提升 UI 可感知性。
               progressEmitter.emitProgress("downloading", item.relativePath);
@@ -360,7 +323,7 @@ export const downloadArchiveFromManifest = (
 
               if (!response.body) {
                 // 某些响应可能不暴露可读流，这里退化为一次性 arrayBuffer 读取。
-                throwIfStreamAborted();
+                streamAbortSignal.throwIfAborted();
 
                 const buffer = new Uint8Array(await response.arrayBuffer());
                 downloadedBytes += buffer.length;
@@ -374,7 +337,7 @@ export const downloadArchiveFromManifest = (
               try {
                 while (true) {
                   // 流式读取循环必须每轮检查取消，确保 Abort 能快速生效。
-                  throwIfStreamAborted();
+                  streamAbortSignal.throwIfAborted();
 
                   const { done, value } = await activeReader.read();
                   if (done) {
@@ -391,13 +354,13 @@ export const downloadArchiveFromManifest = (
                 activeReader = null;
               }
 
-              throwIfStreamAborted();
+              streamAbortSignal.throwIfAborted();
 
               entry.push(new Uint8Array(0), true);
               processedFiles += 1;
             }
 
-            throwIfStreamAborted();
+            streamAbortSignal.throwIfAborted();
             zip.end();
           } catch (error) {
             rejectOnce(error);
@@ -448,10 +411,6 @@ export const downloadArchiveFromManifest = (
     } finally {
       // ── 第八步：统一清理资源，避免组件卸载后仍存在延迟回调或事件监听 ───
       progressEmitter.cleanup();
-
-      if (removeRequestAbortListener) {
-        removeRequestAbortListener();
-      }
 
       activeReader = null;
     }
