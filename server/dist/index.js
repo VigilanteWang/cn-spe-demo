@@ -39,22 +39,23 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const restify = __importStar(require("restify")); // HTTP 服务框架
 require("./config"); // 加载环境变量配置 (副作用导入)
@@ -76,9 +77,21 @@ server.listen(process.env.port || process.env.PORT || 3001, () => {
 /**
  * server.pre 会在路由匹配前拦截每个请求。
  * 这里统一写入跨域响应头，让前端开发服务器可以访问本地后端。
+ *
+ * 安全内容：仅回显白名单内的 Origin，防止 CORS 头被任意域利用。
+ * 兼容对齐：通过 CORS_ALLOWED_ORIGINS 环境变量配置，默认允许 http://localhost:3000。
  */
+// 读取允许的跨域来源列表（逗号分隔），默认允许 Vite 开发服务器的地址。
+const ALLOWED_ORIGINS = new Set((process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean));
 server.pre((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", req.header("origin"));
+    const origin = req.header("origin") ?? "";
+    // 仅回显白名单中的 Origin，防止 CORS 头被任意域利用。
+    if (ALLOWED_ORIGINS.has(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
     res.header("Access-Control-Allow-Headers", req.header("Access-Control-Request-Headers"));
     res.header("Access-Control-Allow-Credentials", "true");
     /** 直接应答 OPTIONS 预检请求，避免进入路由处理。 */
@@ -104,15 +117,16 @@ server.pre((req, res, next) => {
  * - 路由文件保持薄，容易快速浏览所有接口
  * - 业务逻辑集中在单独模块里，更容易测试和复用
  */
-server.get("/api/listContainers", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+server.get("/api/listContainers", async (req, res, next) => {
     try {
-        yield (0, listContainers_1.listContainers)(req, res);
+        await (0, listContainers_1.listContainers)(req, res);
     }
     catch (error) {
-        res.send(500, { message: `Error in API server: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Error in API server: ${msg}` });
     }
     next();
-}));
+});
 /**
  * POST /api/createContainer 路由
  *
@@ -128,15 +142,16 @@ server.get("/api/listContainers", (req, res, next) => __awaiter(void 0, void 0, 
  * 对初级开发者来说，可以把这里理解为 controller，
  * createContainer 则更接近 service 层或 use-case 层。
  */
-server.post("/api/createContainer", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+server.post("/api/createContainer", async (req, res, next) => {
     try {
-        yield (0, createContainer_1.createContainer)(req, res);
+        await (0, createContainer_1.createContainer)(req, res);
     }
     catch (error) {
-        res.send(500, { message: `Error in API server: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Error in API server: ${msg}` });
     }
     next();
-}));
+});
 // ── 批量删除项目 ────────────────────────────────────────────────────────────
 /**
  * POST /api/deleteItems
@@ -158,10 +173,9 @@ server.post("/api/createContainer", (req, res, next) => __awaiter(void 0, void 0
  * 而是返回 successful/failed 两个集合。这样前端可以更友好地提示用户：
  * 哪些项已删除，哪些项失败，以及失败原因是什么。
  */
-server.post("/api/deleteItems", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+server.post("/api/deleteItems", async (req, res, next) => {
     try {
-        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        const authResult = await (0, auth_1.authorizeContainerManageRequest)(req);
         if (!authResult.ok) {
             res.send(authResult.status, authResult.body);
             return next();
@@ -173,29 +187,30 @@ server.post("/api/deleteItems", (req, res, next) => __awaiter(void 0, void 0, vo
             });
             return next();
         }
-        const graphToken = yield (0, auth_1.getGraphToken)(authResult.token);
+        const graphToken = await (0, auth_1.getGraphToken)(authResult.token);
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
         const successful = [];
         const failed = [];
         /** 顺序删除以降低 Microsoft Graph 节流风险。 */
         for (const itemId of itemIds) {
             try {
-                yield graphClient
+                await graphClient
                     .api(`/drives/${containerId}/items/${itemId}`)
                     .delete();
                 successful.push(itemId);
             }
             catch (err) {
-                failed.push({ id: itemId, reason: (_a = err.message) !== null && _a !== void 0 ? _a : "Unknown error" });
+                failed.push({ id: itemId, reason: err instanceof Error ? err.message : String(err) });
             }
         }
         res.send(200, { successful, failed });
     }
     catch (error) {
-        res.send(500, { message: `Error in deleteItems: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Error in deleteItems: ${msg}` });
     }
     next();
-}));
+});
 // ── 归档下载：启动任务 ──────────────────────────────────────────────────────
 /**
  * POST /api/downloadArchive/start
@@ -211,10 +226,9 @@ server.post("/api/deleteItems", (req, res, next) => __awaiter(void 0, void 0, vo
  * - 前端用它轮询准备进度
  * - 准备完成后通过 manifest 接口获取下载清单
  */
-server.post("/api/downloadArchive/start", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b;
+server.post("/api/downloadArchive/start", async (req, res, next) => {
     try {
-        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        const authResult = await (0, auth_1.authorizeContainerManageRequest)(req);
         if (!authResult.ok) {
             res.send(authResult.status, authResult.body);
             return next();
@@ -226,14 +240,15 @@ server.post("/api/downloadArchive/start", (req, res, next) => __awaiter(void 0, 
             });
             return next();
         }
-        const jobId = yield (0, downloadArchive_1.startDownloadJob)(containerId, itemIds, authResult.token, (_b = authResult.claims.oid) !== null && _b !== void 0 ? _b : "");
+        const jobId = await (0, downloadArchive_1.startDownloadJob)(containerId, itemIds, authResult.token, authResult.claims.oid ?? "");
         res.send(200, { jobId });
     }
     catch (error) {
-        res.send(500, { message: `Error starting archive job: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Error starting archive job: ${msg}` });
     }
     next();
-}));
+});
 // ── 归档下载：查询进度 ─────────────────────────────────────────────────────
 /**
  * GET /api/downloadArchive/progress/:jobId
@@ -248,16 +263,15 @@ server.post("/api/downloadArchive/start", (req, res, next) => __awaiter(void 0, 
  * - jobId 本身无效
  * - 任务已经过期并从内存中清理掉
  */
-server.get("/api/downloadArchive/progress/:jobId", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _c;
+server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
     try {
-        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        const authResult = await (0, auth_1.authorizeContainerManageRequest)(req);
         if (!authResult.ok) {
             res.send(authResult.status, authResult.body);
             return next();
         }
         const { jobId } = req.params;
-        const requesterOid = (_c = authResult.claims.oid) !== null && _c !== void 0 ? _c : "";
+        const requesterOid = authResult.claims.oid ?? "";
         const progress = (0, downloadArchive_1.getJobProgress)(jobId, requesterOid);
         if (!progress) {
             res.send(404, { message: "Job not found, expired, or access denied." });
@@ -266,10 +280,11 @@ server.get("/api/downloadArchive/progress/:jobId", (req, res, next) => __awaiter
         res.send(200, progress);
     }
     catch (error) {
-        res.send(500, { message: `Error fetching progress: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Error fetching progress: ${msg}` });
     }
     next();
-}));
+});
 // ── 归档下载：获取文件清单 ──────────────────────────────────────────────────
 /**
  * GET /api/downloadArchive/manifest/:jobId
@@ -277,16 +292,15 @@ server.get("/api/downloadArchive/progress/:jobId", (req, res, next) => __awaiter
  * 这个接口用于在任务准备完成后返回清单（manifest）。
  * 后端会继续校验任务所有权，确保只有创建任务的用户能读取清单。
  */
-server.get("/api/downloadArchive/manifest/:jobId", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _d;
+server.get("/api/downloadArchive/manifest/:jobId", async (req, res, next) => {
     try {
-        const authResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+        const authResult = await (0, auth_1.authorizeContainerManageRequest)(req);
         if (!authResult.ok) {
             res.send(authResult.status, authResult.body);
             return next();
         }
         const { jobId } = req.params;
-        const requesterOid = (_d = authResult.claims.oid) !== null && _d !== void 0 ? _d : "";
+        const requesterOid = authResult.claims.oid ?? "";
         const progress = (0, downloadArchive_1.getJobProgress)(jobId, requesterOid);
         if (!progress) {
             res.send(404, { message: "Job not found, expired, or access denied." });
@@ -306,10 +320,11 @@ server.get("/api/downloadArchive/manifest/:jobId", (req, res, next) => __awaiter
         res.send(200, manifest);
     }
     catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
         res.send(500, {
-            message: `Error fetching archive manifest: ${error.message}`,
+            message: `Error fetching archive manifest: ${msg}`,
         });
     }
     next();
-}));
+});
 //# sourceMappingURL=index.js.map

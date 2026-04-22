@@ -111,7 +111,7 @@ export default class SpEmbedded {
         });
         console.log(`Reusing token: ${accessToken}`);
         return accessToken;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error getting token from global provider", error);
         return null;
       }
@@ -247,8 +247,8 @@ export default class SpEmbedded {
    * 启动归档下载准备任务
    *
    * 后端会异步展开目录并生成下载清单（manifest），
-    * 真正的 ZIP 压缩由前端 archiveDownloader 模块中的
-    * downloadArchiveFromManifest() 负责流式完成。
+   * 真正的 ZIP 压缩由前端 archiveDownloader 模块中的
+   * downloadArchiveFromManifest() 负责流式完成。
    * 返回 jobId 后需要轮询 getArchivePreparationProgress() 查看进度。
    *
    * @param containerId 容器 ID（即 Drive ID）
@@ -260,7 +260,7 @@ export default class SpEmbedded {
    * 1. startDownloadArchive() → 获取 jobId
    * 2. 轮询 getArchivePreparationProgress(jobId) → 等待 status === "ready"
    * 3. 调用 getDownloadManifest(jobId) 获取后端准备好的文件清单
-  * 4. 调用 archiveDownloader.downloadArchiveFromManifest() 在前端流式下载并压缩
+   * 4. 调用 archiveDownloader.downloadArchiveFromManifest() 在前端流式下载并压缩
    **/
   async startDownloadArchive(
     containerId: string,

@@ -101,6 +101,18 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
+/**
+ * Graph 客户端最小操作接口。
+ * 直接导入 @microsoft/microsoft-graph-client 的 Client 类型会与 @microsoft/mgt-element
+ * 内部捆绑的同名类型冲突（private 字段声明不同），因此这里用结构化接口描述
+ * createFolderIfNotExists 实际需要的操作，既类型安全又无跨包兼容问题。
+ */
+interface IGraphApiClient {
+  api(path: string): {
+    get(): Promise<{ value: DriveItem[] }>;
+    post(data: object): Promise<DriveItem>;
+  };
+}
 import {
   IArchiveClientProgress,
   IArchiveSaveTarget,
@@ -110,7 +122,7 @@ import {
 import Preview from "./preview";
 import SpEmbedded, { IJobProgress } from "../services/spembedded";
 import { downloadArchiveFromManifest } from "../services/archiveDownloader";
-require("isomorphic-fetch");
+// Node 18+ 内置 fetch，浏览器也内置 fetch；无需 isomorphic-fetch polyfill
 
 /** SpEmbedded 服务实例（全局单例），用于调用后端 API（删除、下载归档） */
 const spEmbedded = new SpEmbedded();
@@ -599,8 +611,10 @@ export const Files = (props: IFilesProps) => {
 
         // 更新当前文件夹 ID。
         setFolderId(driveItemId);
-      } catch (error: any) {
-        console.error(`Failed to load items: ${error.message}`);
+      } catch (error: unknown) {
+        console.error(
+          `Failed to load items: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
@@ -669,14 +683,15 @@ export const Files = (props: IFilesProps) => {
        * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互（如点击或按键）触发
        * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。*/
       saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
           errorMessage:
+            err instanceof Error &&
             err.message === "Download cancelled by user."
               ? "Download cancelled."
-              : `Failed to open save dialog: ${err.message}`,
+              : `Failed to open save dialog: ${err instanceof Error ? err.message : String(err)}`,
         }),
       );
       return;
@@ -739,7 +754,7 @@ export const Files = (props: IFilesProps) => {
         itemIds,
         { requestAbortSignal: downloadAbortSignal },
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 如果错误是因为用户主动取消（signal.aborted），则静默退出，不展示错误 UI。
       if (downloadAbortSignal.aborted) {
         return;
@@ -748,7 +763,7 @@ export const Files = (props: IFilesProps) => {
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
-          errorMessage: `Failed to start download: ${err.message}`,
+          errorMessage: `Failed to start download: ${err instanceof Error ? err.message : String(err)}`,
         }),
       );
       if (downloadAbortControllerRef.current === runController) {
@@ -893,7 +908,7 @@ export const Files = (props: IFilesProps) => {
           }
         }
         // 分支 C（隐式）：status 仍为 "pending"/"processing"，什么都不做，等下一次轮询。
-      } catch (err: any) {
+      } catch (err: unknown) {
         // ── 异常处理：轮询或下载过程中抛出未预期的错误 ──────────────────────
         // 例如：网络中断、服务器 500、流式写入失败等。
         clearInterval(downloadPollRef.current!);
@@ -904,7 +919,7 @@ export const Files = (props: IFilesProps) => {
           setDownloadProgress(
             createDownloadProgressState({
               phase: "failed",
-              errorMessage: `Download failed: ${err.message}`,
+              errorMessage: `Download failed: ${err instanceof Error ? err.message : String(err)}`,
             }),
           );
         }
@@ -952,8 +967,11 @@ export const Files = (props: IFilesProps) => {
           result.failed.map((f) => `${f.id}: ${f.reason}`).join(", "),
         );
       }
-    } catch (err: any) {
-      console.error("Delete failed:", err.message);
+    } catch (err: unknown) {
+      console.error(
+        "Delete failed:",
+        err instanceof Error ? err.message : String(err),
+      );
     }
     await loadItems(currentFolderId);
     setDeleteDialogOpen(false);
@@ -1114,13 +1132,13 @@ export const Files = (props: IFilesProps) => {
           ...prev,
           successfulFiles: prev.successfulFiles + 1,
         }));
-      } catch (error: any) {
+      } catch (error: unknown) {
         setUploadProgress((prev) => ({
           ...prev,
           failedFiles: prev.failedFiles + 1,
         }));
         console.error(
-          `Failed to upload file ${relativePath}: ${error.message}`,
+          `Failed to upload file ${relativePath}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -1154,7 +1172,7 @@ export const Files = (props: IFilesProps) => {
    * @returns 文件夹 ID（已存在则返回现有 ID，否则返回新创建的 ID）。
    */
   const createFolderIfNotExists = async (
-    graphClient: any,
+    graphClient: IGraphApiClient,
     parentId: string,
     folderName: string,
   ): Promise<string> => {
@@ -1163,12 +1181,12 @@ export const Files = (props: IFilesProps) => {
       const endpoint = `/drives/${props.container.id}/items/${parentId}/children`;
       const response = await graphClient.api(endpoint).get();
 
-      const existingFolder = response.value.find(
-        (item: any) => item.folder && item.name === folderName,
+      const existingFolder = (response.value as DriveItem[]).find(
+        (item) => item.folder !== undefined && item.name === folderName,
       );
 
       if (existingFolder) {
-        return existingFolder.id;
+        return existingFolder.id as string;
       }
 
       // 若不存在则创建。
@@ -1179,9 +1197,10 @@ export const Files = (props: IFilesProps) => {
         "@microsoft.graph.conflictBehavior": "rename",
       };
       const newFolder = await graphClient.api(createEndpoint).post(data);
-      return newFolder.id;
-    } catch (error: any) {
-      console.error(`Failed to create folder ${folderName}: ${error.message}`);
+      return newFolder.id as string;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to create folder ${folderName}: ${msg}`);
       throw error;
     }
   };
@@ -1272,8 +1291,11 @@ export const Files = (props: IFilesProps) => {
         await spEmbedded.deleteItems(props.container.id, [
           currentPreviewFile.id as string,
         ]);
-      } catch (err: any) {
-        console.error("Preview delete failed:", err.message);
+      } catch (err: unknown) {
+        console.error(
+          "Preview delete failed:",
+          err instanceof Error ? err.message : String(err),
+        );
       }
       await loadItems(currentFolderId);
       setPreviewOpen(false);
@@ -1399,16 +1421,14 @@ export const Files = (props: IFilesProps) => {
         style={{ display: "none" }}
       />
       {/*
-        隐藏的文件夹上传 input：使用 webkitdirectory 属性允许选择整个文件夹，
-        因为 webkitdirectory 不是标准属性，TypeScript 可能会报错，
-        所以使用类型断言 any 绕过 (其实可以扩展interface)。
-        通过对象展开的方式注入属性。在某些 React 版本中，直接在组件上写未知的非标准属性可能会被 React 过滤掉。
-        通过展开对象的方式，可以确保属性最终成功挂载到真实的 DOM 元素上
+        隐藏的文件夹上传 input：使用 webkitdirectory 属性允许选择整个文件夹。
+        该属性已在 src/global.d.ts 中通过声明合并扩展 InputHTMLAttributes，
+        因此可直接使用而无需 as any 绕过类型检查。
       */}
       <input
         ref={uploadFolderRef}
         type="file"
-        {...({ webkitdirectory: "" } as any)}
+        webkitdirectory=""
         multiple
         onChange={onUploadFolderSelected}
         style={{ display: "none" }}

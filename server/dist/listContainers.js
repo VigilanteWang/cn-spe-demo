@@ -12,15 +12,6 @@
  * 3. 按服务端配置过滤出当前应用关心的容器类型。
  * 4. 把结果或错误转换成 HTTP 响应。
  */
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listContainers = void 0;
 const auth_1 = require("./auth");
@@ -34,23 +25,23 @@ const config_1 = require("./config");
  * @param res Restify 响应对象。用于返回容器列表或错误信息。
  * @returns Promise<void>
  */
-const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const listContainers = async (req, res) => {
     /** 先做权限校验，避免未授权请求访问下游服务。 */
-    const authorizationResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+    const authorizationResult = await (0, auth_1.authorizeContainerManageRequest)(req);
     if (!authorizationResult.ok) {
         res.send(authorizationResult.status, authorizationResult.body);
         return;
     }
     try {
         /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
-        const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
+        const graphToken = await (0, auth_1.getGraphToken)(authorizationResult.token);
         /** Graph 客户端负责封装认证和请求链式调用。 */
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
         /**
          * 只返回当前应用所属的容器类型。
          * 这里在 Graph 层过滤，能减少无关数据返回到服务端。
          */
-        const graphResponse = yield graphClient
+        const graphResponse = await graphClient
             .api("/storage/fileStorage/containers")
             .version("v1.0")
             .filter(`containerTypeId eq ${config_1.serverConfig.containerTypeId}`)
@@ -59,9 +50,10 @@ const listContainers = (req, res) => __awaiter(void 0, void 0, void 0, function*
         return;
     }
     catch (error) {
-        res.send(500, { message: `Unable to list containers: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Unable to list containers: ${msg}` });
         return;
     }
-});
+};
 exports.listContainers = listContainers;
 //# sourceMappingURL=listContainers.js.map

@@ -42,7 +42,7 @@ import {
 } from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import { Request } from "restify";
-require("isomorphic-fetch");
+// Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
 import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
@@ -503,12 +503,13 @@ export const authorizeContainerManageRequest = async (
       token,
       claims,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     /** 任何验证异常都统一转为 401，避免向客户端泄露内部信息。 */
+    const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       status: 401,
-      body: { message: `Invalid access token: ${error.message}` },
+      body: { message: `Invalid access token: ${message}` },
     };
   }
 };
@@ -561,10 +562,9 @@ export const getGraphToken = async (token: string): Promise<string> => {
     ))!.accessToken;
 
     return oboGraphToken;
-  } catch (error: any) {
-    throw new Error(
-      `Unable to generate Microsoft Graph OBO token: ${error.message}`,
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to generate Microsoft Graph OBO token: ${message}`);
   }
 };
 

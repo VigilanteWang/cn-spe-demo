@@ -12,15 +12,6 @@
  * 3. 使用服务端配置补全安全字段。
  * 4. 调用 Graph 创建容器并返回结果。
  */
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createContainer = void 0;
 const auth_1 = require("./auth");
@@ -35,17 +26,16 @@ const config_1 = require("./config");
  * @param res Restify 响应对象。用于返回创建结果或错误信息。
  * @returns Promise<void>
  */
-const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const createContainer = async (req, res) => {
     /** 所有创建操作都先经过统一权限校验。 */
-    const authorizationResult = yield (0, auth_1.authorizeContainerManageRequest)(req);
+    const authorizationResult = await (0, auth_1.authorizeContainerManageRequest)(req);
     if (!authorizationResult.ok) {
         res.send(authorizationResult.status, authorizationResult.body);
         return;
     }
     try {
         /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
-        const graphToken = yield (0, auth_1.getGraphToken)(authorizationResult.token);
+        const graphToken = await (0, auth_1.getGraphToken)(authorizationResult.token);
         /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
         const graphClient = (0, auth_1.createGraphClient)(graphToken);
         /**
@@ -54,10 +44,10 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
          */
         const containerRequestData = {
             displayName: req.body.displayName,
-            description: ((_a = req.body) === null || _a === void 0 ? void 0 : _a.description) ? req.body.description : "",
+            description: req.body?.description ? req.body.description : "",
             containerTypeId: config_1.serverConfig.containerTypeId,
         };
-        const graphResponse = yield graphClient
+        const graphResponse = await graphClient
             .api("/storage/fileStorage/containers")
             .version("v1.0")
             .post(containerRequestData);
@@ -65,9 +55,10 @@ const createContainer = (req, res) => __awaiter(void 0, void 0, void 0, function
         return;
     }
     catch (error) {
-        res.send(500, { message: `Failed to create container: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        res.send(500, { message: `Failed to create container: ${msg}` });
         return;
     }
-});
+};
 exports.createContainer = createContainer;
 //# sourceMappingURL=createContainer.js.map

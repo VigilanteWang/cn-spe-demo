@@ -1,1 +1,17 @@
-{}
+{
+  // TypeScript：优先使用项目本地的 typescript 包，避免版本不一致导致类型报错
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // 保存时自动修复 ESLint 可修复项
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // 默认格式化工具使用 Prettier
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+
+  // 在 .ts / .tsx 文件中隐藏干扰性的导入提示
+  "typescript.preferences.importModuleSpecifier": "relative"
+}

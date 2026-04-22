@@ -38,6 +38,16 @@ import {
   getGraphToken,
 } from "./auth";
 
+/**
+ * Handler 风格说明（重要）
+ *
+ * 从 Restify 9+ 开始，框架区分两种处理器风格：
+ * - async/Promise 风格：处理器签名为 `(req, res)` 并返回 Promise（或使用 `async`），框架会等待 Promise 完成并自动捕获未处理的拒绝；在该风格下**不要**接收或调用 `next()`。
+ * - callback 风格：处理器签名为 `(req, res, next)`，通过显式调用 `next()` / `next(err)` / `next(false)` 来推进或终止链式执行。
+ *
+ * 因此请确保路由处理器的参数个数与使用方式一致，避免 `async (req, res, next)` 这类混合写法，会触发 Restify 的运行期断言。
+ */
+
 // ─── 服务器初始化 ────────────────────────────────────────────────────────────
 
 /** 创建 Restify 服务器实例。 */
@@ -60,9 +70,25 @@ server.listen(process.env.port || process.env.PORT || 3001, () => {
 /**
  * server.pre 会在路由匹配前拦截每个请求。
  * 这里统一写入跨域响应头，让前端开发服务器可以访问本地后端。
+ *
+ * 安全内容：仅回显白名单内的 Origin，防止 CORS 头被任意域利用。
+ * 兼容对齐：通过 CORS_ALLOWED_ORIGINS 环境变量配置，默认允许 http://localhost:3000。
  */
+
+// 读取允许的跨域来源列表（逗号分隔），默认允许 Vite 开发服务器的地址。
+const ALLOWED_ORIGINS = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+
 server.pre((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.header("origin"));
+  const origin = req.header("origin") ?? "";
+  // 仅回显白名单中的 Origin，防止 CORS 头被任意域利用。
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header(
     "Access-Control-Allow-Headers",
     req.header("Access-Control-Request-Headers"),
@@ -88,19 +114,19 @@ server.pre((req, res, next) => {
  * 1. 接收 HTTP 请求
  * 2. 调用业务函数
  * 3. 如果业务函数抛错，则统一转换成 500 响应
- * 4. 调用 next() 结束当前 Restify 路由处理流程
+ * 4. 在 async 处理器中不要调用 `next()`；请使用 `async (req, res)` 或非 async 的 `function(req, res, next)` 两类风格之一
  *
  * 这种分层方式的好处是：
  * - 路由文件保持薄，容易快速浏览所有接口
  * - 业务逻辑集中在单独模块里，更容易测试和复用
  */
-server.get("/api/listContainers", async (req, res, next) => {
+server.get("/api/listContainers", async (req, res) => {
   try {
     await listContainers(req, res);
-  } catch (error: any) {
-    res.send(500, { message: `Error in API server: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error in API server: ${msg}` });
   }
-  next();
 });
 
 /**
@@ -113,18 +139,18 @@ server.get("/api/listContainers", async (req, res, next) => {
  * 1. 从客户端接收创建请求
  * 2. 调用 createContainer 模块执行业务逻辑
  * 3. 如果底层实现抛错，则返回 500，避免请求无响应
- * 4. 调用 next()，让 Restify 完成这次请求生命周期
+ * 4. 在 async 处理器中不要调用 `next()`；请使用 `async (req, res)` 或非 async 的 `function(req, res, next)` 两类风格之一
  *
  * 对初级开发者来说，可以把这里理解为 controller，
  * createContainer 则更接近 service 层或 use-case 层。
  */
-server.post("/api/createContainer", async (req, res, next) => {
+server.post("/api/createContainer", async (req, res) => {
   try {
     await createContainer(req, res);
-  } catch (error: any) {
-    res.send(500, { message: `Error in API server: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error in API server: ${msg}` });
   }
-  next();
 });
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────
@@ -148,12 +174,12 @@ server.post("/api/createContainer", async (req, res, next) => {
  * 而是返回 successful/failed 两个集合。这样前端可以更友好地提示用户：
  * 哪些项已删除，哪些项失败，以及失败原因是什么。
  */
-server.post("/api/deleteItems", async (req, res, next) => {
+server.post("/api/deleteItems", async (req, res) => {
   try {
     const authResult = await authorizeContainerManageRequest(req);
     if (!authResult.ok) {
       res.send(authResult.status, authResult.body);
-      return next();
+      return;
     }
 
     const { containerId, itemIds } = req.body as {
@@ -165,7 +191,7 @@ server.post("/api/deleteItems", async (req, res, next) => {
       res.send(400, {
         message: "containerId and a non-empty itemIds array are required.",
       });
-      return next();
+      return;
     }
 
     const graphToken = await getGraphToken(authResult.token);
@@ -181,16 +207,19 @@ server.post("/api/deleteItems", async (req, res, next) => {
           .api(`/drives/${containerId}/items/${itemId}`)
           .delete();
         successful.push(itemId);
-      } catch (err: any) {
-        failed.push({ id: itemId, reason: err.message ?? "Unknown error" });
+      } catch (err: unknown) {
+        failed.push({
+          id: itemId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
     res.send(200, { successful, failed });
-  } catch (error: any) {
-    res.send(500, { message: `Error in deleteItems: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error in deleteItems: ${msg}` });
   }
-  next();
 });
 
 // ── 归档下载：启动任务 ──────────────────────────────────────────────────────
@@ -208,12 +237,12 @@ server.post("/api/deleteItems", async (req, res, next) => {
  * - 前端用它轮询准备进度
  * - 准备完成后通过 manifest 接口获取下载清单
  */
-server.post("/api/downloadArchive/start", async (req, res, next) => {
+server.post("/api/downloadArchive/start", async (req, res) => {
   try {
     const authResult = await authorizeContainerManageRequest(req);
     if (!authResult.ok) {
       res.send(authResult.status, authResult.body);
-      return next();
+      return;
     }
 
     const { containerId, itemIds } = req.body as {
@@ -225,7 +254,7 @@ server.post("/api/downloadArchive/start", async (req, res, next) => {
       res.send(400, {
         message: "containerId and a non-empty itemIds array are required.",
       });
-      return next();
+      return;
     }
 
     const jobId = await startDownloadJob(
@@ -235,10 +264,10 @@ server.post("/api/downloadArchive/start", async (req, res, next) => {
       authResult.claims.oid ?? "",
     );
     res.send(200, { jobId });
-  } catch (error: any) {
-    res.send(500, { message: `Error starting archive job: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error starting archive job: ${msg}` });
   }
-  next();
 });
 
 // ── 归档下载：查询进度 ─────────────────────────────────────────────────────
@@ -255,12 +284,12 @@ server.post("/api/downloadArchive/start", async (req, res, next) => {
  * - jobId 本身无效
  * - 任务已经过期并从内存中清理掉
  */
-server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
+server.get("/api/downloadArchive/progress/:jobId", async (req, res) => {
   try {
     const authResult = await authorizeContainerManageRequest(req);
     if (!authResult.ok) {
       res.send(authResult.status, authResult.body);
-      return next();
+      return;
     }
 
     const { jobId } = req.params as { jobId: string };
@@ -268,13 +297,13 @@ server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
     const progress = getJobProgress(jobId, requesterOid);
     if (!progress) {
       res.send(404, { message: "Job not found, expired, or access denied." });
-      return next();
+      return;
     }
     res.send(200, progress);
-  } catch (error: any) {
-    res.send(500, { message: `Error fetching progress: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error fetching progress: ${msg}` });
   }
-  next();
 });
 
 // ── 归档下载：获取文件清单 ──────────────────────────────────────────────────
@@ -284,12 +313,12 @@ server.get("/api/downloadArchive/progress/:jobId", async (req, res, next) => {
  * 这个接口用于在任务准备完成后返回清单（manifest）。
  * 后端会继续校验任务所有权，确保只有创建任务的用户能读取清单。
  */
-server.get("/api/downloadArchive/manifest/:jobId", async (req, res, next) => {
+server.get("/api/downloadArchive/manifest/:jobId", async (req, res) => {
   try {
     const authResult = await authorizeContainerManageRequest(req);
     if (!authResult.ok) {
       res.send(authResult.status, authResult.body);
-      return next();
+      return;
     }
 
     const { jobId } = req.params as { jobId: string };
@@ -297,26 +326,26 @@ server.get("/api/downloadArchive/manifest/:jobId", async (req, res, next) => {
     const progress = getJobProgress(jobId, requesterOid);
     if (!progress) {
       res.send(404, { message: "Job not found, expired, or access denied." });
-      return next();
+      return;
     }
 
     if (progress.status !== "ready") {
       res.send(409, {
         message: `Archive manifest not ready yet. Status: ${progress.status}`,
       });
-      return next();
+      return;
     }
 
     const manifest = getJobManifest(jobId, requesterOid);
     if (!manifest) {
       res.send(404, { message: "Archive manifest not found." });
-      return next();
+      return;
     }
     res.send(200, manifest);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     res.send(500, {
-      message: `Error fetching archive manifest: ${error.message}`,
+      message: `Error fetching archive manifest: ${msg}`,
     });
   }
-  next();
 });

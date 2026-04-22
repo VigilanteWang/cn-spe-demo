@@ -367,10 +367,12 @@ async function processJob(
   let graphToken: string;
   try {
     graphToken = await getGraphToken(userToken);
-  } catch (err: any) {
+  } catch (err: unknown) {
     job.status = "failed";
     job.completedAt = Date.now();
-    job.errors.push(`Graph token error: ${err.message}`);
+    job.errors.push(
+      `Graph token error: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return;
   }
 
@@ -383,8 +385,10 @@ async function processJob(
   for (const itemId of itemIds) {
     try {
       await expandItem(graphClient, containerId, itemId, "", flatFiles);
-    } catch (err: any) {
-      job.errors.push(`Failed to expand item ${itemId}: ${err.message}`);
+    } catch (err: unknown) {
+      job.errors.push(
+        `Failed to expand item ${itemId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -452,8 +456,10 @@ async function processJob(
       preparedBytes += file.size;
       job.preparedBytes = preparedBytes;
       job.processedFiles = i + 1;
-    } catch (err: any) {
-      job.errors.push(`Error preparing ${file.relativePath}: ${err.message}`);
+    } catch (err: unknown) {
+      job.errors.push(
+        `Error preparing ${file.relativePath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

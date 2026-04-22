@@ -57,8 +57,9 @@ export const listContainers = async (req: Request, res: Response) => {
 
     res.send(200, graphResponse);
     return;
-  } catch (error: any) {
-    res.send(500, { message: `Unable to list containers: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Unable to list containers: ${msg}` });
     return;
   }
 };
