@@ -4,7 +4,7 @@
  * 本模块是前端与后端 API 之间的桥梁，负责：
  * 1. 从全局 MGT Provider 获取 API Access Token
  * 2. 调用后端 REST API 完成容器的增删查操作
- * 3. 管理 ZIP 归档下载的异步任务（启动、轮询进度、触发下载）
+ * 3. 管理 ZIP 归档准备任务（启动、轮询进度、获取清单）
  *
  * 核心概念：
  * - MGT (Microsoft Graph Toolkit): 微软提供的前端身份验证和 Graph API 组件库
@@ -30,11 +30,11 @@ import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { clientConfig } from "./../common/config";
 import * as Scopes from "./../common/scopes";
 import {
-  IArchiveClientProgress,
   IArchiveManifest,
+  IArchiveSaveTarget,
   IContainer,
+  IShowSaveFilePickerWindow,
 } from "../common/types";
-import { AsyncZipDeflate, Zip } from "fflate";
 
 /**
  * ZIP 归档任务的进度信息
@@ -53,52 +53,6 @@ export interface IJobProgress {
   preparedBytes: number; // 已准备字节（后端阶段）
   totalBytes: number; // 总字节（后端阶段）
   errors: string[]; // 错误信息列表（部分文件可能失败）
-}
-
-interface IShowSaveFilePickerWindow extends Window {
-  showSaveFilePicker?: (options?: {
-    suggestedName?: string;
-    types?: Array<{
-      description?: string;
-      accept: Record<string, string[]>;
-    }>;
-  }) => Promise<{
-    name?: string;
-    createWritable: () => Promise<{
-      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，
-      // 避免将 fflate 的 Uint8Array 误约束为 BlobPart 后触发类型不兼容。
-      write: (data: BufferSource | Blob | string) => Promise<void>;
-      close: () => Promise<void>;
-      abort: () => Promise<void>;
-    }>;
-  }>;
-}
-
-/**
- * 前端归档输出目标。
- *
- * 如果 writable 存在，表示已经在用户手势上下文中获取了磁盘写入流。
- * 如果 writable 为空，则回退到 Blob 下载模式。
- */
-export interface IArchiveSaveTarget {
-  filename: string;
-  writable: {
-    // 与上面的 window 声明保持一致，统一写入类型，避免调用点发生赋值冲突。
-    write: (data: BufferSource | Blob | string) => Promise<void>;
-    close: () => Promise<void>;
-    abort: () => Promise<void>;
-  } | null;
-}
-
-/**
- * 归档下载会话。
- *
- * - abort: 立即中止当前下载任务
- * - completion: 下载任务完成 Promise（成功完成或主动中止后结束）
- */
-export interface IArchiveDownloadSession {
-  abort: () => void;
-  completion: Promise<void>;
 }
 
 /** 可选请求参数：用于透传 AbortSignal 到 fetch，支持统一取消链路。 */
@@ -293,7 +247,8 @@ export default class SpEmbedded {
    * 启动归档下载准备任务
    *
    * 后端会异步展开目录并生成下载清单（manifest），
-   * 真正的 ZIP 压缩由前端在 downloadArchiveFromManifest() 中流式完成。
+    * 真正的 ZIP 压缩由前端 archiveDownloader 模块中的
+    * downloadArchiveFromManifest() 负责流式完成。
    * 返回 jobId 后需要轮询 getArchivePreparationProgress() 查看进度。
    *
    * @param containerId 容器 ID（即 Drive ID）
@@ -305,7 +260,7 @@ export default class SpEmbedded {
    * 1. startDownloadArchive() → 获取 jobId
    * 2. 轮询 getArchivePreparationProgress(jobId) → 等待 status === "ready"
    * 3. 调用 getDownloadManifest(jobId) 获取后端准备好的文件清单
-   * 4. 调用 downloadArchiveFromManifest() 在前端流式下载并压缩
+  * 4. 调用 archiveDownloader.downloadArchiveFromManifest() 在前端流式下载并压缩
    **/
   async startDownloadArchive(
     containerId: string,
@@ -424,359 +379,5 @@ export default class SpEmbedded {
       }
       throw error;
     }
-  }
-
-  /**
-   * 在前端流式下载并压缩归档，完成后自动触发浏览器下载。
-   *
-   * 该实现会边读取远程文件流边推入 ZIP 压缩器，避免把每个文件完整加载到内存中。
-   * 在支持 File System Access API 的浏览器中，ZIP 输出会直接写入磁盘流，进一步降低内存峰值。
-   *
-   * @param manifest 后端返回的下载清单。
-   * @param saveTarget 归档输出目标。
-   * @param onProgress 进度回调，用于更新下载与压缩进度。
-   * @returns IArchiveDownloadSession 可中止的下载会话。
-   **/
-  downloadArchiveFromManifest(
-    manifest: IArchiveManifest,
-    saveTarget: IArchiveSaveTarget,
-    onProgress: (progress: IArchiveClientProgress) => void,
-    abortOptions?: IAbortRequestOptions,
-  ): IArchiveDownloadSession {
-    const totalFiles = manifest.totalFiles;
-    const totalBytes = manifest.totalBytes;
-    const ABORT_ERROR_MESSAGE = "Archive download aborted.";
-
-    let downloadedBytes = 0;
-    let zippedBytes = 0;
-    let processedFiles = 0;
-    // Blob 构造参数要求的是稳定的二进制片段类型；这里统一收集 ArrayBuffer。
-    const fallbackChunks: ArrayBuffer[] = [];
-
-    const toArrayBuffer = (chunk: Uint8Array): ArrayBuffer => {
-      // 报错根因：fflate 回调中的 data 在类型上可能携带 ArrayBufferLike，
-      // 直接传入 write/Blob 时会与严格类型定义冲突；这里拷贝为标准 ArrayBuffer。
-      const copy = new Uint8Array(chunk.byteLength);
-      copy.set(chunk);
-      return copy.buffer;
-    };
-
-    const writable = saveTarget.writable;
-
-    const PROGRESS_EMIT_INTERVAL_MS = 1000;
-    let lastProgressEmitAt = 0;
-    let pendingProgress: IArchiveClientProgress | null = null;
-    let pendingProgressTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastCurrentItem = "";
-    // 统一使用内部控制器管理下载执行层取消，避免散落的布尔状态。
-    const streamAbortController = new AbortController();
-    const streamAbortSignal = streamAbortController.signal;
-    let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let hasWritableClosed = false;
-    let hasWritableAborted = false;
-    const requestAbortSignal = abortOptions?.requestAbortSignal;
-
-    const getAbortError = (): Error => {
-      const abortReason = streamAbortSignal.reason;
-      if (abortReason instanceof Error) {
-        return abortReason;
-      }
-      return new Error(ABORT_ERROR_MESSAGE);
-    };
-
-    const isStreamAborted = () => streamAbortSignal.aborted;
-
-    const throwIfStreamAborted = () => {
-      if (isStreamAborted()) {
-        throw getAbortError();
-      }
-    };
-
-    let removeRequestAbortListener: (() => void) | null = null;
-
-    // 上层若传入取消信号，这里桥接到内部控制器，统一执行层的取消来源。
-    if (requestAbortSignal) {
-      if (requestAbortSignal.aborted) {
-        streamAbortController.abort(
-          requestAbortSignal.reason ?? new Error(ABORT_ERROR_MESSAGE),
-        );
-      } else {
-        const onRequestAbort = () => {
-          streamAbortController.abort(
-            requestAbortSignal.reason ?? new Error(ABORT_ERROR_MESSAGE),
-          );
-        };
-        requestAbortSignal.addEventListener("abort", onRequestAbort, {
-          once: true,
-        });
-        removeRequestAbortListener = () => {
-          requestAbortSignal.removeEventListener("abort", onRequestAbort);
-        };
-      }
-    }
-
-    const flushProgress = () => {
-      if (!pendingProgress) {
-        return;
-      }
-      onProgress(pendingProgress);
-      pendingProgress = null;
-      lastProgressEmitAt = Date.now();
-    };
-
-    const emitProgress = (
-      stage: IArchiveClientProgress["stage"],
-      currentItem: string,
-      force = false,
-    ) => {
-      pendingProgress = {
-        stage,
-        totalFiles,
-        processedFiles,
-        totalBytes,
-        downloadedBytes,
-        zippedBytes,
-        currentItem,
-      };
-
-      const now = Date.now();
-      const itemChanged = currentItem !== lastCurrentItem;
-      lastCurrentItem = currentItem;
-
-      // 当前文件发生切换时立即刷新，避免用户观察到文件名延迟。
-      if (force || itemChanged) {
-        if (pendingProgressTimer) {
-          clearTimeout(pendingProgressTimer);
-          pendingProgressTimer = null;
-        }
-        flushProgress();
-        return;
-      }
-
-      const elapsed = now - lastProgressEmitAt;
-      if (elapsed >= PROGRESS_EMIT_INTERVAL_MS) {
-        if (pendingProgressTimer) {
-          clearTimeout(pendingProgressTimer);
-          pendingProgressTimer = null;
-        }
-        flushProgress();
-        return;
-      }
-
-      if (!pendingProgressTimer) {
-        pendingProgressTimer = setTimeout(() => {
-          pendingProgressTimer = null;
-          flushProgress();
-        }, PROGRESS_EMIT_INTERVAL_MS - elapsed);
-      }
-    };
-
-    const abort = () => {
-      if (isStreamAborted()) {
-        return;
-      }
-
-      streamAbortController.abort(new Error(ABORT_ERROR_MESSAGE));
-
-      if (pendingProgressTimer) {
-        clearTimeout(pendingProgressTimer);
-        pendingProgressTimer = null;
-      }
-
-      if (activeReader) {
-        void activeReader.cancel().catch((error) => {
-          console.error("Reader cancel error:", error);
-        });
-        activeReader = null;
-      }
-
-      if (writable && !hasWritableClosed && !hasWritableAborted) {
-        hasWritableAborted = true;
-        void writable.abort().catch((error) => {
-          console.error("Writable abort error:", error);
-        });
-      }
-    };
-
-    let writeChain: Promise<void> = Promise.resolve();
-
-    const completion = (async () => {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          let isSettled = false;
-
-          const resolveOnce = () => {
-            if (isSettled) {
-              return;
-            }
-            isSettled = true;
-            resolve();
-          };
-
-          const rejectOnce = (error: unknown) => {
-            if (isSettled) {
-              return;
-            }
-            isSettled = true;
-            reject(error);
-          };
-
-          const zip = new Zip((error, data, final) => {
-            if (error) {
-              if (!isStreamAborted()) {
-                rejectOnce(error);
-              }
-              return;
-            }
-
-            if (isStreamAborted()) {
-              return;
-            }
-
-            writeChain = writeChain
-              .then(async () => {
-                zippedBytes += data.length;
-                if (writable) {
-                  // 先转成标准 ArrayBuffer，再写入磁盘流，规避 Uint8Array 泛型缓冲区差异。
-                  await writable.write(toArrayBuffer(data));
-                } else {
-                  // 回退路径同样存放 ArrayBuffer，确保 new Blob(...) 的参数类型稳定。
-                  fallbackChunks.push(toArrayBuffer(data));
-                }
-              })
-              .catch(rejectOnce);
-
-            if (final) {
-              writeChain.then(resolveOnce).catch(rejectOnce);
-            }
-          });
-
-          const run = async () => {
-            try {
-              for (const item of manifest.items) {
-                throwIfStreamAborted();
-
-                emitProgress("downloading", item.relativePath);
-
-                const entry = new AsyncZipDeflate(item.relativePath, {
-                  level: 6,
-                });
-                zip.add(entry);
-
-                const response = await fetch(item.downloadUrl, {
-                  method: "GET",
-                  // 将统一的取消信号透传给 fetch，实现真正 I/O 级别中止。
-                  signal: streamAbortSignal,
-                });
-
-                if (!response.ok) {
-                  throw new Error(
-                    `Failed to download ${item.relativePath}. HTTP ${response.status}`,
-                  );
-                }
-
-                if (!response.body) {
-                  throwIfStreamAborted();
-
-                  const buffer = new Uint8Array(await response.arrayBuffer());
-                  downloadedBytes += buffer.length;
-                  emitProgress("downloading", item.relativePath);
-                  entry.push(buffer, true);
-                  processedFiles += 1;
-                  continue;
-                }
-
-                activeReader = response.body.getReader();
-                try {
-                  while (true) {
-                    // 流式读取循环必须每轮检查取消，确保 Abort 能快速生效。
-                    throwIfStreamAborted();
-
-                    const { done, value } = await activeReader.read();
-                    if (done) {
-                      break;
-                    }
-
-                    if (value) {
-                      downloadedBytes += value.length;
-                      emitProgress("downloading", item.relativePath);
-                      entry.push(value, false);
-                    }
-                  }
-                } finally {
-                  activeReader = null;
-                }
-
-                throwIfStreamAborted();
-
-                entry.push(new Uint8Array(0), true);
-                processedFiles += 1;
-              }
-
-              throwIfStreamAborted();
-
-              zip.end();
-            } catch (error) {
-              rejectOnce(error);
-            }
-          };
-
-          void run();
-        });
-
-        if (isStreamAborted()) {
-          return;
-        }
-
-        if (writable) {
-          await writable.close();
-          hasWritableClosed = true;
-        } else {
-          const zipBlob = new Blob(fallbackChunks, { type: "application/zip" });
-          const blobUrl = URL.createObjectURL(zipBlob);
-          const anchor = document.createElement("a");
-          anchor.href = blobUrl;
-          anchor.download = saveTarget.filename;
-          anchor.style.display = "none";
-          document.body.appendChild(anchor);
-          anchor.click();
-          document.body.removeChild(anchor);
-          URL.revokeObjectURL(blobUrl);
-        }
-
-        emitProgress("done", "", true);
-      } catch (error: unknown) {
-        if (isStreamAborted()) {
-          return;
-        }
-
-        if (writable && !hasWritableClosed && !hasWritableAborted) {
-          hasWritableAborted = true;
-          await writable.abort().catch((abortError) => {
-            console.error("Writable abort error:", abortError);
-          });
-        }
-
-        throw error;
-      } finally {
-        // 清理节流定时器，避免组件卸载后仍有延迟回调。
-        if (pendingProgressTimer) {
-          clearTimeout(pendingProgressTimer);
-          pendingProgressTimer = null;
-        }
-
-        if (removeRequestAbortListener) {
-          removeRequestAbortListener();
-          removeRequestAbortListener = null;
-        }
-
-        activeReader = null;
-      }
-    })();
-
-    return {
-      abort,
-      completion,
-    };
   }
 }

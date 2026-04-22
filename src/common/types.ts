@@ -83,3 +83,52 @@ export interface IArchiveClientProgress {
   zippedBytes: number;
   currentItem: string;
 }
+
+/**
+ * 浏览器 Window 扩展：支持 File System Access API 保存对话框。
+ */
+export interface IShowSaveFilePickerWindow extends Window {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    name?: string;
+    createWritable: () => Promise<{
+      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，
+      // 避免将 Uint8Array 误约束为 BlobPart 后触发类型不兼容。
+      write: (data: BufferSource | Blob | string) => Promise<void>;
+      close: () => Promise<void>;
+      abort: () => Promise<void>;
+    }>;
+  }>;
+}
+
+/**
+ * 前端归档输出目标。
+ *
+ * 如果 writable 存在，表示已经在用户手势上下文中获取了磁盘写入流。
+ * 如果 writable 为空，则回退到 Blob 下载模式。
+ */
+export interface IArchiveSaveTarget {
+  filename: string;
+  writable: {
+    // 与上面的 window 声明保持一致，统一写入类型，避免调用点发生赋值冲突。
+    write: (data: BufferSource | Blob | string) => Promise<void>;
+    close: () => Promise<void>;
+    abort: () => Promise<void>;
+  } | null;
+}
+
+/**
+ * 归档下载会话。
+ *
+ * - abort: 立即中止当前下载任务
+ * - completion: 下载任务完成 Promise（成功完成或主动中止后结束）
+ */
+export interface IArchiveDownloadSession {
+  abort: () => void;
+  completion: Promise<void>;
+}

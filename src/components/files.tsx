@@ -34,6 +34,8 @@
  * - startDownloadArchive()   → 启动 ZIP 归档任务
  * - getArchivePreparationProgress() → 轮询归档准备进度
  * - getDownloadManifest()    → 获取归档清单
+ *
+ * 前端归档模块调用（通过 archiveDownloader 模块）：
  * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
 
@@ -101,14 +103,13 @@ import {
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import {
   IArchiveClientProgress,
+  IArchiveSaveTarget,
   IContainer,
   IDriveItemExtended,
 } from "../common/types";
 import Preview from "./preview";
-import SpEmbedded, {
-  IArchiveSaveTarget,
-  IJobProgress,
-} from "../services/spembedded";
+import SpEmbedded, { IJobProgress } from "../services/spembedded";
+import { downloadArchiveFromManifest } from "../services/archiveDownloader";
 require("isomorphic-fetch");
 
 /** SpEmbedded 服务实例（全局单例），用于调用后端 API（删除、下载归档） */
@@ -823,7 +824,7 @@ export const Files = (props: IFilesProps) => {
           // 全部完成后直接保存到 finalSaveTarget 指定路径。
           // 第三个参数是进度回调（callback），每压缩完一个文件就会被调用一次，
           // 我们在这里把最新的客户端进度同步到 UI。
-          const downloadSession = spEmbedded.downloadArchiveFromManifest(
+          const downloadSession = downloadArchiveFromManifest(
             manifest,
             finalSaveTarget,
             (clientProgress) => {
