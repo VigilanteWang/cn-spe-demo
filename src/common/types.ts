@@ -98,8 +98,8 @@ export interface IShowSaveFilePickerWindow extends Window {
   }) => Promise<{
     name?: string;
     createWritable: () => Promise<{
-      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，https://whatpr.org/fs/1.html#api-filesystemwritablefilestream
-      // 避免将 fflate 输出的 Uint8Array 误约束为 BlobPart 的一种防御性写法，参考 docs\fix&refactor\arraybuffer-type-issue-notes.md
+      // 这里实现浏览器 FileSystemWritableFileStream.write 的参数，https://whatpr.org/fs/1.html#api-filesystemwritablefilestream
+      // ’BufferSource | Blob | string‘，避免将 fflate 输出的 Uint8Array 误约束为 BlobPart 的一种防御性写法，参考 docs\fix&refactor\arraybuffer-type-issue-notes.md
       write: (data: BufferSource | Blob | string) => Promise<void>;
       close: () => Promise<void>;
       abort: () => Promise<void>;
@@ -108,9 +108,9 @@ export interface IShowSaveFilePickerWindow extends Window {
 }
 
 /**
- * 前端归档后保存的文件。
+ * 前端归档后的zip文件。
  *
- * 如果 writable 存在，表示已经在用户手势上下文中获取了FileSystemWritableFileStream.write。
+ * 如果 writable 存在，表示已经在用户手势上下文中获取了文件写入器 FileSystemWritableFileStream.write。
  * 如果 writable 为 null，则回退到 Blob 下载模式。
  */
 export interface IArchiveSaveTarget {

@@ -20,7 +20,7 @@ import {
   IArchiveSaveTarget,
 } from "../common/types";
 
-/** 可选请求参数：用于透传 AbortSignal 到 fetch，支持统一取消链路。 */
+/** 可选请求参数：用于透传调用方 AbortSignal 到 fetch，支持统一取消链路。 */
 interface IAbortRequestOptions {
   requestAbortSignal?: AbortSignal;
 }
@@ -39,7 +39,7 @@ const toArrayBuffer = (chunk: Uint8Array): ArrayBuffer => {
 };
 
 /**
- * 创建进度事件发射器（带节流与文件切换即时刷新）。
+ * 创建进度发射器（带节流与文件切换即时刷新）。
  * @param totalFiles 总文件数。
  * @param totalBytes 总字节数。
  * @param getSnapshot 获取当前动态进度快照。
@@ -58,18 +58,24 @@ const createProgressEmitter = (
 ) => {
   // 节流周期：避免高频 setState 导致 React 渲染压力过大。
   const PROGRESS_EMIT_INTERVAL_MS = 1000;
+  // 记录上次真正触发 onProgress 回调的时间戳，用于计算是否应该立即发送还是等待节流。
   let lastProgressEmitAt = 0;
+  // 暂存最新的进度对象，可能被多次 emitProgress 更新，定时器触发时读取其最新值。
   let pendingProgress: IArchiveClientProgress | null = null;
+  // 定时器句柄，用于在回调执行时清除（避免多次触发）或取消（当检测到文件切换时）。
   let pendingProgressTimer: ReturnType<typeof setTimeout> | null = null;
+  // 记录上一次报告的文件名，用于检测当前文件是否发生切换（如从 file1.txt 变成 file2.txt）。
   let lastCurrentItem = "";
 
   const flushProgress = () => {
     if (!pendingProgress) {
       return;
     }
-    // 真正触发组件层回调的唯一出口，保证进度写入行为集中可控。
+    // 立即把当前缓存的进度对象交给外部回调。
+    // 这是唯一真正“发送进度”的地方，发送后会清空缓存，避免同一份进度被重复上报。
     onProgress(pendingProgress);
     pendingProgress = null;
+    // 更新发送时间戳，作为下一轮节流判断的基准点。
     lastProgressEmitAt = Date.now();
   };
 
@@ -78,8 +84,10 @@ const createProgressEmitter = (
     currentItem: string,
     force = false,
   ) => {
-    // 每次发射都重新抓取快照，确保 downloaded/zipped/processed 同步最新值。
+    // 重新读取当前快照，把最新的 downloaded / zipped / processed 数值打包成一个完整进度对象。
+    // 这样外部收到的进度总是自洽的，不会出现文件名和字节数来自不同时间点的情况。
     const snapshot = getSnapshot();
+    // 把这次生成的进度对象先放到 pendingProgress 中，后续定时器回调会读取它并统一发出。
     pendingProgress = {
       stage,
       totalFiles,
@@ -91,10 +99,13 @@ const createProgressEmitter = (
     };
 
     const now = Date.now();
+    // 对比当前文件名和上次文件名，判断是不是切到了新文件。
     const itemChanged = currentItem !== lastCurrentItem;
+    // 先记录本次文件名，方便下一次调用判断是否发生切换。
     lastCurrentItem = currentItem;
 
-    // 当前文件发生切换时立即刷新，避免用户观察到文件名延迟。
+    // 如果文件切换了，或者调用方要求强制发送，就立刻刷新进度。
+    // 这样 UI 能马上看到新文件名，不会被节流延迟影响。
     if (force || itemChanged) {
       if (pendingProgressTimer) {
         clearTimeout(pendingProgressTimer);
@@ -104,7 +115,9 @@ const createProgressEmitter = (
       return;
     }
 
+    // 计算距离上次真正发送已经过去多久，用于决定这次是立即发还是继续等。
     const elapsed = now - lastProgressEmitAt;
+    // 超过 1000ms 就直接发送；否则先缓存起来，等到节流窗口结束再统一发出。
     if (elapsed >= PROGRESS_EMIT_INTERVAL_MS) {
       if (pendingProgressTimer) {
         clearTimeout(pendingProgressTimer);
@@ -114,6 +127,8 @@ const createProgressEmitter = (
       return;
     }
 
+    // 如果还没有定时器，就安排一个延迟回调。
+    // 回调触发时会发送“当前最新”的 pendingProgress，所以中间多次更新会被合并。
     if (!pendingProgressTimer) {
       pendingProgressTimer = setTimeout(() => {
         pendingProgressTimer = null;
@@ -123,12 +138,13 @@ const createProgressEmitter = (
   };
 
   const cleanup = () => {
+    // 清理可能仍在等待中的定时器，避免卸载组件后仍有延迟回调执行。
     if (pendingProgressTimer) {
       clearTimeout(pendingProgressTimer);
       pendingProgressTimer = null;
     }
   };
-
+  // 返回一个进度更新函数和一个清理函数。
   return {
     emitProgress,
     cleanup,
@@ -149,19 +165,18 @@ const composeAbortSignal = (
   if (!requestAbortSignal) {
     return internalAbortSignal;
   }
-
   // 现代组合方式：任一信号取消都会立即中止整条执行链路。
   return AbortSignal.any([requestAbortSignal, internalAbortSignal]);
 };
 
 /**
- * 在前端流式下载并压缩归档，完成后自动触发浏览器下载。
+ * 在前端流式下载多个文件文件夹并压缩归档，完成后自动触发浏览器下载。
  *
- * 该实现会边读取远程文件流边推入 ZIP 压缩器，避免把每个文件完整加载到内存中。
- * 在支持 File System Access API 的浏览器中，ZIP 输出会直接写入磁盘流，进一步降低内存峰值。
+ * 该实现会边读取远程文件流边推入 ZIP 压缩器。如果浏览器支持，ZIP 输出会直接写入磁盘流。
+ * 做到 “边下载，边压缩，边写入”，减少内存占用。
  *
  * @param manifest 后端返回的下载清单。
- * @param saveTarget 归档输出目标。
+ * @param saveTarget zip保存文件，拿到文件写入器。
  * @param onProgress 进度回调，用于更新下载与压缩进度。
  * @param abortOptions 可选中止参数，用于接入外层 AbortSignal 并与内部信号合并。
  * @returns IArchiveDownloadSession 可中止的下载会话。
@@ -181,13 +196,13 @@ export const downloadArchiveFromManifest = (
   let downloadedBytes = 0;
   let zippedBytes = 0;
   let processedFiles = 0;
-  // Blob 构造参数要求的是稳定的二进制片段类型；这里统一收集 ArrayBuffer。
+  // 回退Blob下载方式，要求统一收集 ArrayBuffer。
   const fallbackChunks: ArrayBuffer[] = [];
-
+  //  FileSystemWritableFileStream 写入器
   const writable = saveTarget.writable;
 
   // ── 第一步：创建内部取消控制器，并与上层信号合成为统一取消源 ───────────
-  // 这样组件层点击 Abort 后，fetch/reader/writable 都能收到同一取消信号。
+  // 这样上层点击 Abort 后，fetch/reader/writable 都能收到同一取消信号。
   const streamAbortController = new AbortController();
   const streamAbortSignal = composeAbortSignal(
     abortOptions?.requestAbortSignal,
@@ -203,7 +218,7 @@ export const downloadArchiveFromManifest = (
 
   // 目标 writable 是否已被 abort（中止），用于保持 abort 调用的幂等性。
   let hasWritableAborted = false;
-
+  // 辅助函数：检查当前有没有 Abort 信号。
   const isStreamAborted = () => streamAbortSignal.aborted;
 
   // ── 第二步：创建进度发射器，统一管理节流与即时刷新逻辑 ───────────────
@@ -220,7 +235,6 @@ export const downloadArchiveFromManifest = (
   );
 
   // ── 第三步：暴露中止方法，统一处理 reader/writable/定时器资源回收 ─────
-  // 约定：abort() 可重复调用且幂等，不会因为二次调用抛异常。
   const abort = () => {
     if (isStreamAborted()) {
       return;
