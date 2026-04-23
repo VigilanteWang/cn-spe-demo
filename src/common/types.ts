@@ -85,7 +85,8 @@ export interface IArchiveClientProgress {
 }
 
 /**
- * 浏览器 Window 扩展：支持 File System Access API 保存对话框。
+ * 默认 lib.dom.d.ts 中没有 showSaveFilePicker 的类型定义，这里进行扩展声明。
+ * File System Access API 不是 JS，为了调用时类型安全
  */
 export interface IShowSaveFilePickerWindow extends Window {
   showSaveFilePicker?: (options?: {
@@ -97,8 +98,8 @@ export interface IShowSaveFilePickerWindow extends Window {
   }) => Promise<{
     name?: string;
     createWritable: () => Promise<{
-      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，
-      // 避免将 Uint8Array 误约束为 BlobPart 后触发类型不兼容。
+      // 这里使用浏览器 FileSystemWritableFileStream.write 的入参语义，https://whatpr.org/fs/1.html#api-filesystemwritablefilestream
+      // 避免将 fflate 输出的 Uint8Array 误约束为 BlobPart 的一种防御性写法，参考 docs\fix&refactor\arraybuffer-type-issue-notes.md
       write: (data: BufferSource | Blob | string) => Promise<void>;
       close: () => Promise<void>;
       abort: () => Promise<void>;
@@ -107,15 +108,14 @@ export interface IShowSaveFilePickerWindow extends Window {
 }
 
 /**
- * 前端归档输出目标。
+ * 前端归档后保存的文件。
  *
- * 如果 writable 存在，表示已经在用户手势上下文中获取了磁盘写入流。
- * 如果 writable 为空，则回退到 Blob 下载模式。
+ * 如果 writable 存在，表示已经在用户手势上下文中获取了FileSystemWritableFileStream.write。
+ * 如果 writable 为 null，则回退到 Blob 下载模式。
  */
 export interface IArchiveSaveTarget {
   filename: string;
   writable: {
-    // 与上面的 window 声明保持一致，统一写入类型，避免调用点发生赋值冲突。
     write: (data: BufferSource | Blob | string) => Promise<void>;
     close: () => Promise<void>;
     abort: () => Promise<void>;

@@ -28,7 +28,7 @@ interface IAbortRequestOptions {
 /**
  * 将 Uint8Array 安全转换为标准 ArrayBuffer。
  * @param chunk 需要转换的二进制块。
- * @returns 可稳定用于 writable.write/Blob 的 ArrayBuffer。
+ * @returns 可稳定用于 writable.write 的 ArrayBuffer。
  */
 const toArrayBuffer = (chunk: Uint8Array): ArrayBuffer => {
   // 报错根因：fflate 回调中的 data 在类型上可能携带 ArrayBufferLike，
@@ -194,8 +194,14 @@ export const downloadArchiveFromManifest = (
     streamAbortController.signal,
   );
 
+  // 来自 response.body.getReader()
+  // 用于逐块读取远端响应的 Uint8Array 数据，读取完成或中止后需释放（设为 null）。
   let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
+  // 目标 writable 是否已成功 close，避免重复 close/在已 close 状态下调用 abort。
   let hasWritableClosed = false;
+
+  // 目标 writable 是否已被 abort（中止），用于保持 abort 调用的幂等性。
   let hasWritableAborted = false;
 
   const isStreamAborted = () => streamAbortSignal.aborted;
@@ -346,7 +352,10 @@ export const downloadArchiveFromManifest = (
 
                   if (value) {
                     downloadedBytes += value.length;
-                    progressEmitter.emitProgress("downloading", item.relativePath);
+                    progressEmitter.emitProgress(
+                      "downloading",
+                      item.relativePath,
+                    );
                     entry.push(value, false);
                   }
                 }

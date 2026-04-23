@@ -25,7 +25,7 @@
 ## 3. 为什么会触发类型冲突
 
 - 某些库或上下文中，`Uint8Array` 的底层 buffer 可能被推断到更宽泛的 `ArrayBufferLike`。
-- DOM 类型定义在部分 API 上要求更严格（偏向标准 `ArrayBuffer`）。
+- DOM 类型定义 BlobPart（虽然就是 BufferSource | Blob | string 的别名）在部分 API 上要求更严格（偏向标准 `ArrayBuffer`）。
 - 因此会出现“运行时常常可用，但 TypeScript 编译不通过”的情况。
 
 ## 4. 本次采用的修复策略
