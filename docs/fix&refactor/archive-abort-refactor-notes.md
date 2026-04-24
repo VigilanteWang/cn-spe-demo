@@ -58,6 +58,12 @@ controller.abort();
 
 ### 2.3 在自定义异步函数中支持取消
 
+调用 controller.abort() 时，JavaScript 引擎会执行以下操作：
+
+- 将 signal.aborted 属性设置为 true。
+- 将 signal.reason 设置为传入的参数。
+- 在 signal 对象上触发 abort 事件。
+
 如果你自己写了一个 Promise 函数，也可以接受并响应 `signal`：
 
 ```typescript

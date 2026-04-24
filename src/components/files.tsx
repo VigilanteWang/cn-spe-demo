@@ -304,6 +304,10 @@ export const Files = (props: IFilesProps) => {
   const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 当前 ZIP 下载流程的统一取消控制器：轮询、manifest 请求和流式下载都共享该信号。
   const downloadAbortControllerRef = useRef<AbortController | null>(null);
+  // 当前 downloadArchiveFromManifest 返回的 abort 函数引用。
+  // 仅靠 AbortSignal 无法触发服务层的 reader.cancel/writable.abort 等资源清理，
+  // 因此需要单独存储并在 onAbortClick 中显式调用。
+  const downloadSessionAbortRef = useRef<(() => void) | null>(null);
   // 记录 loadItems 的最新请求序号，避免旧请求，因为慢一步返回而覆盖新目录数据。
   const loadItemsRequestSeqRef = useRef(0);
   // 用于创建新文件夹。
@@ -354,6 +358,13 @@ export const Files = (props: IFilesProps) => {
       if (downloadPollRef.current) {
         clearInterval(downloadPollRef.current);
         downloadPollRef.current = null;
+      }
+
+      // 组件卸载时先触发服务层的命令式清理（reader.cancel / writable.abort），
+      // 再中止 AbortSignal，确保资源释放顺序正确。
+      if (downloadSessionAbortRef.current) {
+        downloadSessionAbortRef.current();
+        downloadSessionAbortRef.current = null;
       }
 
       if (downloadAbortControllerRef.current) {
@@ -497,6 +508,13 @@ export const Files = (props: IFilesProps) => {
    * @returns void
    */
   const onAbortClick = () => {
+    // 先调用服务层的命令式 abort：显式取消 activeReader 和 writable，
+    // 避免仅靠 AbortSignal 时这些资源被旁路而泄露。
+    if (downloadSessionAbortRef.current) {
+      downloadSessionAbortRef.current();
+      downloadSessionAbortRef.current = null;
+    }
+
     if (downloadAbortControllerRef.current) {
       // 触发统一取消信号，让所有依赖该信号的异步流程尽快停止。
       downloadAbortControllerRef.current.abort();
@@ -864,6 +882,14 @@ export const Files = (props: IFilesProps) => {
             { requestAbortSignal: downloadAbortSignal },
           );
 
+          // 将服务层的命令式 abort 存入 ref，让 onAbortClick 能够触发完整资源清理。
+          // 仅在信号尚未中止时写入，若信号已中止则直接触发清理并返回。
+          if (downloadAbortSignal.aborted) {
+            downloadSession.abort();
+            return;
+          }
+          downloadSessionAbortRef.current = downloadSession.abort;
+
           // 等待整个流式下载 + 压缩流程结束（completion 是一个 Promise）。
           await downloadSession.completion;
 
@@ -883,6 +909,7 @@ export const Files = (props: IFilesProps) => {
             isAborted: false,
           }));
           // 清理控制器引用，表示本次任务已结束，无需再持有取消能力。
+          downloadSessionAbortRef.current = null;
           if (downloadAbortControllerRef.current === runController) {
             downloadAbortControllerRef.current = null;
           }
@@ -903,6 +930,7 @@ export const Files = (props: IFilesProps) => {
                   : "Archive job failed.",
             }),
           );
+          downloadSessionAbortRef.current = null;
           if (downloadAbortControllerRef.current === runController) {
             downloadAbortControllerRef.current = null;
           }
@@ -923,6 +951,7 @@ export const Files = (props: IFilesProps) => {
             }),
           );
         }
+        downloadSessionAbortRef.current = null;
         if (downloadAbortControllerRef.current === runController) {
           downloadAbortControllerRef.current = null;
         }

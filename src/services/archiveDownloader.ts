@@ -235,15 +235,21 @@ export const downloadArchiveFromManifest = (
   );
 
   // ── 第三步：暴露中止方法，统一处理 reader/writable/定时器资源回收 ─────
+  // 注意：这里不进行 isStreamAborted() 前置检查。
+  // 原因：当上层的 requestAbortSignal 已经中止时，streamAbortSignal.aborted 为 true，
+  // 如果在此处返回， reader.cancel / writable.abort 等命令式清理将被忽略，
+  // 导致 FileSystemWritableFileStream 句柄泄露。
+  // 幂等性通过 hasWritableAborted / hasWritableClosed / activeReader === null 等标志保证。
   const abort = () => {
-    if (isStreamAborted()) {
-      return;
-    }
-
+    // 先触发内部中止信号，把 fetch / read / 写入链路统一切到取消态。
+    // 这里保留命令式清理，不依赖 signal 本身来释放资源。
     streamAbortController.abort(new Error(ABORT_ERROR_MESSAGE));
+
+    // 先清掉进度定时器，避免取消后仍然延迟刷新 UI。
     progressEmitter.cleanup();
 
     if (activeReader) {
+      // 主动取消当前 reader，尽快释放正在占用的网络流。
       void activeReader.cancel().catch((error) => {
         console.error("Reader cancel error:", error);
       });
@@ -251,6 +257,7 @@ export const downloadArchiveFromManifest = (
     }
 
     if (writable && !hasWritableClosed && !hasWritableAborted) {
+      // 直接中止可写文件流，确保文件句柄被及时释放。
       hasWritableAborted = true;
       void writable.abort().catch((error) => {
         console.error("Writable abort error:", error);
@@ -419,15 +426,19 @@ export const downloadArchiveFromManifest = (
       // ── 第七步：最终强制发射 done，确保 UI 立即收敛到完成态 ─────────────
       progressEmitter.emitProgress("done", "", true);
     } catch (error: unknown) {
-      if (isStreamAborted()) {
-        return;
-      }
-
+      // 无论是用户主动取消还是真实错误，都需要先确保 writable 被正确释放。
+      // 注意：若 abort() 已经执行过，hasWritableAborted 标志会阻止重复调用。
       if (writable && !hasWritableClosed && !hasWritableAborted) {
         hasWritableAborted = true;
         await writable.abort().catch((abortError) => {
           console.error("Writable abort error:", abortError);
         });
+      }
+
+      // 中止信号触发的错误是预期行为（用户主动取消），静默恢复即可。
+      // 真实错误（网络中断、写入失败等）才需要向上抛出，让外层 catch 展示错误 UI。
+      if (isStreamAborted()) {
+        return;
       }
 
       throw error;
