@@ -170,6 +170,18 @@ const composeAbortSignal = (
 };
 
 /**
+ * 闭包工厂函数（Closure-based Factory Function）说明：
+ *
+ * - `downloadArchiveFromManifest` 以闭包工厂的形式实现，
+ *   每次调用会构建一组私有变量（如 downloadedBytes、activeReader、writeChain 等），
+ *   并返回一个仅包含 `abort` 与 `completion` 的最小会话句柄给调用方。
+ * - 为什么优于 class（简要总结）：
+ *   1. 封装性更好：闭包天然实现私有状态，无需暴露或管理 `this`。
+ *   2. API 更小：只暴露必要接口，降低误用风险并保持调用侧简单。
+ *   3. 与现代函数式/组合式风格一致：便于在 React Hooks、Web Streams 场景中使用与测试。
+ *   4. 无继承/原型开销：不引入 class 继承链或依赖注入复杂性，代码更轻量、打包更小，支持Tree Shaking。
+ */
+/**
  * 在前端流式下载多个文件文件夹并压缩归档，完成后自动触发浏览器下载。
  *
  * 该实现会边读取远程文件流边推入 ZIP 压缩器。如果浏览器支持，ZIP 输出会直接写入磁盘流。
@@ -201,7 +213,7 @@ export const downloadArchiveFromManifest = (
   //  FileSystemWritableFileStream 写入器
   const writable = saveTarget.writable;
 
-  // ── 第一步：创建内部取消控制器，并与上层信号合成为统一取消源 ───────────
+  // ── 第一步：创建内部 AbortController，并与上层信号合成为统一取消源 ───────────
   // 这样上层点击 Abort 后，fetch/reader/writable 都能收到同一取消信号。
   const streamAbortController = new AbortController();
   const streamAbortSignal = composeAbortSignal(
@@ -266,13 +278,39 @@ export const downloadArchiveFromManifest = (
   };
 
   // ── 第四步：启动主下载流程（逐文件 fetch -> 流式压缩 -> 写入目标）─────
-  // writeChain 用于串行化 ZIP 输出写入，避免多段压缩数据并发写入目标流。
+
+  // writeChain 初始化为一个已解决的 Promise，它就会立刻执行后续的 then() 回调。
+  // 每当 ZIP 输出一段数据时，都会把写入操作链到 writeChain 上，形成一个串行的 Promise 链。
   let writeChain: Promise<void> = Promise.resolve();
 
+  // ── 异步 IIFE（立即执行函数表达式）说明 ─────────────────────────────────
+  // completion 被写成 "(async () => { ... })()" 的形式：
+  //   - "async () => { ... }" 是一个匿名异步函数。
+  //   - 末尾的 "()" 表示"定义完立刻调用"，函数一经声明就自动执行，返回的 Promise 赋值给 completion。
+  //
+  // 为什么用 IIFE 而不是普通 async 函数？
+  //   1. 【自启动】工厂函数 return 的瞬间，下载任务已在后台自动开始，调用方无需再手动触发。
+  //   2. 【闭包捕获】IIFE 内部可以直接访问上面声明的所有私有变量（writable、progressEmitter 等）。
+  //   3. 【即时 Promise】completion 从工厂函数同步执行期间就已经是"运行中"的 Promise，
+  //      调用方直接 await completion 即可等待整个任务结束，无需额外触发动作。
   const completion = (async () => {
     try {
+      // ── 为什么 completion 一开始就 await new Promise？（范式桥接层）────────
+      // 问题背景：
+      //   - 下载层（fetch + 流读取）是"拉取式"：代码用 async/await 一步步等待数据块到来。
+      //   - 压缩层（fflate.Zip）是"推送式"：数据压缩好后它主动调用回调函数通知我们。
+      //   这两种范式（async/await vs 回调）无法直接组合，需要一个"转换适配器"。
+      //
+      // 解决方案：用 new Promise 手动包裹整条管道，自己掌控 resolve / reject 的触发时机：
+      //   - resolve 的时机：ZIP 回调收到 final=true，且最后一段数据已写入磁盘（writeChain 完成）。
+      //   - reject 的时机：任意环节（网络失败/写入失败/压缩失败）调用 rejectOnce 时。
+      //
+      // 如果不用 await new Promise 会怎样？
+      //   for 循环跑完 ≠ 压缩完成 ≠ 磁盘写入完成。
+      //   若直接调用 writable.close()，文件将被提前截断，尾部数据永久丢失。
       await new Promise<void>((resolve, reject) => {
         // 保护 Promise：无论出现多少回调事件，只允许 settle 一次。
+        // 原因：ZIP 回调、writeChain、run() 三条路都可能触发 reject，需防止重复 settle。
         let isSettled = false;
 
         const resolveOnce = () => {
@@ -291,18 +329,34 @@ export const downloadArchiveFromManifest = (
           reject(error);
         };
 
+        // ── ZIP 引擎初始化 ──────────────────────────────────────────────────
+        // ZIP 和 fflate 介绍，参考 archive-downloader-deep-dive.md 文档。
+        // fflate.Zip 构造时接收一个"输出回调"，每当有一批压缩好的数据块准备好时就会触发。
+        //
+        // 【重要】这个回调是在 entry.push() 的同步调用栈中触发的——不是异步的！
+        // 当 run() 调用 entry.push(chunk) 时，fflate 会在同一调用帧内立刻调用此回调，
+        // 把压缩好的数据"推"过来。回调执行完毕，entry.push() 才返回，run() 才继续循环。
+        //
+        // 由于回调是同步的，但磁盘写入是异步的，我们用 writeChain（串行 Promise 链）来排队：
+        //   每次回调触发 → 追加一个写入任务到 writeChain 末尾 → 前一个写完再写下一个 → 保证顺序。
         const zip = new Zip((error, data, final) => {
           if (error) {
+            // 压缩引擎内部错误，非用户取消，才需要 reject 外层 Promise。
             if (!isStreamAborted()) {
               rejectOnce(error);
             }
             return;
           }
 
+          // 如果已经收到中止信号，停止写入，避免无用的磁盘 I/O。
           if (isStreamAborted()) {
             return;
           }
-
+          // async function通常会返回一个新的 Promise，但由于 Promise flattening,
+          // 外层的 then 会等待它完成，这样即使 writeChain.then(async).then(async)
+          // 每个 async 操作就会被串行化，确保数据按顺序写入。
+          // 如果没有 Promise flattening，因为 async 执行到 await 异步等待 时就会立刻返回，
+          // then 看到返回后就会立刻resolve，交由下一个 then 执行，导致数据写入可能乱序。
           writeChain = writeChain
             .then(async () => {
               // ZIP 回调可能非常频繁；每段数据都需要累加并写入输出目标。
@@ -318,24 +372,37 @@ export const downloadArchiveFromManifest = (
             .catch(rejectOnce);
 
           if (final) {
+            // ZIP 引擎已输出所有数据（包含中央目录结束标记）。
+            // 但最后几段数据的磁盘写入可能还在 writeChain 里排队中——
+            // 必须等 writeChain 全部冲刷完毕，才能 resolve 外层 Promise，
+            // 这样后续的 writable.close() 或 Blob 下载才能在数据完整落盘后安全执行。
             writeChain.then(resolveOnce).catch(rejectOnce);
           }
         });
 
+        // run 是真正执行下载流程的异步工作函数：
+        // 因为 外层执行函数必须是同步的（new Promise 的执行器要求），所以这里定义一个 async function 来跑异步代码。
+        // 它会先同步跑完前面的普通代码，遇到第一个 await 才暂停，并把控制权交回事件循环。
+        // 完成后，async function 会自动 fulfill 返回的 Promise，或者在抛出错误时 reject 这个 Promise。
         const run = async () => {
           try {
-            // ── 第五步：遍历 manifest，逐文件下载并推送到 ZIP ────────────────
+            // 这里开始真正处理每个文件。
+            // 做法是：先下载，再压缩，最后把压缩结果交给 ZIP。
             for (const item of manifest.items) {
+              // 每轮开始先检查一次取消信号，避免用户已经点了停止还继续跑。
               streamAbortSignal.throwIfAborted();
 
-              // 第五步：每个文件开始时先通知当前处理项，提升 UI 可感知性。
+              // 先告诉界面：现在正在处理哪个文件。
               progressEmitter.emitProgress("downloading", item.relativePath);
 
+              // 为当前文件创建一个压缩入口。
+              // 这个入口会接收原始字节，再把压缩后的内容交给 ZIP。
               const entry = new AsyncZipDeflate(item.relativePath, {
                 level: 6,
               });
               zip.add(entry);
 
+              //  这里不是直接下载到内存，而是拿到一个可读流，边下载边读，配合 entry.push() 实现流式压缩。
               const response = await fetch(item.downloadUrl, {
                 method: "GET",
                 // 将统一的取消信号透传给 fetch，实现真正 I/O 级别中止。
@@ -343,60 +410,92 @@ export const downloadArchiveFromManifest = (
               });
 
               if (!response.ok) {
+                // HTTP 返回失败时，直接中断整个归档流程。
                 throw new Error(
                   `Failed to download ${item.relativePath}. HTTP ${response.status}`,
                 );
               }
 
               if (!response.body) {
-                // 某些响应可能不暴露可读流，这里退化为一次性 arrayBuffer 读取。
+                // 有些响应没有流，只能一次性读完整个文件。
                 streamAbortSignal.throwIfAborted();
 
                 const buffer = new Uint8Array(await response.arrayBuffer());
+                // 记录已经下载了多少字节，方便进度条更新。
                 downloadedBytes += buffer.length;
                 progressEmitter.emitProgress("downloading", item.relativePath);
+                // 把完整文件一次性推给压缩器。
                 entry.push(buffer, true);
+                // 这个文件已经处理完成。
                 processedFiles += 1;
                 continue;
               }
 
+              // 如果有下载可读流，就按块读取，这样更省内存。
               activeReader = response.body.getReader();
               try {
                 while (true) {
-                  // 流式读取循环必须每轮检查取消，确保 Abort 能快速生效。
+                  // 每读一轮都检查一次取消，保证停止按钮能尽快生效。
                   streamAbortSignal.throwIfAborted();
 
+                  // 读取下一块数据。
                   const { done, value } = await activeReader.read();
                   if (done) {
+                    // 读完了就跳出循环。
                     break;
                   }
 
                   if (value) {
+                    // 记录已下载字节数，并把进度发给界面。
                     downloadedBytes += value.length;
                     progressEmitter.emitProgress(
                       "downloading",
                       item.relativePath,
                     );
+                    // 把这一小块原始数据推给压缩器。
                     entry.push(value, false);
                   }
                 }
               } finally {
+                // 不管成功还是失败，都释放 reader。
                 activeReader = null;
               }
 
+              // 再检查一次取消信号，避免刚读完就被取消后继续收尾。
               streamAbortSignal.throwIfAborted();
 
+              // 告诉压缩器：这个文件结束了。
+              // true 表示 final，压缩器会把剩下的内容一次性吐出来。
               entry.push(new Uint8Array(0), true);
+              // 这个文件已经完整处理完。
               processedFiles += 1;
             }
 
             streamAbortSignal.throwIfAborted();
+            // 所有文件都处理完后，通知 ZIP 开始收尾。
+            // 这里会写出 ZIP 结尾需要的目录信息。
             zip.end();
           } catch (error) {
+            // 任何一步出错，都交给外层统一处理。
             rejectOnce(error);
           }
         };
 
+        // ── 为什么这里写 void run()，而不是 await run()？──────────────────
+        // 外层 new Promise 的执行器（(resolve, reject) => { ... }）本身必须是同步函数。
+        // 这里调用 run() 时，它会立刻返回一个 Promise，但 外层 Promise 构造函数不会自动等待这个返回值。
+        //
+        // 如果把执行器写成 async，然后在里面写 await run()，那么执行器自己会额外返回一个 Promise。
+        // 这个“执行器返回的 Promise”不会被 new Promise 使用，所以它里面的错误也不会自动传给外层的 reject。
+        //
+        // 现在的写法是：
+        //   1. run() 负责真正执行下载工作，并在内部用 try/catch 把错误转成 rejectOnce(error)。
+        //   2. void 只是告诉阅读者和 TypeScript：这里故意不等待 run() 的返回值，
+        //      因为外层已经通过 resolveOnce / rejectOnce 接管了结果。
+        //   3. run() 一调用就开始执行，先同步跑一段代码，遇到第一个 await 后再挂起到事件循环。
+        //      它完成后，会自动 fulfill。
+        //
+        // 简单说：void run() 的作用是“启动它”，不是“等待它”。
         void run();
       });
 
