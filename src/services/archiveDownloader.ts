@@ -299,9 +299,14 @@ export const downloadArchiveFromManifest = (
       // 问题背景：
       //   - 下载层（fetch + 流读取）是"拉取式"：代码用 async/await 一步步等待数据块到来。
       //   - 压缩层（fflate.Zip）是"推送式"：数据压缩好后它主动调用回调函数通知我们。
-      //   这两种范式（async/await vs 回调）无法直接组合，需要一个"转换适配器"。
+      //   - 这里最容易误解的点是：回调里“可以”写 async/await，
+      //     但 fflate 不会替我们等待这个回调返回的 Promise。
+      //   - 也就是说，回调里的 await 只能暂停“回调自己”，不能自动暂停整个 ZIP 流程。
+      //   所以这里需要一个额外的"转换适配器"，把回调驱动的完成时机桥接成外层可 await 的 Promise。
       //
       // 解决方案：用 new Promise 手动包裹整条管道，自己掌控 resolve / reject 的触发时机：
+      //   - writeChain 负责“把写入任务按顺序排队”。
+      //   - 外层 Promise 负责“等待最终版本的 writeChain 全部完成”。
       //   - resolve 的时机：ZIP 回调收到 final=true，且最后一段数据已写入磁盘（writeChain 完成）。
       //   - reject 的时机：任意环节（网络失败/写入失败/压缩失败）调用 rejectOnce 时。
       //
@@ -336,9 +341,12 @@ export const downloadArchiveFromManifest = (
         // 【重要】这个回调是在 entry.push() 的同步调用栈中触发的——不是异步的！
         // 当 run() 调用 entry.push(chunk) 时，fflate 会在同一调用帧内立刻调用此回调，
         // 把压缩好的数据"推"过来。回调执行完毕，entry.push() 才返回，run() 才继续循环。
+        // 即使把这个回调写成 async，fflate 也不会 await 它返回的 Promise。
+        // 所以我们不能指望“在回调里直接 await writable.write(...)”就让外层流程停下来。
         //
         // 由于回调是同步的，但磁盘写入是异步的，我们用 writeChain（串行 Promise 链）来排队：
         //   每次回调触发 → 追加一个写入任务到 writeChain 末尾 → 前一个写完再写下一个 → 保证顺序。
+        // 等 final 到来后，再由外层 Promise 去等待“最新版本的 writeChain”完全冲刷结束。
         const zip = new Zip((error, data, final) => {
           if (error) {
             // 压缩引擎内部错误，非用户取消，才需要 reject 外层 Promise。
@@ -352,11 +360,12 @@ export const downloadArchiveFromManifest = (
           if (isStreamAborted()) {
             return;
           }
-          // async function通常会返回一个新的 Promise，但由于 Promise flattening,
-          // 外层的 then 会等待它完成，这样即使 writeChain.then(async).then(async)
-          // 每个 async 操作就会被串行化，确保数据按顺序写入。
-          // 如果没有 Promise flattening，因为 async 执行到 await 异步等待 时就会立刻返回，
-          // then 看到返回后就会立刻resolve，交由下一个 then 执行，导致数据写入可能乱序。
+          // 这里不要理解成“ZIP 回调正在等待写盘完成”。
+          // 真正发生的事是：
+          //   1. 当前回调同步执行，把一个“异步写盘任务”接到 writeChain 后面。
+          //   2. 回调立刻返回给 fflate，外层 push 调用继续向前。
+          //   3. Promise flattening 会让新的 writeChain 代表“之前所有任务 + 当前任务”的整条链。
+          //   4. 因此后续任务会自然排队，直到前一个 writable.write 完成为止。
           writeChain = writeChain
             .then(async () => {
               // ZIP 回调可能非常频繁；每段数据都需要累加并写入输出目标。
