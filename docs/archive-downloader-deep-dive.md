@@ -184,10 +184,10 @@ const completion = (async () => {
                   调用 downloadArchiveFromManifest(...)
                               │
           ┌───────────────────┴────────────────────────┐
-          │ 同步初始化（创建私有变量、abort 函数等）         │
+          │ 同步初始化（创建私有变量、abort 函数等）      │
           │                                            │
           │  const completion = (async () => {...})()  │
-          │        ↑ 此刻下载任务已自动启动！              │
+          │        ↑ 此刻下载任务已自动启动！            │
           │                                            │
           │  return { abort, completion }              │
           └────────────────────────────────────────────┘
@@ -320,11 +320,11 @@ fflate ZIP 回调
 
 ```typescript
 new Promise<void>((resolve, reject) => {
-  // 这个函数是"同步"调用的！
+  // 最上层这个 new Promise 的 constructor 里的 执行器函数 (resolve, reject) => {} 是"同步"调用的！
   // JS 引擎不知道也不关心你在里面 await 了什么
   // 如果你写 await run()，执行器函数就变成了 async，
   // 它会返回一个 Promise——但 new Promise 完全不会去 await 它，直接忽略！
-
+  // 注意区别 await new Promise(...) : 这里await的是 新建的这个Promise<void>, 而不是 假设的 "async执行器" 返回的 Promise。
   await run(); // ❌ 执行器里的 await，错误被 new Promise 吞掉，永远不会 reject 外层 Promise
 });
 ```
@@ -340,7 +340,6 @@ new Promise<void>((resolve, reject) => {
       rejectOnce(error); // ← run 内部捕获错误，通过 rejectOnce 桥接给外层 Promise
     }
   };
-
   void run();
   // void 的作用：
   // 1. 立刻调用 run()，不等待它完成（非阻塞启动）
@@ -356,16 +355,18 @@ void run()
   │
   ├── run() 开始执行
   │     │
-  │     ├── 第一个 await fetch(...) ← 遇到第一个异步点
+  │     ├── 第一个 await fetch(...) ← 遇到第一个异步点，fetch 调用 web API 在新线程处理网络请求
   │     │         │
-  │     │         └── run() 暂时挂起，把控制权还给执行器
+  │     │         └── run() 的后续代码暂时挂起，把控制权还给执行器
   │     │
-  │     └── 执行器继续同步执行（此时 zip 已创建好，回调已注册好）
+  │     └── 执行器继续同步执行
   │
   └── new Promise(...) 完整初始化完毕，执行器返回
         │
-        └── JS 事件循环继续 → fetch 响应到来 → run() 从暂停点继续 → ...
+        └── JS 事件循环继续 → fetch 响应到来 → run() 从暂停点继续 → 放到 Microtask 队列等待被调入callstack → ...
 ```
+
+> 这图之所以看上去 run 和 new Promise 是并行的，是因为 run() 内部的 fetch web API 是在另外线程中执行的。实际 JS 是严格单线程的，run() 交还控制权，才让 new Promise 先完成初始化， `await new Promise(...)` 这里再继续向上交还控制权。
 
 ---
 
