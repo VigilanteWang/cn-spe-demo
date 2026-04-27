@@ -2,13 +2,18 @@
   "$schema": "http://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "outDir": "./dist",
-    "target": "ES2015",
+    // Node 20 完整支持 ES2022，包括顶层 await、class static blocks 等现代语法
+    "target": "ES2022",
     "module": "Node16",
     "sourceMap": true,
     "inlineSources": true,
-    "lib": ["es5", "es6", "dom", "es2015.collection"],
+    // 局限于 Node 服务端环境，不包含 DOM 类型，防止意外引入浏览器特有 API
+    "lib": ["ES2022"],
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "moduleResolution": "node16",
-    "strict": true
+    "strict": true,
+    // 跳过第三方包 d.ts 类型检查，避免 @lit/task 等包的嵌套 const 泛型报错
+    "skipLibCheck": true
   }
 }

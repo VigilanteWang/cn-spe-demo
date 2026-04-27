@@ -12,11 +12,15 @@
     },
     {
       "name": "Run Dev (Frontend Chrome)",
-      "type": "pwa-chrome",
+      "type": "chrome",
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
-      "preLaunchTask": "dev:frontend"
+      "preLaunchTask": "dev:frontend",
+      "sourceMapPathOverrides": {
+        "/@fs/*": "${workspaceFolder}/*",
+        "/src/*": "${workspaceFolder}/src/*"
+      }
     },
     {
       "name": "Start Prod (Local)",

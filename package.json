@@ -16,40 +16,31 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.126",
+    "@types/node": "^20.17.0",
     "@types/react": "^18.3.21",
+    "@types/react-dom": "^18.3.5",
     "archiver": "^7.0.1",
-    "isomorphic-fetch": "3.0.0",
+    "fflate": "^0.8.2",
     "jsonwebtoken": "9.0.2",
     "jwks-rsa": "3.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-scripts": "^5.0.1",
     "restify": "11.1.0",
-    "typescript": "^4.9.5",
+    "typescript": "^5.8.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "build:backend": "tsc -p ./server/tsconfig.json",
-    "build:frontend": "react-scripts build",
+    "build:frontend": "vite build",
     "build:prod": "run-s build:backend build:frontend",
     "dev": "run-p dev:frontend dev:backend",
-    "dev:frontend": "react-scripts start",
+    "dev:frontend": "vite",
     "dev:backend": "env-cmd --silent -f .env.development.local nodemon --watch server --ext ts --exec \"ts-node --project ./server/tsconfig.json ./server/index.ts\"",
     "dev:backend:debug": "cross-env TS_NODE_PROJECT=./server/tsconfig.json env-cmd --silent -f .env.development.local nodemon --watch server --ext ts --exec \"node --inspect=9230 -r ts-node/register ./server/index.ts\"",
     "start": "npm run dev",
     "start:prod": "run-s build:prod start:backend:prod",
     "start:backend:prod": "cross-env NODE_ENV=production env-cmd --silent -f .env.production.local node ./server/dist/index.js",
-    "start-cre": "react-scripts start",
-    "build-cre": "react-scripts build",
-    "test-cre": "react-scripts test",
-    "eject-cre": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "test": "vitest"
   },
   "browserslist": {
     "production": [
@@ -64,20 +55,18 @@
     ]
   },
   "devDependencies": {
-    "@babel/core": "^7.27.1",
     "@eslint/js": "^9.27.0",
     "@eslint/json": "^0.12.0",
     "@microsoft/microsoft-graph-types": "^2.40.0",
     "@types/archiver": "^7.0.0",
-    "@types/isomorphic-fetch": "0.0.39",
     "@types/jsonwebtoken": "9.0.9",
     "@types/restify": "8.5.12",
     "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.4.0",
     "cross-env": "^7.0.3",
     "env-cmd": "10.1.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.5",
-    "eslint-config-react-app": "^7.0.1",
     "eslint-plugin-prettier": "^5.4.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.1.0",
@@ -85,6 +74,8 @@
     "npm-run-all": "4.1.5",
     "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
-    "typescript-eslint": "^8.32.1"
+    "typescript-eslint": "^8.32.1",
+    "vite": "^6.3.0",
+    "vitest": "^3.1.0"
   }
 }

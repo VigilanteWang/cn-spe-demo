@@ -4,7 +4,7 @@
  * 本模块是前端与后端 API 之间的桥梁，负责：
  * 1. 从全局 MGT Provider 获取 API Access Token
  * 2. 调用后端 REST API 完成容器的增删查操作
- * 3. 管理 ZIP 归档下载的异步任务（启动、轮询进度、触发下载）
+ * 3. 管理 ZIP 归档准备任务（启动、轮询进度、获取清单）
  *
  * 核心概念：
  * - MGT (Microsoft Graph Toolkit): 微软提供的前端身份验证和 Graph API 组件库
@@ -23,31 +23,41 @@
  *   * POST /api/deleteItems              - 批量删除文件/文件夹
  *   * POST /api/downloadArchive/start    - 启动 ZIP 归档任务
  *   * GET  /api/downloadArchive/progress - 查询归档进度
- *   * POST /api/downloadArchive/ticket    - 申请一次性下载票据
- *   * GET  /api/downloadArchive/fileByTicket - 使用票据下载归档文件
+ *   * GET  /api/downloadArchive/manifest - 获取归档清单（文件 URL + 路径）
  **/
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { clientConfig } from "./../common/config";
 import * as Scopes from "./../common/scopes";
-import { IContainer } from "../common/types";
+import {
+  IArchiveManifest,
+  IArchiveSaveTarget,
+  IContainer,
+  IShowSaveFilePickerWindow,
+} from "../common/types";
 
 /**
  * ZIP 归档任务的进度信息
  *
- * 任务有 5 个状态，按顺序流转：queued → preparing → zipping → ready/failed
+ * 任务有 4 个状态，按顺序流转：queued → preparing → ready/failed
  * - queued: 任务已创建，等待处理
- * - preparing: 正在遍历文件/文件夹结构
- * - zipping: 正在压缩文件到 ZIP
- * - ready: 压缩完成，可以下载
+ * - preparing: 正在遍历文件/文件夹结构并准备下载清单
+ * - ready: 清单准备完成，可由前端开始流式下载和压缩
  * - failed: 任务失败
  **/
 export interface IJobProgress {
-  status: "queued" | "preparing" | "zipping" | "ready" | "failed";
+  status: "queued" | "preparing" | "ready" | "failed";
   processedFiles: number; // 已处理的文件数
   totalFiles: number; // 总文件数
   currentItem: string; // 当前正在处理的文件名
+  preparedBytes: number; // 已准备字节（后端阶段）
+  totalBytes: number; // 总字节（后端阶段）
   errors: string[]; // 错误信息列表（部分文件可能失败）
+}
+
+/** 可选请求参数：用于透传 AbortSignal 到 fetch，支持统一取消链路。 */
+interface IAbortRequestOptions {
+  requestAbortSignal?: AbortSignal;
 }
 
 /**
@@ -101,7 +111,7 @@ export default class SpEmbedded {
         });
         console.log(`Reusing token: ${accessToken}`);
         return accessToken;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error getting token from global provider", error);
         return null;
       }
@@ -234,10 +244,12 @@ export default class SpEmbedded {
   }
 
   /**
-   * 启动 ZIP 归档下载任务
+   * 启动归档下载准备任务
    *
-   * 将指定的文件/文件夹打包为 ZIP 归档（后端异步处理）。
-   * 返回 jobId 后需要轮询 getDownloadProgress() 查看进度。
+   * 后端会异步展开目录并生成下载清单（manifest），
+   * 真正的 ZIP 压缩由前端 archiveDownloader 模块中的
+   * downloadArchiveFromManifest() 负责流式完成。
+   * 返回 jobId 后需要轮询 getArchivePreparationProgress() 查看进度。
    *
    * @param containerId 容器 ID（即 Drive ID）
    * @param itemIds 要打包的文件/文件夹 ID 数组
@@ -246,13 +258,14 @@ export default class SpEmbedded {
    *
    * 完整下载流程：
    * 1. startDownloadArchive() → 获取 jobId
-   * 2. 轮询 getDownloadProgress(jobId) → 等待 status === "ready"
-   * 3. 前端显示“可下载”状态，等待用户点击 Download now
-   * 4. triggerArchiveFileDownload(jobId, "SPE-<unixMs>.zip") → 申请下载票据并触发浏览器原生下载
+   * 2. 轮询 getArchivePreparationProgress(jobId) → 等待 status === "ready"
+   * 3. 调用 getDownloadManifest(jobId) 获取后端准备好的文件清单
+   * 4. 调用 archiveDownloader.downloadArchiveFromManifest() 在前端流式下载并压缩
    **/
   async startDownloadArchive(
     containerId: string,
     itemIds: string[],
+    abortOptions?: IAbortRequestOptions,
   ): Promise<string> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/start`;
     const token = await this.getApiAccessToken();
@@ -263,6 +276,7 @@ export default class SpEmbedded {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ containerId, itemIds }),
+      signal: abortOptions?.requestAbortSignal,
     });
 
     if (response.ok) {
@@ -279,73 +293,91 @@ export default class SpEmbedded {
    * @returns 任务进度信息，包含状态、已处理文件数、当前处理项等
    * @throws 请求失败时抛出错误
    **/
-  async getDownloadProgress(jobId: string): Promise<IJobProgress> {
+  async getArchivePreparationProgress(
+    jobId: string,
+    abortOptions?: IAbortRequestOptions,
+  ): Promise<IJobProgress> {
     const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/progress/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
     const response = await fetch(api_endpoint, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
+      signal: abortOptions?.requestAbortSignal,
     });
 
     if (response.ok) {
       return (await response.json()) as IJobProgress;
     }
-    throw new Error(`getDownloadProgress failed: ${response.status}`);
+    throw new Error(`getArchivePreparationProgress failed: ${response.status}`);
   }
 
   /**
-   * 触发浏览器下载 ZIP 归档文件
+   * 获取归档下载清单。
    *
-   * 当任务状态为 "ready" 且用户点击下载按钮后调用此方法，
-   * 先向后端申请一次性下载票据，再将下载交给浏览器原生下载器。
-   *
-   * @param jobId 任务 ID
-   * @param filename 下载文件名，默认值为 "archive.zip"。
-   *        当前页面调用方会传入 "SPE-<unixMs>.zip"。
-   * @throws 请求失败时抛出错误
-   *
-   * 实现原理：
-   * 1. 调用票据接口生成一次性下载 URL（仍需 Authorization）
-   * 2. 使用 window.location.assign() 导航到下载 URL
-   * 3. 下载由浏览器原生下载器接管，避免前端 Blob 全量占用内存
-   **/
-  async triggerArchiveFileDownload(
+   * @param jobId 任务 ID。
+   * @returns Promise<IArchiveManifest> 后端准备好的下载清单。
+   * @throws 请求失败时抛出错误。
+   */
+  async getDownloadManifest(
     jobId: string,
-    filename = "archive.zip",
-  ): Promise<void> {
+    abortOptions?: IAbortRequestOptions,
+  ): Promise<IArchiveManifest> {
+    const api_endpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/manifest/${encodeURIComponent(jobId)}`;
     const token = await this.getApiAccessToken();
-    if (!token) {
-      throw new Error("Unable to acquire API access token");
-    }
-
-    const ticketEndpoint = `${clientConfig.apiServerUrl}/api/downloadArchive/ticket/${encodeURIComponent(jobId)}`;
-    const ticketResponse = await fetch(ticketEndpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ filename }),
+    const response = await fetch(api_endpoint, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: abortOptions?.requestAbortSignal,
     });
 
-    if (!ticketResponse.ok) {
-      throw new Error(
-        `Archive ticket request failed: ${ticketResponse.status}`,
-      );
+    if (response.ok) {
+      return (await response.json()) as IArchiveManifest;
+    }
+    throw new Error(`getDownloadManifest failed: ${response.status}`);
+  }
+
+  /**
+   * 在用户点击手势上下文中预先弹出保存窗口。
+   *
+   * 这样可以避免在异步轮询回调中调用 showSaveFilePicker 导致手势校验失败。
+   * @param filename 建议下载文件名。
+   * @returns Promise<IArchiveSaveTarget> 归档输出目标。
+   */
+  async selectArchiveSaveTarget(filename: string): Promise<IArchiveSaveTarget> {
+    const canWriteDirectly =
+      typeof window !== "undefined" &&
+      typeof (window as IShowSaveFilePickerWindow).showSaveFilePicker ===
+        "function";
+
+    if (!canWriteDirectly) {
+      return { filename, writable: null };
     }
 
-    const ticketData = (await ticketResponse.json()) as {
-      downloadUrl?: string;
-    };
-
-    if (!ticketData.downloadUrl) {
-      throw new Error("Archive ticket response missing downloadUrl");
+    const pickerWindow = window as IShowSaveFilePickerWindow;
+    const savePicker = pickerWindow.showSaveFilePicker;
+    if (!savePicker) {
+      return { filename, writable: null };
     }
 
-    const downloadUrl = new URL(
-      ticketData.downloadUrl,
-      clientConfig.apiServerUrl,
-    ).toString();
-    window.location.assign(downloadUrl);
+    try {
+      const handle = await savePicker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "ZIP Archive",
+            accept: { "application/zip": [".zip"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      // 统一用 filename 承载最终文件名：优先使用用户在保存对话框中确认的名称。
+      return { filename: handle.name || filename, writable };
+    } catch (error: any) {
+      // 用户取消保存对话框时，不应继续后续下载流程。
+      if (error?.name === "AbortError") {
+        throw new Error("Download cancelled by user.");
+      }
+      throw error;
+    }
   }
 }

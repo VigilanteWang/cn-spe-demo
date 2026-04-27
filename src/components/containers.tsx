@@ -94,18 +94,25 @@ const useStyles = makeStyles({
 });
 
 /**
+ * Containers 组件属性接口（当前无属性，预留未来扩展）
+ **/
+interface IContainersProps {
+  // 当前暂无属性需求；勿删除此接口，下一次需要新增属性时直接在此补充即可。
+}
+
+/**
  * 容器管理组件
  *
- * @param props 组件属性（当前未使用特定属性）
+ * @param _props 组件属性（当前未使用具体属性）
  *
  * 状态管理：
  * - containers: 容器列表数据（从后端 API 获取）
  * - selectedContainer: 当前选中的容器（传递给 <Files /> 子组件）
  * - dialogOpen: 创建容器对话框是否打开
  * - name/description: 创建容器表单的输入值
- * - creatingContainer: 是否正在创建容器（用于 loading 状态和按钮禁用）
+ * - creatingContainer: 是否正在创建容器（用于 loading 状态和按鈕禁用）
  **/
-export const Containers = (props: any) => {
+export const Containers = (_props: IContainersProps) => {
   // =============== 容器列表相关状态 ===============
   const [containers, setContainers] = useState<IContainer[]>([]);
   const [selectedContainer, setSelectedContainer] = useState<

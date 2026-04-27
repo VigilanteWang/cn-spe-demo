@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Vite 将 public/ 目录中的静态资源以根路径 "/" 提供，无需 %PUBLIC_URL% 前缀 -->
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="SharePoint Embedded Demo" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>SPE Demo</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      Vite 以 ES Module 方式加载入口文件，type="module" 是必须的。
+      CRA 的脚本注入由构建工具自动完成，Vite 则需要在此显式声明入口。
+    -->
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

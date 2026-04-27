@@ -1,20 +1,14 @@
 /**
- * 提供基于后台任务的 ZIP 归档能力。
+ * 提供“后端准备清单 + 前端流式归档”的下载任务能力。
  *
- * 当用户一次选择很多文件或文件夹下载时，服务端不适合在单个 HTTP 请求中
- * 同步完成全部读取和压缩工作。这个模块通过“任务 + 轮询 + 一次性票据”的方式
- * 把耗时操作拆成多个更稳定的阶段。
+ * 这个模块只负责以下后端职责：
+ * 1. 鉴权后的任务创建与所有权隔离。
+ * 2. 递归展开文件/文件夹结构。
+ * 3. 为每个文件解析可下载 URL，并返回前端可直接消费的清单。
  *
- * 整体流程如下：
- *
- * 1. 调用 startDownloadJob 创建后台任务并立即返回 jobId。
- * 2. 前端通过进度接口轮询任务状态。
- * 3. 任务完成后，调用方创建一次性下载票据。
- * 4. 浏览器再使用票据请求最终 ZIP 文件。
+ * 真正的下载与 ZIP 压缩由前端完成，避免后端长时间占用 CPU 和内存。
  */
 
-import archiver from "archiver";
-import { PassThrough } from "stream";
 import { createGraphClient, getGraphToken } from "./auth";
 import { v4 as uuidv4 } from "uuid";
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
@@ -24,11 +18,10 @@ import type { DriveItem } from "@microsoft/microsoft-graph-types";
 const MAX_FILES = 500;
 const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
 const JOB_TTL_MS = 10 * 60 * 1000; // 10 分钟
-const DOWNLOAD_TICKET_TTL_MS = 60 * 1000; // 1 分钟
 
 // ─────────────────────────  类型定义  ───────────────────────────────────────
 
-export type JobStatus = "queued" | "preparing" | "zipping" | "ready" | "failed";
+export type JobStatus = "queued" | "preparing" | "ready" | "failed";
 
 /**
  * 前端可见的任务进度信息。
@@ -38,7 +31,32 @@ export interface JobProgress {
   processedFiles: number;
   totalFiles: number;
   currentItem: string;
+  preparedBytes: number;
+  totalBytes: number;
   errors: string[];
+}
+
+/**
+ * 单个文件的下载清单条目。
+ */
+export interface ArchiveManifestItem {
+  itemId: string;
+  name: string;
+  relativePath: string;
+  size: number;
+  mimeType: string;
+  downloadUrl: string;
+}
+
+/**
+ * 提供给前端用于流式下载和归档的清单。
+ */
+export interface ArchiveManifest {
+  jobId: string;
+  archiveName: string;
+  totalFiles: number;
+  totalBytes: number;
+  items: ArchiveManifestItem[];
 }
 
 /**
@@ -48,7 +66,7 @@ export interface JobProgress {
  * 以便后续下载、过期清理和权限校验。
  */
 interface Job extends JobProgress {
-  zipBuffer?: Buffer;
+  manifest?: ArchiveManifest;
   createdAt: number;
   /**
    * 任务进入终态（ready 或 failed）的时间戳。
@@ -57,27 +75,17 @@ interface Job extends JobProgress {
   completedAt?: number;
   /**
    * 启动本任务的用户的 Azure AD Object ID（来自 JWT oid claim）。
-   * 用于确保只有任务创建者才能查询进度或申请下载票据。
+   * 用于确保只有任务创建者才能查询进度或读取下载清单。
    */
   ownerOid: string;
 }
 
-/**
- * 一次性下载票据的内部存储结构。
- */
-interface DownloadTicketRecord {
-  jobId: string;
-  filename: string;
-  expiresAt: number;
-}
-
-// ─────────────────────────  任务与票据存储  ─────────────────────────────────
+// ─────────────────────────  任务存储  ───────────────────────────────────────
 
 const jobs = new Map<string, Job>();
-const downloadTickets = new Map<string, DownloadTicketRecord>();
 
 /**
- * 定时清理过期任务和票据，避免内存中的状态无限增长。
+ * 定时清理过期任务，避免内存中的状态无限增长。
  */
 setInterval(
   () => {
@@ -85,12 +93,6 @@ setInterval(
     for (const [id, job] of jobs) {
       if (now - (job.completedAt ?? job.createdAt) > JOB_TTL_MS) {
         jobs.delete(id);
-      }
-    }
-
-    for (const [ticket, record] of downloadTickets) {
-      if (record.expiresAt <= now) {
-        downloadTickets.delete(ticket);
       }
     }
   },
@@ -101,7 +103,14 @@ setInterval(
 
 interface FlatFile {
   itemId: string;
-  zipPath: string; // ZIP 包内的相对路径
+  name: string;
+  relativePath: string;
+  size: number;
+  mimeType: string;
+}
+
+interface GraphDriveItemWithDownloadUrl extends DriveItem {
+  "@microsoft.graph.downloadUrl"?: string;
 }
 
 /**
@@ -141,7 +150,10 @@ async function expandItem(
   } else {
     result.push({
       itemId,
-      zipPath: basePath ? `${basePath}/${itemName}` : itemName,
+      name: itemName,
+      relativePath: basePath ? `${basePath}/${itemName}` : itemName,
+      size: item.size ?? 0,
+      mimeType: item.file?.mimeType ?? "application/octet-stream",
     });
   }
 }
@@ -184,7 +196,10 @@ async function expandFolder(
       } else {
         result.push({
           itemId: childId,
-          zipPath: `${folderPath}/${childName}`,
+          name: childName,
+          relativePath: `${folderPath}/${childName}`,
+          size: child.size ?? 0,
+          mimeType: child.file?.mimeType ?? "application/octet-stream",
         });
       }
     }
@@ -193,12 +208,53 @@ async function expandFolder(
   }
 }
 
+/**
+ * 从 Graph 元数据中优先读取下载 URL，缺失时回退到 /content 重定向地址。
+ *
+ * @param graphClient 已认证的 Graph 客户端。
+ * @param graphToken Graph 访问令牌。
+ * @param driveId 当前容器的 Drive ID。
+ * @param itemId 文件 ID。
+ * @returns Promise<string> 可直接下载文件内容的 URL。
+ */
+async function resolveDownloadUrl(
+  graphClient: ReturnType<typeof createGraphClient>,
+  graphToken: string,
+  driveId: string,
+  itemId: string,
+): Promise<string> {
+  const item = (await graphClient
+    .api(`/drives/${driveId}/items/${itemId}`)
+    .get()) as GraphDriveItemWithDownloadUrl;
+
+  if (item["@microsoft.graph.downloadUrl"]) {
+    return item["@microsoft.graph.downloadUrl"];
+  }
+
+  // 兜底方案：使用 /content 端点的 302 Location 作为下载地址。
+  const contentEndpoint = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/content`;
+  const response = await fetch(contentEndpoint, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${graphToken}` },
+    redirect: "manual",
+  });
+
+  const location = response.headers.get("location");
+  if (!location) {
+    throw new Error(
+      `Cannot resolve download url for item ${itemId}. HTTP ${response.status}`,
+    );
+  }
+
+  return location;
+}
+
 // ─────────────────────────  对外 API  ───────────────────────────────────────
 
 /**
  * 启动一个新的归档任务。
  *
- * 这个函数只负责创建任务记录并返回 jobId，真正耗时的文件下载和压缩工作
+ * 这个函数只负责创建任务记录并返回 jobId，真正耗时的目录展开和清单准备工作
  * 会在后台异步执行。
  *
  * @param containerId SharePoint Embedded 容器对应的 Drive ID。
@@ -220,6 +276,8 @@ export async function startDownloadJob(
     processedFiles: 0,
     totalFiles: 0,
     currentItem: "",
+    preparedBytes: 0,
+    totalBytes: 0,
     errors: [],
     createdAt: Date.now(),
     ownerOid,
@@ -255,7 +313,7 @@ export function getJobProgress(
   if (!job) return null;
   if (requesterOid !== undefined && job.ownerOid !== requesterOid) return null;
   const {
-    zipBuffer: _ignored,
+    manifest: _ignored,
     createdAt: _c,
     completedAt: _ca,
     ownerOid: _o,
@@ -265,55 +323,20 @@ export function getJobProgress(
 }
 
 /**
- * 读取已完成任务的 ZIP 二进制内容。
+ * 读取已完成任务的下载清单。
  *
  * @param jobId 任务 ID。
- * @returns Buffer | null 只有当任务状态为 ready 时才返回 ZIP Buffer。
+ * @param requesterOid 请求者 oid，用于所有权校验。
+ * @returns ArchiveManifest | null 当任务未就绪、无权限或已过期时返回 null。
  */
-export function getJobBuffer(jobId: string): Buffer | null {
+export function getJobManifest(
+  jobId: string,
+  requesterOid?: string,
+): ArchiveManifest | null {
   const job = jobs.get(jobId);
-  if (!job || job.status !== "ready" || !job.zipBuffer) return null;
-  return job.zipBuffer;
-}
-
-/**
- * 创建一个短时有效、单次消费的下载票据。
- *
- * @param jobId 已完成归档任务的 ID。
- * @param filename 下载时建议使用的文件名。
- * @returns string 新生成的票据字符串。
- */
-export function createDownloadTicket(jobId: string, filename: string): string {
-  const ticket = uuidv4();
-  downloadTickets.set(ticket, {
-    jobId,
-    filename,
-    expiresAt: Date.now() + DOWNLOAD_TICKET_TTL_MS,
-  });
-  return ticket;
-}
-
-/**
- * 消费并作废下载票据。
- *
- * 票据一旦被读取就会立刻删除，确保它只能使用一次。
- *
- * @param ticket 下载票据。
- * @returns {{ jobId: string; filename: string } | null} 票据关联信息；无效或过期则返回 null。
- */
-export function consumeDownloadTicket(
-  ticket: string,
-): { jobId: string; filename: string } | null {
-  const record = downloadTickets.get(ticket);
-  if (!record) return null;
-
-  /** 先删除再校验，确保同一票据不会被重复利用。 */
-  downloadTickets.delete(ticket);
-  if (record.expiresAt <= Date.now()) {
-    return null;
-  }
-
-  return { jobId: record.jobId, filename: record.filename };
+  if (!job || job.status !== "ready" || !job.manifest) return null;
+  if (requesterOid !== undefined && job.ownerOid !== requesterOid) return null;
+  return job.manifest;
 }
 
 // ─────────────────────────  后台处理流程  ───────────────────────────────────
@@ -322,7 +345,7 @@ export function consumeDownloadTicket(
  * 在后台执行真实的归档处理流程。
  *
  * 这是整个模块的核心函数，负责准备 Graph 客户端、展开目录结构、
- * 下载文件内容、构建 ZIP，并持续回写任务状态。
+ * 解析文件下载 URL、构建清单，并持续回写任务状态。
  *
  * @param jobId 当前任务 ID。
  * @param containerId 当前容器对应的 Drive ID。
@@ -339,29 +362,33 @@ async function processJob(
   const job = jobs.get(jobId)!;
 
   job.status = "preparing";
-  job.currentItem = "Initialising…";
+  job.currentItem = "Initialising...";
 
   let graphToken: string;
   try {
     graphToken = await getGraphToken(userToken);
-  } catch (err: any) {
+  } catch (err: unknown) {
     job.status = "failed";
     job.completedAt = Date.now();
-    job.errors.push(`Graph token error: ${err.message}`);
+    job.errors.push(
+      `Graph token error: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return;
   }
 
   const graphClient = createGraphClient(graphToken);
 
-  /** 先把文件夹递归展开为扁平文件列表，方便后续统一压缩。 */
-  job.currentItem = "Expanding folder structure…";
+  // 先把文件夹递归展开为扁平文件列表，便于后续逐项解析下载地址。
+  job.currentItem = "Expanding folder structure...";
   const flatFiles: FlatFile[] = [];
 
   for (const itemId of itemIds) {
     try {
       await expandItem(graphClient, containerId, itemId, "", flatFiles);
-    } catch (err: any) {
-      job.errors.push(`Failed to expand item ${itemId}: ${err.message}`);
+    } catch (err: unknown) {
+      job.errors.push(
+        `Failed to expand item ${itemId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -382,72 +409,74 @@ async function processJob(
   }
 
   job.totalFiles = flatFiles.length;
-
-  /** 进入真正的 ZIP 构建阶段。 */
-  job.status = "zipping";
-
-  const chunks: Buffer[] = [];
-  const passThrough = new PassThrough();
-  passThrough.on("data", (chunk: Buffer) => chunks.push(chunk));
-
-  const archive = archiver("zip", { zlib: { level: 6 } });
-  archive.pipe(passThrough);
-
   let totalBytes = 0;
+  let preparedBytes = 0;
+  const manifestItems: ArchiveManifestItem[] = [];
 
   for (let i = 0; i < flatFiles.length; i++) {
-    const { itemId, zipPath } = flatFiles[i];
-    job.currentItem = zipPath;
+    const flatFile = flatFiles[i];
+    job.currentItem = flatFile.relativePath;
     job.processedFiles = i;
 
-    try {
-      /**
-       * 通过 Graph 的 /content 端点拉取文件内容。
-       * 这种做法比依赖临时下载地址更稳定，也便于统一认证处理。
-       */
-      const contentUrl = `https://graph.microsoft.com/v1.0/drives/${containerId}/items/${itemId}/content`;
-      const fileResponse = await fetch(contentUrl, {
-        headers: { Authorization: `Bearer ${graphToken}` },
-        redirect: "follow",
-      });
-      if (!fileResponse.ok) {
-        job.errors.push(
-          `Failed to download ${zipPath}: HTTP ${fileResponse.status}`,
-        );
-        continue;
-      }
-
-      const arrayBuffer = await fileResponse.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      /** 按已下载字节累计总量，防止归档结果过大。 */
-      totalBytes += buffer.length;
-      if (totalBytes > MAX_BYTES) {
-        job.status = "failed";
-        job.completedAt = Date.now();
-        job.errors.push(
-          `Archive would exceed the ${MAX_BYTES / 1024 / 1024} MB size limit.`,
-        );
-        archive.abort();
-        return;
-      }
-
-      archive.append(buffer, { name: zipPath });
-      job.processedFiles = i + 1;
-    } catch (err: any) {
-      job.errors.push(`Error adding ${zipPath}: ${err.message}`);
+    totalBytes += flatFile.size;
+    if (totalBytes > MAX_BYTES) {
+      job.status = "failed";
+      job.completedAt = Date.now();
+      job.errors.push(
+        `Archive would exceed the ${MAX_BYTES / 1024 / 1024} MB size limit.`,
+      );
+      return;
     }
   }
 
-  /** 等待 ZIP 流真正结束后再拼接 Buffer，避免拿到不完整数据。 */
-  await new Promise<void>((resolve, reject) => {
-    passThrough.on("finish", resolve);
-    passThrough.on("error", reject);
-    archive.on("error", reject);
-    archive.finalize();
-  });
+  job.totalBytes = totalBytes;
 
-  job.zipBuffer = Buffer.concat(chunks);
+  for (let i = 0; i < flatFiles.length; i++) {
+    const file = flatFiles[i];
+    job.currentItem = file.relativePath;
+    job.processedFiles = i;
+
+    try {
+      const downloadUrl = await resolveDownloadUrl(
+        graphClient,
+        graphToken,
+        containerId,
+        file.itemId,
+      );
+
+      manifestItems.push({
+        itemId: file.itemId,
+        name: file.name,
+        relativePath: file.relativePath,
+        size: file.size,
+        mimeType: file.mimeType,
+        downloadUrl,
+      });
+
+      preparedBytes += file.size;
+      job.preparedBytes = preparedBytes;
+      job.processedFiles = i + 1;
+    } catch (err: unknown) {
+      job.errors.push(
+        `Error preparing ${file.relativePath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  if (manifestItems.length === 0) {
+    job.status = "failed";
+    job.completedAt = Date.now();
+    job.errors.push("No downloadable files available.");
+    return;
+  }
+
+  job.manifest = {
+    jobId,
+    archiveName: `SPE-${Date.now()}.zip`,
+    totalFiles: manifestItems.length,
+    totalBytes,
+    items: manifestItems,
+  };
   job.status = "ready";
   job.currentItem = "";
   job.completedAt = Date.now();

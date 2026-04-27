@@ -26,15 +26,6 @@
  * - Scope: 权限标记，如 "Container.Manage" 表示能管理容器
  *   * Token 的 scp claim 包含拥有的所有权限，以空格分隔
  */
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -44,7 +35,7 @@ const microsoft_graph_client_1 = require("@microsoft/microsoft-graph-client");
 const msal_node_1 = require("@azure/msal-node");
 const jsonwebtoken_1 = require("jsonwebtoken");
 const jwks_rsa_1 = __importDefault(require("jwks-rsa"));
-require("isomorphic-fetch");
+// Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
 const scopes_1 = require("./common/scopes");
 const config_1 = require("./config");
 // 从 Graph API 基础 URL 中提取主机名（如 "graph.microsoft.com")
@@ -78,13 +69,13 @@ const acceptedAudiences = [
  */
 const identityEndpointsByCloud = {
     global: {
-        v1IssuerHost: "https://sts.windows.net",
-        v2IssuerHost: "https://login.microsoftonline.com",
+        v1IssuerHost: "https://sts.windows.net", // v1.0 token 的签发者
+        v2IssuerHost: "https://login.microsoftonline.com", // v2.0 token 的签发者
         discoveryHost: "https://login.microsoftonline.com", // 获取公钥的地址
     },
     china: {
-        v1IssuerHost: "https://sts.chinacloudapi.cn",
-        v2IssuerHost: "https://login.partner.microsoftonline.cn",
+        v1IssuerHost: "https://sts.chinacloudapi.cn", // 中国环境的 v1.0 issuer
+        v2IssuerHost: "https://login.partner.microsoftonline.cn", // 中国环境的 v2.0 issuer
         discoveryHost: "https://login.chinacloudapi.cn", // 中国环境的公钥地址
     },
 };
@@ -115,8 +106,8 @@ const jwksClients = {
     "1.0": (0, jwks_rsa_1.default)({
         // v1.0 token 的公钥端点
         jwksUri: `${identityEndpoints.discoveryHost}/${config_1.serverConfig.tenantId}/discovery/keys`,
-        cache: true,
-        cacheMaxAge: 10 * 60 * 1000,
+        cache: true, // 启用缓存，减少网络请求
+        cacheMaxAge: 10 * 60 * 1000, // 缓存保留 10 分钟
         rateLimit: true, // 防止缓存失效时频繁请求
     }),
     "2.0": (0, jwks_rsa_1.default)({
@@ -154,7 +145,7 @@ const msalConfig = {
             loggerCallback() {
                 return; // 忽略日志输出
             },
-            piiLoggingEnabled: false,
+            piiLoggingEnabled: false, // 不记录个人身份信息
             logLevel: msal_node_1.LogLevel.Warning, // 只记录警告级别及以上
         },
     },
@@ -256,7 +247,7 @@ const getSigningKey = (tokenVersion, header, callback) => {
             return;
         }
         // 从 JWKS 密钥对象中提取公钥部分，传给回调
-        callback(null, key === null || key === void 0 ? void 0 : key.getPublicKey());
+        callback(null, key?.getPublicKey());
     });
 };
 /**
@@ -285,7 +276,7 @@ const getSigningKey = (tokenVersion, header, callback) => {
  * @returns 验证通过后的 token claims
  * @throws 如果任何验证步骤失败
  */
-const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
+const verifyAccessToken = async (token) => {
     /** 先做无验证解码，快速获取 ver 和 tid，用于选择对应的 JWKS 客户端和 issuer。 */
     const decodedClaims = decodeTokenClaims(token);
     const tokenVersion = decodedClaims.ver === "2.0" ? "2.0" : "1.0";
@@ -313,7 +304,7 @@ const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function*
             resolve(decoded);
         });
     });
-});
+};
 /**
  * 检查 token 是否拥有必要的权限
  *
@@ -332,9 +323,8 @@ const verifyAccessToken = (token) => __awaiter(void 0, void 0, void 0, function*
  * @returns true 如果有 Container.Manage 权限，否则 false
  */
 const hasRequiredScope = (claims) => {
-    var _a;
     /** 拆分权限列表并过滤多余空项。 */
-    const scopes = ((_a = claims.scp) !== null && _a !== void 0 ? _a : "").split(" ").filter(Boolean);
+    const scopes = (claims.scp ?? "").split(" ").filter(Boolean);
     /** 检查是否包含所需的 Container.Manage 权限。 */
     return scopes.includes(scopes_1.SPEMBEDDED_CONTAINER_MANAGE);
 };
@@ -365,7 +355,7 @@ const hasRequiredScope = (claims) => {
  * // result.token 和 result.claims 已验证，可以安全使用
  * ```
  */
-const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const authorizeContainerManageRequest = async (req) => {
     /** 从请求头中提取 Authorization 字段。 */
     const authorizationHeader = req.headers.authorization;
     /** token 不存在则直接返回 401。 */
@@ -389,7 +379,7 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
     }
     try {
         /** 验证 token 签名和 claims。 */
-        const claims = yield verifyAccessToken(token);
+        const claims = await verifyAccessToken(token);
         /** 签名有效后再校验权限，遵循最小权限验证顺序。 */
         if (!hasRequiredScope(claims)) {
             return {
@@ -409,13 +399,14 @@ const authorizeContainerManageRequest = (req) => __awaiter(void 0, void 0, void 
     }
     catch (error) {
         /** 任何验证异常都统一转为 401，避免向客户端泄露内部信息。 */
+        const message = error instanceof Error ? error.message : String(error);
         return {
             ok: false,
             status: 401,
-            body: { message: `Invalid access token: ${error.message}` },
+            body: { message: `Invalid access token: ${message}` },
         };
     }
-});
+};
 exports.authorizeContainerManageRequest = authorizeContainerManageRequest;
 /**
  * 执行 OBO (On-Behalf-Of) 流程获取 Graph API token
@@ -449,7 +440,7 @@ exports.authorizeContainerManageRequest = authorizeContainerManageRequest;
  * // 现在可以用 graphClient 代表用户调用 Graph API
  * ```
  */
-const getGraphToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
+const getGraphToken = async (token) => {
     try {
         /** 构建 OBO 请求体，声明代理用户访问 Graph 所需的权限范围。 */
         const graphTokenRequest = {
@@ -459,13 +450,14 @@ const getGraphToken = (token) => __awaiter(void 0, void 0, void 0, function* () 
             ],
         };
         /** 通过 MSAL 机密客户端执行 OBO 令牌交换，得到 Graph 访问令牌。 */
-        const oboGraphToken = (yield confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
+        const oboGraphToken = (await confidentialClient.acquireTokenOnBehalfOf(graphTokenRequest)).accessToken;
         return oboGraphToken;
     }
     catch (error) {
-        throw new Error(`Unable to generate Microsoft Graph OBO token: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Unable to generate Microsoft Graph OBO token: ${message}`);
     }
-});
+};
 exports.getGraphToken = getGraphToken;
 /**
  * 创建 Microsoft Graph API 客户端

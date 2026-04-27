@@ -32,8 +32,11 @@
  * 后端 API 调用（通过 SpEmbedded 服务层）：
  * - deleteItems()            → 批量删除文件
  * - startDownloadArchive()   → 启动 ZIP 归档任务
- * - getDownloadProgress()    → 轮询归档进度
- * - triggerArchiveFileDownload() → 触发归档文件下载
+ * - getArchivePreparationProgress() → 轮询归档准备进度
+ * - getDownloadManifest()    → 获取归档清单
+ *
+ * 前端归档模块调用（通过 archiveDownloader 模块）：
+ * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
 
 import React, {
@@ -49,23 +52,21 @@ import {
   ArrowUploadRegular,
   FolderRegular,
   DocumentRegular,
-  SaveRegular,
   DeleteRegular,
   ArrowLeftRegular,
   ChevronRightRegular,
   HomeRegular,
-  CheckmarkRegular,
   FolderAddRegular,
   ArrowDownloadRegular,
   HistoryRegular,
   PeopleRegular,
-  WarningRegular,
 } from "@fluentui/react-icons";
 import {
   Button,
   Link,
   Label,
   Spinner,
+  ProgressBar,
   Input,
   InputProps,
   InputOnChangeData,
@@ -100,11 +101,28 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { IContainer } from "../common/types";
+/**
+ * Graph 客户端最小操作接口。
+ * 直接导入 @microsoft/microsoft-graph-client 的 Client 类型会与 @microsoft/mgt-element
+ * 内部捆绑的同名类型冲突（private 字段声明不同），因此这里用结构化接口描述
+ * createFolderIfNotExists 实际需要的操作，既类型安全又无跨包兼容问题。
+ */
+interface IGraphApiClient {
+  api(path: string): {
+    get(): Promise<{ value: DriveItem[] }>;
+    post(data: object): Promise<DriveItem>;
+  };
+}
+import {
+  IArchiveClientProgress,
+  IArchiveSaveTarget,
+  IContainer,
+  IDriveItemExtended,
+} from "../common/types";
 import Preview from "./preview";
-import { IDriveItemExtended } from "../common/types";
 import SpEmbedded, { IJobProgress } from "../services/spembedded";
-require("isomorphic-fetch");
+import { downloadArchiveFromManifest } from "../services/archiveDownloader";
+// Node 18+ 内置 fetch，浏览器也内置 fetch；无需 isomorphic-fetch polyfill
 
 /** SpEmbedded 服务实例（全局单例），用于调用后端 API（删除、下载归档） */
 const spEmbedded = new SpEmbedded();
@@ -125,7 +143,9 @@ interface IBreadcrumbItem {
 interface IUploadProgress {
   isUploading: boolean; // 是否正在上传
   currentFile: string; // 当前上传的文件路径
-  currentIndex: number; // 当前文件序号（从 1 开始）
+  currentIndex: number; // 当前尝试上传的文件序号（从 1 开始）
+  successfulFiles: number; // 上传成功文件数
+  failedFiles: number; // 上传失败文件数
   totalFiles: number; // 总文件数
   fileSize: string; // 当前文件大小（格式化后，如 "1.5 MB"）
   isCompleted: boolean; // 上传是否已完成（用于显示完成提示）
@@ -147,22 +167,17 @@ interface DriveItemWithDownloadUrl extends DriveItem {
 /**
  * ZIP 归档下载进度状态
  *
- * 下载流程：启动任务 -> 轮询进度 -> 归档就绪 -> 用户点击后触发浏览器下载。
+ * 下载流程：启动任务 -> 轮询后端准备进度 -> 前端流式下载+压缩 -> 自动触发下载。
  */
 interface IDownloadProgress {
-  isActive: boolean; // 是否正在轮询进度
-  jobProgress: IJobProgress | null; // 后端返回的任务进度详情
-  readyJobId: string | null; // 归档已就绪时可下载的任务 ID
-  isReadyToDownload: boolean; // 是否已就绪，等待用户触发下载
-  isTriggeringDownload: boolean; // 是否正在触发浏览器下载
-  isCompleted: boolean; // 是否下载完成
-  errorMessage: string; // 错误信息（为空表示无错误）
-  /**
-   * 下载触发失败（例如票据过期或网络抖动），可通过重新申请票据重试。
-   * 当此字段为 true 且 readyJobId 不为 null 时，UI 显示过期提示和
-   * "Request new link" 按钮。
-   */
-  needsTicketRefresh: boolean;
+  phase: "idle" | "preparing" | "downloading" | "zipping" | "done" | "failed";
+  isActive: boolean;
+  backendProgress: IJobProgress | null;
+  clientProgress: IArchiveClientProgress | null;
+  isCompleted: boolean;
+  errorMessage: string;
+  shouldAutoHide: boolean;
+  isAborted: boolean;
 }
 
 /** 组件样式定义 */
@@ -185,9 +200,14 @@ const useStyles = makeStyles({
   },
   progressContainer: {
     marginBottom: "16px",
+    width: "100%",
     display: "flex",
-    alignItems: "center",
-    gap: "12px",
+    flexDirection: "column",
+    alignItems: "stretch",
+    rowGap: "8px",
+  },
+  progressBar: {
+    width: "100%",
   },
   progressText: {
     fontSize: "14px",
@@ -197,10 +217,38 @@ const useStyles = makeStyles({
     color: tokens.colorPaletteGreenForeground1,
     fontWeight: "600",
   },
+  progressStatusRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    columnGap: "12px",
+  },
+  progressStatusText: {
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  progressStatusRight: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "10px",
+    flexShrink: 0,
+  },
+  progressPercent: {
+    fontWeight: "600",
+  },
   actionsButtonGroup: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
+  },
+  // Files 容器样式：100% 宽度、最大宽度限制并水平居中
+  filesContainer: {
+    width: "100%",
+    maxWidth: "min(1000px, 92%)",
+    margin: "0 auto",
   },
 });
 
@@ -213,8 +261,8 @@ const useStyles = makeStyles({
 const columnSizingOptions = {
   driveItemName: {
     minWidth: 150,
-    defaultWidth: 250,
-    idealWidth: 200,
+    defaultWidth: 350,
+    idealWidth: 300,
   },
   lastModifiedTimestamp: {
     minWidth: 150,
@@ -254,6 +302,12 @@ export const Files = (props: IFilesProps) => {
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
   // 由于下载归档需要轮询后端任务状态，我们使用 useRef 存储定时器 ID，以便在组件卸载时清理
   const downloadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 当前 ZIP 下载流程的统一取消控制器：轮询、manifest 请求和流式下载都共享该信号。
+  const downloadAbortControllerRef = useRef<AbortController | null>(null);
+  // 当前 downloadArchiveFromManifest 返回的 abort 函数引用。
+  // 仅靠 AbortSignal 无法触发服务层的 reader.cancel/writable.abort 等资源清理，
+  // 因此需要单独存储并在 onAbortClick 中显式调用。
+  const downloadSessionAbortRef = useRef<(() => void) | null>(null);
   // 记录 loadItems 的最新请求序号，避免旧请求，因为慢一步返回而覆盖新目录数据。
   const loadItemsRequestSeqRef = useRef(0);
   // 用于创建新文件夹。
@@ -271,20 +325,22 @@ export const Files = (props: IFilesProps) => {
     isUploading: false,
     currentFile: "",
     currentIndex: 0,
+    successfulFiles: 0,
+    failedFiles: 0,
     totalFiles: 0,
     fileSize: "",
     isCompleted: false,
   });
   // 下载进度状态（用于 ZIP 任务）。
   const [downloadProgress, setDownloadProgress] = useState<IDownloadProgress>({
+    phase: "idle",
     isActive: false,
-    jobProgress: null,
-    readyJobId: null,
-    isReadyToDownload: false,
-    isTriggeringDownload: false,
+    backendProgress: null,
+    clientProgress: null,
     isCompleted: false,
     errorMessage: "",
-    needsTicketRefresh: false,
+    shouldAutoHide: false,
+    isAborted: false,
   });
   // 用于面包屑导航。
   const [breadcrumbPath, setBreadcrumbPath] = useState<IBreadcrumbItem[]>([
@@ -303,6 +359,19 @@ export const Files = (props: IFilesProps) => {
         clearInterval(downloadPollRef.current);
         downloadPollRef.current = null;
       }
+
+      // 组件卸载时先触发服务层的命令式清理（reader.cancel / writable.abort），
+      // 再中止 AbortSignal，确保资源释放顺序正确。
+      if (downloadSessionAbortRef.current) {
+        downloadSessionAbortRef.current();
+        downloadSessionAbortRef.current = null;
+      }
+
+      if (downloadAbortControllerRef.current) {
+        // 组件卸载时统一中止仍在进行的异步任务，避免卸载后继续更新状态。
+        downloadAbortControllerRef.current.abort();
+        downloadAbortControllerRef.current = null;
+      }
     };
   }, []);
 
@@ -315,6 +384,165 @@ export const Files = (props: IFilesProps) => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  /** 计算百分比文本，避免出现 NaN% 或 Infinity%。 */
+  const formatPercent = (current: number, total: number): string => {
+    if (total <= 0) {
+      return "0%";
+    }
+    const value = Math.min(100, Math.max(0, (current / total) * 100));
+    return `${value.toFixed(0)}%`;
+  };
+
+  /**
+   * 将进度转换为 ProgressBar 所需的 0-1 数值。
+   * @param current 当前进度值。
+   * @param total 总量。
+   * @returns 0 到 1 之间的进度值。
+   */
+  const toProgressValue = (current: number, total: number): number => {
+    if (total <= 0) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0, current / total));
+  };
+
+  /**
+   * 默认值工厂，允许以部分字段创建完整IDownloadProgress。
+   * @param overrides 需要覆盖的状态字段。
+   * @returns 完整的下载进度状态对象。
+   */
+  const createDownloadProgressState = (
+    overrides: Partial<IDownloadProgress> = {},
+  ): IDownloadProgress => ({
+    phase: "idle",
+    isActive: false,
+    backendProgress: null,
+    clientProgress: null,
+    isCompleted: false,
+    errorMessage: "",
+    shouldAutoHide: false,
+    isAborted: false,
+    ...overrides,
+  });
+
+  /**
+   * 截断进度文案中的文件名，避免超长文件名破坏布局。
+   * @param fileName 原始文件名或相对路径。
+   * @returns 最多 32 个字符的文件名，超出部分追加省略号。
+   */
+  const truncateProgressFileName = (fileName: string): string => {
+    const maxLength = 32;
+    if (fileName.length <= maxLength) {
+      return fileName;
+    }
+    return `${fileName.slice(0, maxLength)}...`;
+  };
+
+  /**
+   * 计算 ZIP 下载区域的进度条值。
+   * @returns 0 到 1 之间的进度值。
+   */
+  const getArchiveProgressBarValue = (): number => {
+    if (downloadProgress.phase === "preparing") {
+      const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
+      const total = downloadProgress.backendProgress?.totalFiles ?? 0;
+      return 0.25 * toProgressValue(processed, total);
+    }
+
+    if (downloadProgress.phase === "downloading") {
+      const downloaded = downloadProgress.clientProgress?.downloadedBytes ?? 0;
+      const total = downloadProgress.clientProgress?.totalBytes ?? 0;
+      return 0.25 + 0.65 * toProgressValue(downloaded, total);
+    }
+
+    if (downloadProgress.phase === "done" || downloadProgress.isCompleted) {
+      return 1;
+    }
+
+    return 0;
+  };
+
+  /**
+   * 获取归档任务的整体百分比文本（0-100%）。
+   * @returns 百分比字符串，如 50%。
+   */
+  const getArchiveProgressPercentText = (): string => {
+    const percent = Math.round(getArchiveProgressBarValue() * 100);
+    return `${percent}%`;
+  };
+
+  /**
+   * 生成 ZIP 下载区域的说明文案。
+   * @returns 当前进度文本。
+   */
+  const getArchiveProgressText = (): string => {
+    if (downloadProgress.phase === "preparing") {
+      const processed = downloadProgress.backendProgress?.processedFiles ?? 0;
+      const total = downloadProgress.backendProgress?.totalFiles ?? 0;
+      return `Preparing manifest: ${processed}/${total}`;
+    }
+
+    if (
+      downloadProgress.phase === "downloading" ||
+      downloadProgress.phase === "zipping"
+    ) {
+      const currentItem =
+        downloadProgress.clientProgress?.currentItem?.trim() ?? "";
+      if (currentItem) {
+        return `Downloading and zipping: ${truncateProgressFileName(currentItem)}`;
+      }
+      return "Downloading and zipping";
+    }
+
+    if (downloadProgress.phase === "done" || downloadProgress.isCompleted) {
+      return "Download Completed";
+    }
+
+    return "Processing archive...";
+  };
+
+  /**
+   * 用户点击 Abort 时中止当前下载流程，并立即重置可视状态。
+   * @returns void
+   */
+  const onAbortClick = () => {
+    // 先调用服务层的命令式 abort：显式取消 activeReader 和 writable，
+    // 避免仅靠 AbortSignal 时这些资源被旁路而泄露。
+    if (downloadSessionAbortRef.current) {
+      downloadSessionAbortRef.current();
+      downloadSessionAbortRef.current = null;
+    }
+
+    if (downloadAbortControllerRef.current) {
+      // 触发统一取消信号，让所有依赖该信号的异步流程尽快停止。
+      downloadAbortControllerRef.current.abort();
+      downloadAbortControllerRef.current = null;
+    }
+
+    if (downloadPollRef.current) {
+      clearInterval(downloadPollRef.current);
+      downloadPollRef.current = null;
+    }
+
+    setDownloadProgress((prev) =>
+      createDownloadProgressState({
+        isAborted: true,
+        shouldAutoHide: false,
+        backendProgress: prev.backendProgress,
+        clientProgress: prev.clientProgress,
+      }),
+    );
+  };
+
+  /**
+   * 用户点击 Dismiss 后手动关闭下载进度区域。
+   * @returns void
+   */
+  const onDismissClick = () => {
+    downloadAbortControllerRef.current = null;
+    setDownloadProgress(createDownloadProgressState());
   };
 
   /**
@@ -401,8 +629,10 @@ export const Files = (props: IFilesProps) => {
 
         // 更新当前文件夹 ID。
         setFolderId(driveItemId);
-      } catch (error: any) {
-        console.error(`Failed to load items: ${error.message}`);
+      } catch (error: unknown) {
+        console.error(
+          `Failed to load items: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
@@ -464,165 +694,273 @@ export const Files = (props: IFilesProps) => {
     }
 
     // 多个项目或包含文件夹 -> 走后端 ZIP 任务。
-    await startZipDownload(selectedIds);
+    const defaultFilename = `SPE-${Date.now()}.zip`;
+    let saveTarget: IArchiveSaveTarget;
+    try {
+      /**用户手势限制 (User Gesture Restriction) 是浏览器的一种安全机制。
+       * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互（如点击或按键）触发
+       * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。*/
+      saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
+    } catch (err: unknown) {
+      setDownloadProgress(
+        createDownloadProgressState({
+          phase: "failed",
+          errorMessage:
+            err instanceof Error &&
+            err.message === "Download cancelled by user."
+              ? "Download cancelled."
+              : `Failed to open save dialog: ${err instanceof Error ? err.message : String(err)}`,
+        }),
+      );
+      return;
+    }
+
+    await startZipDownload(selectedIds, saveTarget);
   };
 
   /**
    * 启动 ZIP 归档下载
    *
    * 完整流程：
-   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端任务
-   * 2. 每 800ms 轮询 spEmbedded.getDownloadProgress() 查看进度
-   * 3. 当 status === "ready" 时，仅更新 UI 为“可下载”状态，等待用户点击
-   * 4. 用户点击 Download now 后调用 triggerArchiveFileDownload() 触发浏览器下载
-   * 5. 下载触发后 4 秒自动清除完成提示
-   * 6. 如果任务失败，显示错误信息。
+   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端准备任务
+   * 2. 轮询后端进度直到状态 ready
+   * 3. 获取 manifest 后在前端边下载边压缩
+   * 4. 压缩完成后自动触发浏览器下载
    */
-  const startZipDownload = async (itemIds: string[]) => {
-    // 清理上一轮下载进度状态。
+  const startZipDownload = async (
+    itemIds: string[],
+    saveTarget: IArchiveSaveTarget,
+  ) => {
+    // ── 第一步：清理上一轮残留的轮询定时器 ──────────────────────────────────
+    // 如果上一次下载还留有定时器未清除（例如用户快速连续点击），先停掉它。
+    // 否则两个定时器会同时运行，同时更新同一个 UI 状态，导致进度条跳跃或状态混乱。
     if (downloadPollRef.current) {
       clearInterval(downloadPollRef.current);
       downloadPollRef.current = null;
     }
 
-    setDownloadProgress({
-      isActive: true,
-      jobProgress: null,
-      readyJobId: null,
-      isReadyToDownload: false,
-      isTriggeringDownload: false,
-      isCompleted: false,
-      errorMessage: "",
-      needsTicketRefresh: false,
-    });
+    // ── 第二步：为本次下载创建一个新的取消控制器（AbortController）──────────
+    // AbortController 是浏览器内置 API，用于"取消"异步操作（fetch 请求、流式读取等）。
+    // 调用 runController.abort() 后，所有传入了 downloadAbortSignal 的异步操作都会收到
+    // 取消信号并提前结束，避免已取消的任务继续消耗资源或更新已卸载组件的状态。
+    if (downloadAbortControllerRef.current) {
+      // 新任务开始前先取消旧任务，避免两条下载流程并发争用同一组 UI 状态。
+      downloadAbortControllerRef.current.abort();
+    }
+    const runController = new AbortController();
+    // 将新控制器保存到 ref，方便用户点击 Abort 时从外部调用 abort()。
+    downloadAbortControllerRef.current = runController;
+    // signal 是一个只读标志对象，传给每个异步调用，当 abort() 被触发时 signal.aborted 变为 true。
+    const downloadAbortSignal = runController.signal;
 
+    // ── 第三步：将 UI 进度状态切换为"准备中" ────────────────────────────────
+    // 让进度条和提示文字立刻出现在界面上，给用户即时反馈。
+    setDownloadProgress(
+      createDownloadProgressState({
+        phase: "preparing",
+        isActive: true,
+      }),
+    );
+
+    // ── 第四步：调用后端接口，启动归档任务，获取任务 ID ─────────────────────
+    // 后端会异步地将所选文件打包成 ZIP manifest（文件清单），这里只是"提交任务"，
+    // 并不等待打包完成——打包结果需要后续轮询获取。
     let jobId: string;
     try {
       jobId = await spEmbedded.startDownloadArchive(
         props.container.id,
         itemIds,
+        { requestAbortSignal: downloadAbortSignal },
       );
-    } catch (err: any) {
-      setDownloadProgress({
-        isActive: false,
-        jobProgress: null,
-        readyJobId: null,
-        isReadyToDownload: false,
-        isTriggeringDownload: false,
-        isCompleted: false,
-        errorMessage: `Failed to start download: ${err.message}`,
-        needsTicketRefresh: false,
-      });
+    } catch (err: unknown) {
+      // 如果错误是因为用户主动取消（signal.aborted），则静默退出，不展示错误 UI。
+      if (downloadAbortSignal.aborted) {
+        return;
+      }
+      // 其他真实错误（网络问题、鉴权失败等）才展示错误状态。
+      setDownloadProgress(
+        createDownloadProgressState({
+          phase: "failed",
+          errorMessage: `Failed to start download: ${err instanceof Error ? err.message : String(err)}`,
+        }),
+      );
+      if (downloadAbortControllerRef.current === runController) {
+        downloadAbortControllerRef.current = null;
+      }
       return;
     }
 
-    // 每 800ms 轮询一次任务进度。
+    // ── 第五步：启动轮询，每 800ms 查询一次后端任务进度 ─────────────────────
+    // 因为后端打包是异步的，无法立刻拿到结果，所以用 setInterval 定期询问：
+    // "你打包好了吗？当前打包了多少个文件？"
+    // isPolling 是一个本地互斥锁，防止上一次请求还未返回时，新的轮询又开始请求，
+    // 造成多个并发请求同时修改 UI 状态。
+    let isPolling = false;
+
     downloadPollRef.current = setInterval(async () => {
+      // 轮询入口做并发与取消双重保护：避免重叠请求和取消后继续推进流程。
+      if (isPolling || downloadAbortSignal.aborted) {
+        return;
+      }
+
       try {
-        const progress = await spEmbedded.getDownloadProgress(jobId);
-        // 给set一个 Update function，确保拿到最新的状态值，因为下面会多次调用，而useState只会
-        // 在每次 render时更新 state，见useState 文档
+        isPolling = true;
+        // 查询后端当前的打包进度（已处理文件数、总文件数、状态等）。
+        const progress = await spEmbedded.getArchivePreparationProgress(jobId, {
+          requestAbortSignal: downloadAbortSignal,
+        });
+
+        // await 返回后再次检查：用户可能在请求进行中点击 Abort。
+        // 因为 await 期间 JS 会交出控制权，用户有机会触发取消操作。
+        if (downloadAbortSignal.aborted) {
+          return;
+        }
+
+        // 将最新的后端进度同步到 UI，进度条会根据 backendProgress 计算填充比例。
         setDownloadProgress((prev) => ({
           ...prev,
-          jobProgress: progress,
+          phase: progress.status === "failed" ? "failed" : "preparing",
+          backendProgress: progress,
         }));
 
+        // ── 分支 A：后端打包完成（status === "ready"）──────────────────────
         if (progress.status === "ready") {
+          // 打包已完成，不再需要轮询，立刻清除定时器。
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
 
+          // 进入 manifest 阶段前检查一次，避免取消后继续触发下游下载。
+          if (downloadAbortSignal.aborted) {
+            return;
+          }
+
+          // 获取文件清单（manifest）：包含每个待下载文件的 URL 和元数据。
+          // 前端将根据这份清单逐个下载文件并在本地实时压缩成 ZIP。
+          const manifest = await spEmbedded.getDownloadManifest(jobId, {
+            requestAbortSignal: downloadAbortSignal,
+          });
+
+          // manifest 获取后再次检查，防止取消后仍创建下载会话。
+          if (downloadAbortSignal.aborted) {
+            return;
+          }
+
+          // 确定最终保存的文件名：优先用用户指定名，其次用后端建议名。
+          const finalSaveTarget: IArchiveSaveTarget = {
+            ...saveTarget,
+            // filename 优先级：用户定义名（若存在）> 前端建议默认名 > 后端默认名。
+            filename: saveTarget.filename || manifest.archiveName,
+          };
+
+          // 启动前端流式下载 + 实时压缩会话：
+          // downloadArchiveFromManifest 会按清单逐个下载文件，边下载边用 zip.js 压缩，
+          // 全部完成后直接保存到 finalSaveTarget 指定路径。
+          // 第三个参数是进度回调（callback），每压缩完一个文件就会被调用一次，
+          // 我们在这里把最新的客户端进度同步到 UI。
+          const downloadSession = downloadArchiveFromManifest(
+            manifest,
+            finalSaveTarget,
+            (clientProgress) => {
+              // 回调内先检查取消标志，避免取消后仍触发 setState（会导致 React 警告）。
+              if (downloadAbortSignal.aborted) {
+                return;
+              }
+
+              // 属性简写：clientProgress 等价于 clientProgress: clientProgress（ES6 语法）。
+              // 后写的属性会覆盖 ...prev 中同名的 clientProgress，从而刷新进度数据。
+              setDownloadProgress((prev) => ({
+                ...prev,
+                // stage === "done" 时表示压缩全部完成，isActive 置 false 隐藏进度条操作按钮。
+                isActive: clientProgress.stage !== "done",
+                phase:
+                  clientProgress.stage === "done"
+                    ? "done"
+                    : clientProgress.stage,
+                clientProgress,
+              }));
+            },
+            { requestAbortSignal: downloadAbortSignal },
+          );
+
+          // 将服务层的命令式 abort 存入 ref，让 onAbortClick 能够触发完整资源清理。
+          // 仅在信号尚未中止时写入，若信号已中止则直接触发清理并返回。
+          if (downloadAbortSignal.aborted) {
+            downloadSession.abort();
+            return;
+          }
+          downloadSessionAbortRef.current = downloadSession.abort;
+
+          // 等待整个流式下载 + 压缩流程结束（completion 是一个 Promise）。
+          await downloadSession.completion;
+
+          // completion resolve 后再检查一次：用户可能在最后一刻点击 Abort。
+          if (downloadAbortSignal.aborted) {
+            return;
+          }
+
+          // 下载全部完成，将 UI 切换为"已完成"状态，进度条显示 100%。
           setDownloadProgress((prev) => ({
             ...prev,
+            phase: "done",
             isActive: false,
-            readyJobId: jobId,
-            isReadyToDownload: true,
-            isCompleted: false,
+            isCompleted: true,
             errorMessage: "",
+            shouldAutoHide: false,
+            isAborted: false,
           }));
+          // 清理控制器引用，表示本次任务已结束，无需再持有取消能力。
+          downloadSessionAbortRef.current = null;
+          if (downloadAbortControllerRef.current === runController) {
+            downloadAbortControllerRef.current = null;
+          }
+
+          // ── 分支 B：后端打包失败（status === "failed"）─────────────────────
         } else if (progress.status === "failed") {
+          // 后端打包出错，停止轮询并将错误信息展示给用户。
           clearInterval(downloadPollRef.current!);
           downloadPollRef.current = null;
-          setDownloadProgress({
-            isActive: false,
-            jobProgress: progress,
-            readyJobId: null,
-            isReadyToDownload: false,
-            isTriggeringDownload: false,
-            isCompleted: false,
-            errorMessage:
-              progress.errors.length > 0
-                ? progress.errors.join("; ")
-                : "Archive job failed.",
-            needsTicketRefresh: false,
-          });
+          setDownloadProgress(
+            createDownloadProgressState({
+              phase: "failed",
+              backendProgress: progress,
+              // 如果后端返回了具体错误列表，将其拼接展示；否则显示通用提示。
+              errorMessage:
+                progress.errors.length > 0
+                  ? progress.errors.join("; ")
+                  : "Archive job failed.",
+            }),
+          );
+          downloadSessionAbortRef.current = null;
+          if (downloadAbortControllerRef.current === runController) {
+            downloadAbortControllerRef.current = null;
+          }
         }
-      } catch (err: any) {
+        // 分支 C（隐式）：status 仍为 "pending"/"processing"，什么都不做，等下一次轮询。
+      } catch (err: unknown) {
+        // ── 异常处理：轮询或下载过程中抛出未预期的错误 ──────────────────────
+        // 例如：网络中断、服务器 500、流式写入失败等。
         clearInterval(downloadPollRef.current!);
         downloadPollRef.current = null;
-        setDownloadProgress({
-          isActive: false,
-          jobProgress: null,
-          readyJobId: null,
-          isReadyToDownload: false,
-          isTriggeringDownload: false,
-          isCompleted: false,
-          errorMessage: `Progress check failed: ${err.message}`,
-          needsTicketRefresh: false,
-        });
+
+        // 取消操作本身也会导致 fetch 抛出 AbortError，此时不应展示错误 UI。
+        if (!downloadAbortSignal.aborted) {
+          setDownloadProgress(
+            createDownloadProgressState({
+              phase: "failed",
+              errorMessage: `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+            }),
+          );
+        }
+        downloadSessionAbortRef.current = null;
+        if (downloadAbortControllerRef.current === runController) {
+          downloadAbortControllerRef.current = null;
+        }
+      } finally {
+        // finally 块无论成功、失败还是取消都会执行，确保互斥锁被释放，
+        // 否则 isPolling 永远为 true，后续所有轮询都会被跳过。
+        isPolling = false;
       }
     }, 800);
-  };
-
-  /**
-   * 用户在归档 ready 后手动触发浏览器下载
-   * 文件名规则：SPE-<unixMs>.zip
-   */
-  const onDownloadReadyClick = async () => {
-    if (!downloadProgress.readyJobId || downloadProgress.isTriggeringDownload) {
-      return;
-    }
-
-    const readyJobId = downloadProgress.readyJobId;
-    const filename = `SPE-${Date.now()}.zip`;
-
-    setDownloadProgress((prev) => ({
-      ...prev,
-      isTriggeringDownload: true,
-      needsTicketRefresh: false,
-      errorMessage: "",
-    }));
-
-    try {
-      await spEmbedded.triggerArchiveFileDownload(readyJobId, filename);
-
-      setDownloadProgress((prev) => ({
-        ...prev,
-        isTriggeringDownload: false,
-        isReadyToDownload: false,
-        readyJobId: null,
-        needsTicketRefresh: false,
-        isCompleted: true,
-      }));
-
-      setTimeout(() => {
-        setDownloadProgress((prev) => ({
-          ...prev,
-          isCompleted: false,
-          jobProgress: null,
-        }));
-      }, 4000);
-    } catch (err: any) {
-      // 即使 ticket 申请失败，job 仍可能存活（例如瞬时网络抖动，
-      // 或后端缓存仍可用）。这里展示重试按钮而不是终态错误，
-      // 让用户可以重新申请一个新的下载链接。
-      setDownloadProgress((prev) => ({
-        ...prev,
-        isTriggeringDownload: false,
-        isReadyToDownload: false,
-        needsTicketRefresh: true,
-        errorMessage: `Download failed: ${err.message}`,
-      }));
-    }
   };
 
   // ── 工具栏：删除选中项 ─────────────────────────────────────────────────────
@@ -658,8 +996,11 @@ export const Files = (props: IFilesProps) => {
           result.failed.map((f) => `${f.id}: ${f.reason}`).join(", "),
         );
       }
-    } catch (err: any) {
-      console.error("Delete failed:", err.message);
+    } catch (err: unknown) {
+      console.error(
+        "Delete failed:",
+        err instanceof Error ? err.message : String(err),
+      );
     }
     await loadItems(currentFolderId);
     setDeleteDialogOpen(false);
@@ -773,6 +1114,8 @@ export const Files = (props: IFilesProps) => {
       isUploading: true,
       currentFile: "",
       currentIndex: 0,
+      successfulFiles: 0,
+      failedFiles: 0,
       totalFiles,
       fileSize: "",
       isCompleted: false,
@@ -814,9 +1157,17 @@ export const Files = (props: IFilesProps) => {
         const fileData = await file.arrayBuffer();
 
         await graphClient.api(endpoint).putStream(fileData);
-      } catch (error: any) {
+        setUploadProgress((prev) => ({
+          ...prev,
+          successfulFiles: prev.successfulFiles + 1,
+        }));
+      } catch (error: unknown) {
+        setUploadProgress((prev) => ({
+          ...prev,
+          failedFiles: prev.failedFiles + 1,
+        }));
         console.error(
-          `Failed to upload file ${relativePath}: ${error.message}`,
+          `Failed to upload file ${relativePath}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -850,7 +1201,7 @@ export const Files = (props: IFilesProps) => {
    * @returns 文件夹 ID（已存在则返回现有 ID，否则返回新创建的 ID）。
    */
   const createFolderIfNotExists = async (
-    graphClient: any,
+    graphClient: IGraphApiClient,
     parentId: string,
     folderName: string,
   ): Promise<string> => {
@@ -859,12 +1210,12 @@ export const Files = (props: IFilesProps) => {
       const endpoint = `/drives/${props.container.id}/items/${parentId}/children`;
       const response = await graphClient.api(endpoint).get();
 
-      const existingFolder = response.value.find(
-        (item: any) => item.folder && item.name === folderName,
+      const existingFolder = (response.value as DriveItem[]).find(
+        (item) => item.folder !== undefined && item.name === folderName,
       );
 
       if (existingFolder) {
-        return existingFolder.id;
+        return existingFolder.id as string;
       }
 
       // 若不存在则创建。
@@ -875,9 +1226,10 @@ export const Files = (props: IFilesProps) => {
         "@microsoft.graph.conflictBehavior": "rename",
       };
       const newFolder = await graphClient.api(createEndpoint).post(data);
-      return newFolder.id;
-    } catch (error: any) {
-      console.error(`Failed to create folder ${folderName}: ${error.message}`);
+      return newFolder.id as string;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to create folder ${folderName}: ${msg}`);
       throw error;
     }
   };
@@ -968,8 +1320,11 @@ export const Files = (props: IFilesProps) => {
         await spEmbedded.deleteItems(props.container.id, [
           currentPreviewFile.id as string,
         ]);
-      } catch (err: any) {
-        console.error("Preview delete failed:", err.message);
+      } catch (err: unknown) {
+        console.error(
+          "Preview delete failed:",
+          err instanceof Error ? err.message : String(err),
+        );
       }
       await loadItems(currentFolderId);
       setPreviewOpen(false);
@@ -1080,8 +1435,13 @@ export const Files = (props: IFilesProps) => {
   );
 
   // 组件渲染区域。
+  // width: "100%" 确保 DataGrid 的 useMeasureElement 初始即能测量到完整父容器宽度。
+  // 若省略，父容器 Containers 的 alignItems:"center" 会使本 div 收缩至内容宽度，
+  // 导致高 DPI 下（CSS 视口更窄）DataGrid 误判容器不足，把各列压缩至 minWidth。
+  // maxWidth 限制最大宽度，防止 DataGrid 的 autoFitColumns 把各列拉伸到视口宽度；
+  // 父容器 alignItems:"center" 会将本 div 在水平方向居中显示。
   return (
-    <div>
+    <div className={styles.filesContainer}>
       <input
         ref={uploadFileRef}
         type="file"
@@ -1090,16 +1450,14 @@ export const Files = (props: IFilesProps) => {
         style={{ display: "none" }}
       />
       {/*
-        隐藏的文件夹上传 input：使用 webkitdirectory 属性允许选择整个文件夹，
-        因为 webkitdirectory 不是标准属性，TypeScript 可能会报错，
-        所以使用类型断言 any 绕过 (其实可以扩展interface)。
-        通过对象展开的方式注入属性。在某些 React 版本中，直接在组件上写未知的非标准属性可能会被 React 过滤掉。
-        通过展开对象的方式，可以确保属性最终成功挂载到真实的 DOM 元素上
+        隐藏的文件夹上传 input：使用 webkitdirectory 属性允许选择整个文件夹。
+        该属性已在 src/global.d.ts 中通过声明合并扩展 InputHTMLAttributes，
+        因此可直接使用而无需 as any 绕过类型检查。
       */}
       <input
         ref={uploadFolderRef}
         type="file"
-        {...({ webkitdirectory: "" } as any)}
+        webkitdirectory=""
         multiple
         onChange={onUploadFolderSelected}
         style={{ display: "none" }}
@@ -1197,13 +1555,7 @@ export const Files = (props: IFilesProps) => {
             vertical
             icon={<ArrowDownloadRegular />}
             onClick={onToolbarDownloadClick}
-            disabled={
-              selectedRows.size === 0 ||
-              downloadProgress.isActive ||
-              downloadProgress.isReadyToDownload ||
-              downloadProgress.isTriggeringDownload ||
-              downloadProgress.needsTicketRefresh
-            }
+            disabled={selectedRows.size === 0 || downloadProgress.isActive}
           >
             Download
           </ToolbarButton>
@@ -1221,101 +1573,86 @@ export const Files = (props: IFilesProps) => {
 
       {/*
         上传进度条：仅在上传进行中或刚完成时显示（完成后 3 秒自动隐藏）
-        - isUploading=true: 显示 Spinner + 当前文件名、序号和大小
-        - isCompleted=true: 显示绿色 Checkmark + "Upload completed" 提示
+        - 上传中：使用 ProgressBar，并按成功文件数推进
+        - 完成后：显示满进度条与完成提示
       */}
       {(uploadProgress.isUploading || uploadProgress.isCompleted) && (
         <div className={styles.progressContainer}>
+          <ProgressBar
+            className={styles.progressBar}
+            shape="rounded"
+            thickness="medium"
+            value={
+              uploadProgress.isCompleted
+                ? 1
+                : toProgressValue(
+                    uploadProgress.successfulFiles,
+                    uploadProgress.totalFiles,
+                  )
+            }
+          />
           {uploadProgress.isUploading ? (
-            <>
-              <Spinner size="small" />
-              <Text className={styles.progressText}>
-                Uploading {uploadProgress.currentFile} (
-                {uploadProgress.currentIndex}/{uploadProgress.totalFiles}) -{" "}
-                {uploadProgress.fileSize}
-              </Text>
-            </>
+            <Text className={styles.progressText}>
+              Uploading: {uploadProgress.successfulFiles}/
+              {uploadProgress.totalFiles} succeeded
+              {uploadProgress.failedFiles > 0
+                ? `, ${uploadProgress.failedFiles} failed`
+                : ""}
+              {uploadProgress.currentFile
+                ? ` - Current: ${uploadProgress.currentFile} (${uploadProgress.fileSize})`
+                : ""}
+            </Text>
           ) : uploadProgress.isCompleted ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>Upload completed</Text>
-            </>
+            <Text className={styles.progressCompleted}>
+              Upload completed: {uploadProgress.successfulFiles}/
+              {uploadProgress.totalFiles} succeeded
+              {uploadProgress.failedFiles > 0
+                ? `, ${uploadProgress.failedFiles} failed`
+                : ""}
+            </Text>
           ) : null}
         </div>
       )}
 
       {/*
-        ZIP 归档下载进度：在归档任务活跃、待点击下载、触发中、已触发或失败时显示
-        - isActive=true: 显示 Spinner，文字根据后端 status 细分三个阶段：
-            * 无 jobProgress（任务刚提交）: "Starting download job…"
-            * status=="preparing": 正在遍历文件结构，显示当前文件名
-            * status=="zipping": 正在压缩，显示 processedFiles/totalFiles 进度
-        - isReadyToDownload=true: 显示 "Archive ready" + "Download now"，等待用户明确触发
-        - needsTicketRefresh=true: 显示 Warning 图标 + "Download failed" 提示，
-          并提供 "Request new link" 按钮让用户重新申请票据
-        - isTriggeringDownload=true: 禁用按钮并显示小型 Spinner，防止重复点击
-        - isCompleted=true: 显示 "Download started" 提示（4 秒后自动清除）
-        - errorMessage 非空: 以红色文字显示错误原因
+        ZIP 归档下载进度：使用 ProgressBar 展示当前阶段进度，文字放置在进度条下方。
       */}
       {(downloadProgress.isActive ||
-        downloadProgress.isReadyToDownload ||
-        downloadProgress.isTriggeringDownload ||
         downloadProgress.isCompleted ||
-        downloadProgress.needsTicketRefresh ||
         downloadProgress.errorMessage) && (
         <div className={styles.progressContainer}>
-          {downloadProgress.isActive ? (
-            <>
-              <Spinner size="small" />
-              <Text className={styles.progressText}>
-                {downloadProgress.jobProgress?.status === "preparing"
-                  ? `Preparing archive${downloadProgress.jobProgress.currentItem ? `: ${downloadProgress.jobProgress.currentItem}` : "…"}`
-                  : downloadProgress.jobProgress?.status === "zipping"
-                    ? `Compressing ${downloadProgress.jobProgress.processedFiles}/${downloadProgress.jobProgress.totalFiles}: ${downloadProgress.jobProgress.currentItem}`
-                    : "Starting download job…"}
-              </Text>
-            </>
-          ) : downloadProgress.isReadyToDownload ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>Archive ready</Text>
-              <Button
-                appearance="primary"
-                onClick={onDownloadReadyClick}
-                disabled={downloadProgress.isTriggeringDownload}
+          {(downloadProgress.isActive || downloadProgress.isCompleted) && (
+            <ProgressBar
+              className={styles.progressBar}
+              shape="rounded"
+              thickness="medium"
+              value={getArchiveProgressBarValue()}
+            />
+          )}
+          {downloadProgress.isActive || downloadProgress.isCompleted ? (
+            <div className={styles.progressStatusRow}>
+              <Text
+                className={
+                  downloadProgress.isCompleted
+                    ? styles.progressCompleted
+                    : styles.progressText
+                }
+                block
+                truncate
               >
-                Download now
-              </Button>
-              {downloadProgress.isTriggeringDownload && <Spinner size="tiny" />}
-            </>
-          ) : downloadProgress.needsTicketRefresh ? (
-            <>
-              <WarningRegular
-                style={{ color: tokens.colorPaletteYellowForeground1 }}
-              />
-              <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
-                Download failed - please request a new link.
+                {getArchiveProgressText()}
               </Text>
-              <Button
-                appearance="primary"
-                onClick={onDownloadReadyClick}
-                disabled={downloadProgress.isTriggeringDownload}
-              >
-                Request new link
-              </Button>
-              {downloadProgress.isTriggeringDownload && <Spinner size="tiny" />}
-            </>
-          ) : downloadProgress.isCompleted ? (
-            <>
-              <CheckmarkRegular
-                style={{ color: tokens.colorPaletteGreenForeground1 }}
-              />
-              <Text className={styles.progressCompleted}>Download started</Text>
-            </>
+              <div className={styles.progressStatusRight}>
+                {downloadProgress.isActive ? (
+                  <Link onClick={onAbortClick}>Abort</Link>
+                ) : downloadProgress.isCompleted ? (
+                  <Link onClick={onDismissClick}>Dismiss</Link>
+                ) : null}
+                <Text className={styles.progressPercent}>
+                  {getArchiveProgressPercentText()}
+                </Text>
+              </div>
+            </div>
           ) : downloadProgress.errorMessage ? (
             <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
               {downloadProgress.errorMessage}

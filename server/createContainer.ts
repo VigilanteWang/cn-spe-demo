@@ -63,8 +63,9 @@ export const createContainer = async (req: Request, res: Response) => {
 
     res.send(200, graphResponse);
     return;
-  } catch (error: any) {
-    res.send(500, { message: `Failed to create container: ${error.message}` });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Failed to create container: ${msg}` });
     return;
   }
 };

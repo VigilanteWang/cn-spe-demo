@@ -117,7 +117,7 @@ src/
                                     ↓
                          spEmbedded.startDownloadArchive() → 获取 jobId
                                     ↓
-                         每 800ms 轮询 getDownloadProgress()
+                         每 800ms 轮询 getArchivePreparationProgress()
                                     ↓
                          状态: queued → preparing → zipping → ready
                                     ↓

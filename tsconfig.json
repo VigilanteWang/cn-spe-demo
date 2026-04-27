@@ -1,20 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "outDir": "./dist",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
+    // 目标运行时：ES2020 覆盖所有主流浏览器，且 Node 20 完整支持；
+    // 同时解锁 AbortSignal.any 等在旧 target 下缺失的 DOM 类型定义。
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    // Vite 以 bundler 模式解析模块，与 Node16 解析方式互不相同；
+    // 两者同时设置会导致路径解析行为不一致，这里统一切换到 bundler。
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    // allowImportingTsExtensions 允许 .ts/.tsx 显式写扩展名（配合 Vite 的 ESM）
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    // skipLibCheck 跳过第三方 d.ts 类型检查，避免 @lit/task 等外部包的 const 泛型问题
     "skipLibCheck": true,
-    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "module": "Node16",
-    "moduleResolution": "node16",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    // Vite 负责编译，TypeScript 仅做类型检查；设为 true 与 allowImportingTsExtensions 配套
     "noEmit": true,
+    "isolatedModules": true,
     "jsx": "react-jsx"
   },
   "include": ["src"]
