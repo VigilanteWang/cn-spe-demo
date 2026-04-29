@@ -1,0 +1,108 @@
+name: Delete Stale Copilot Branch
+
+# 此工作流用于删除遗留的 copilot/refactor-files-tsx 分支
+# 由于该分支是历史遗留分支，无法通过 GitHub UI 的 "View all branches" 找到并删除
+# 触发方式：手动触发（workflow_dispatch）或在推送到当前分支时自动触发
+
+on:
+  push:
+    branches:
+      - 'copilot/delete-remote-branch-copilot'
+  workflow_dispatch:
+    inputs:
+      branch_to_delete:
+        description: '要删除的分支名称 (默认: copilot/refactor-files-tsx)'
+        required: false
+        default: 'copilot/refactor-files-tsx'
+
+permissions:
+  # 需要 contents: write 权限来删除分支
+  contents: write
+
+jobs:
+  delete-branch:
+    name: 删除遗留分支
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 确认目标分支名称
+        id: set-branch
+        run: |
+          # 确定要删除的分支名称
+          BRANCH="${{ github.event.inputs.branch_to_delete || 'copilot/refactor-files-tsx' }}"
+          echo "target_branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "将要删除的分支: $BRANCH"
+
+      - name: 检查目标分支是否存在
+        id: check-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.set-branch.outputs.target_branch }}"
+          REPO="${{ github.repository }}"
+
+          # 通过 GitHub API 检查分支是否存在
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/git/refs/heads/$BRANCH")
+
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ 分支存在: $BRANCH (HTTP $HTTP_STATUS)"
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ 分支不存在或无法访问: $BRANCH (HTTP $HTTP_STATUS)"
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 删除目标分支
+        if: steps.check-branch.outputs.branch_exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.set-branch.outputs.target_branch }}"
+          REPO="${{ github.repository }}"
+
+          echo "正在删除分支: refs/heads/$BRANCH"
+
+          # 调用 GitHub REST API 删除分支引用
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/git/refs/heads/$BRANCH")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          if [ "$HTTP_CODE" = "204" ]; then
+            echo "✅ 分支删除成功: $BRANCH"
+          else
+            echo "❌ 分支删除失败 (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi
+
+      - name: 验证分支已被删除
+        if: steps.check-branch.outputs.branch_exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.set-branch.outputs.target_branch }}"
+          REPO="${{ github.repository }}"
+
+          # 验证分支已不存在
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/git/refs/heads/$BRANCH")
+
+          if [ "$HTTP_STATUS" = "404" ]; then
+            echo "✅ 已确认分支不再存在: $BRANCH"
+          else
+            echo "⚠️ 分支仍然存在或状态异常 (HTTP $HTTP_STATUS)"
+          fi
+
+      - name: 跳过（分支已不存在）
+        if: steps.check-branch.outputs.branch_exists == 'false'
+        run: |
+          echo "ℹ️ 目标分支不存在，无需删除。任务完成。"
