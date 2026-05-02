@@ -70,6 +70,6 @@ export const useFilesStyles = makeStyles({
   filesContainer: {
     width: "100%",
     maxWidth: "min(1000px, 92%)",
-    margin: "0 auto",
+    margin: "0",
   },
 });
