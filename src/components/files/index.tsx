@@ -282,7 +282,9 @@ export const Files = ({ container }: IFilesProps) => {
     const folderIdSnapshot = folderId || "root";
 
     try {
-      await spEmbedded.deleteItems(container.id, [currentPreviewFile.id as string]);
+      await spEmbedded.deleteItems(container.id, [
+        currentPreviewFile.id as string,
+      ]);
     } catch (error: unknown) {
       console.error(
         "Preview delete failed:",
@@ -461,7 +463,8 @@ export const Files = ({ container }: IFilesProps) => {
           <DialogBody>
             {/* 动态标题：单项显示 "Delete Item"，多项显示 "Delete N items" */}
             <DialogTitle>
-              Delete {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
+              Delete{" "}
+              {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
             </DialogTitle>
             <DialogContent>
               <p>
@@ -481,7 +484,10 @@ export const Files = ({ container }: IFilesProps) => {
                   Cancel
                 </Button>
               </DialogTrigger>
-              <Button appearance="primary" onClick={() => void onDeleteItemClick()}>
+              <Button
+                appearance="primary"
+                onClick={() => void onDeleteItemClick()}
+              >
                 Delete
               </Button>
             </DialogActions>
@@ -494,14 +500,18 @@ export const Files = ({ container }: IFilesProps) => {
         - items: 当前文件夹的 DriveItem 列表（IDriveItemExtended）
         - selectionMode="multiselect": 支持多选，选中集合存入 selectedRows
       */}
-      <FilesDataGrid
-        driveItems={driveItems}
-        selectedRows={selectedRows}
-        onSelectionChange={onSelectionChange}
-        onOpenFolder={navigateToFolder}
-        onPreviewFile={handlePreviewOpen}
-        actionsButtonGroupClassName={styles.actionsButtonGroup}
-      />
+      {/* DataGrid 独立滚动区：仅表格横向溢出时滚动，不影响页面其他部分 */}
+      <div className={styles.dataGridWrapper}>
+        <FilesDataGrid
+          driveItems={driveItems}
+          selectedRows={selectedRows}
+          onSelectionChange={onSelectionChange}
+          onOpenFolder={navigateToFolder}
+          onPreviewFile={handlePreviewOpen}
+          actionsButtonGroupClassName={styles.actionsButtonGroup}
+          nameCellContentClassName={styles.nameCellContent}
+        />
+      </div>
 
       {/*
         文件预览对话框（全屏）：点击文件名时打开。

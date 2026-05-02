@@ -140,14 +140,14 @@ export const Containers = (_props: IContainersProps) => {
 
           {/* 操作按钮组：与容器选择器同一行排列，必要时允许换行，但逻辑上仍属于同一控制区 */}
           <div className={styles.actionGroup} data-testid="container-actions">
-            <Button appearance="primary" onClick={() => setIsCreateDialogOpen(true)}>
-              Create container
-            </Button>
             <Button
-              className={styles.managePermissionButton}
+              appearance="primary"
               onClick={() => setIsPermissionDialogOpen(true)}
             >
-              Manage Container Permission
+              Manage Permission
+            </Button>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              Create container
             </Button>
           </div>
         </div>

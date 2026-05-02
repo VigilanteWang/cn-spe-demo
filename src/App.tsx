@@ -48,7 +48,7 @@ const useStyles = makeStyles({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "1px 15px",
+    padding: "1px 35px",
   },
   title: {
     color: tokens.colorBrandForeground1,

@@ -66,7 +66,10 @@ export const ContainerPermissionDialog = ({
   const [selectedTab, setSelectedTab] = useState("users");
 
   return (
-    <Dialog open={open} onOpenChange={(_event, data) => !data.open && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(_event, data) => !data.open && onClose()}
+    >
       <DialogSurface>
         <DialogBody>
           <DialogTitle>Manage Container Permission</DialogTitle>
@@ -78,7 +81,8 @@ export const ContainerPermissionDialog = ({
                 Container: {containerName ?? "未选择容器"}
               </Text>
               <Text>
-                这里先保留容器级权限管理的弹窗框架，后续再接入真实 Graph 权限数据。
+                这里先保留容器级权限管理的弹窗框架，后续再接入真实 Graph
+                权限数据。
               </Text>
             </div>
 
@@ -93,7 +97,6 @@ export const ContainerPermissionDialog = ({
               >
                 <Tab value="users">Users</Tab>
                 <Tab value="groups">Groups</Tab>
-                <Tab value="links">Links</Tab>
               </TabList>
             </div>
 

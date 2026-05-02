@@ -50,6 +50,8 @@ interface IFilesDataGridProps {
   onPreviewFile: (file: IDriveItemExtended) => void;
   /** 动作按钮容器样式类名。 */
   actionsButtonGroupClassName: string;
+  /** Name 列单元格内容样式类名，用于启用文字换行。 */
+  nameCellContentClassName: string;
 }
 
 /**
@@ -67,6 +69,7 @@ export const FilesDataGrid = ({
   onOpenFolder,
   onPreviewFile,
   actionsButtonGroupClassName,
+  nameCellContentClassName,
 }: IFilesDataGridProps) => {
   // useMemo 保证：只要 navigateToFolder 和 styles 引用不变，columns 数组就是同一个引用。
   // DataGrid 内部用引用比较检测 columns 是否变化，引用不变则不重置列宽状态。
@@ -79,6 +82,7 @@ export const FilesDataGrid = ({
           <TableCellLayout media={driveItem.iconElement}>
             {driveItem.isFolder ? (
               <Link
+                className={nameCellContentClassName}
                 onClick={(event) => {
                   // 防止事件冒泡到 DataGridRow 的选中逻辑，避免进入文件夹同时选中文件夹。
                   event.stopPropagation();
@@ -91,7 +95,10 @@ export const FilesDataGrid = ({
                 {driveItem.name}
               </Link>
             ) : (
-              <Link onClick={() => onPreviewFile(driveItem)}>
+              <Link
+                className={nameCellContentClassName}
+                onClick={() => onPreviewFile(driveItem)}
+              >
                 {driveItem.name}
               </Link>
             )}

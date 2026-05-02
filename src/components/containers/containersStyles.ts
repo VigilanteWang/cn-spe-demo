@@ -9,7 +9,7 @@ export const useContainersStyles = makeStyles({
     flexDirection: "column",
     alignItems: "stretch",
     width: "100%",
-    ...shorthands.padding("24px"),
+    ...shorthands.padding("35px"),
     boxSizing: "border-box",
   },
   headerSection: {
@@ -28,8 +28,7 @@ export const useContainersStyles = makeStyles({
     width: "100%",
   },
   containerDropdown: {
-    width: "min(420px, 100%)",
-    minWidth: "280px",
+    width: "min(350px, 100%)",
   },
   actionGroup: {
     display: "flex",
@@ -41,11 +40,14 @@ export const useContainersStyles = makeStyles({
   managePermissionButton: {
     backgroundColor: tokens.colorPaletteGreenBackground3,
     color: tokens.colorNeutralForegroundOnBrand,
+    // 悬停时使用更深的绿色（Foreground 色阶比 Background 更深），与 primary 按钮变暗行为一致
     ":hover": {
-      backgroundColor: tokens.colorPaletteGreenBackground2,
+      backgroundColor: tokens.colorPaletteGreenForeground1,
+      color: tokens.colorNeutralForegroundOnBrand,
     },
     ":active": {
-      backgroundColor: tokens.colorPaletteGreenBackground1,
+      backgroundColor: tokens.colorPaletteGreenForeground2,
+      color: tokens.colorNeutralForegroundOnBrand,
     },
   },
   filesRegion: {
