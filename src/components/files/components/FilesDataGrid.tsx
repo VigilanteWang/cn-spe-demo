@@ -19,21 +19,20 @@ import { IDriveItemExtended } from "../../../common/types";
 
 const columnSizingOptions = {
   driveItemName: {
-    minWidth: 150,
-    defaultWidth: 350,
-    idealWidth: 300,
+    minWidth: 220,
+    defaultWidth: 960,
   },
   lastModifiedTimestamp: {
-    minWidth: 150,
-    defaultWidth: 150,
+    minWidth: 160,
+    defaultWidth: 190,
   },
   lastModifiedBy: {
-    minWidth: 150,
-    defaultWidth: 150,
+    minWidth: 160,
+    defaultWidth: 190,
   },
   actions: {
-    minWidth: 300,
-    defaultWidth: 320,
+    minWidth: 240,
+    defaultWidth: 260,
   },
 };
 
@@ -167,6 +166,7 @@ export const FilesDataGrid = ({
       items={driveItems}
       columns={columns}
       getRowId={(item) => item.id}
+      style={{ width: "100%" }}
       resizableColumns
       columnSizingOptions={columnSizingOptions}
       selectionMode="multiselect"

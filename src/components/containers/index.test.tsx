@@ -68,9 +68,11 @@ describe("Containers", () => {
       expect(listContainersMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByRole("button", { name: "Create container" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Manage Container Permission" }),
+      screen.getByRole("button", { name: "Create container" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Manage Permission" }),
     ).toBeInTheDocument();
   });
 
@@ -83,7 +85,7 @@ describe("Containers", () => {
 
     fireEvent.click(
       within(header).getByRole("button", {
-        name: "Manage Container Permission",
+        name: "Manage Permission",
       }),
     );
 
@@ -111,15 +113,19 @@ describe("Containers", () => {
     const header = await screen.findByTestId("containers-header");
     const filesRegion = screen.getByTestId("containers-files-region");
 
-    expect(within(header).getByTestId("container-selector")).toBeInTheDocument();
+    expect(
+      within(header).getByTestId("container-selector"),
+    ).toBeInTheDocument();
     expect(within(header).getByTestId("container-actions")).toBeInTheDocument();
-    expect(within(filesRegion).queryByTestId("mock-files")).not.toBeInTheDocument();
+    expect(
+      within(filesRegion).queryByTestId("mock-files"),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("combobox"));
     fireEvent.click(await screen.findByText("Container A"));
 
-    expect(await within(filesRegion).findByTestId("mock-files")).toHaveTextContent(
-      "Files for Container A",
-    );
+    expect(
+      await within(filesRegion).findByTestId("mock-files"),
+    ).toHaveTextContent("Files for Container A");
   });
 });
