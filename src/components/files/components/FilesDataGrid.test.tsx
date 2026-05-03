@@ -10,7 +10,9 @@ if (typeof globalThis.NodeFilter === "undefined") {
   } as typeof NodeFilter;
 }
 
-const createItem = (overrides: Partial<IDriveItemExtended>): IDriveItemExtended =>
+const createItem = (
+  overrides: Partial<IDriveItemExtended>,
+): IDriveItemExtended =>
   ({
     id: "1",
     name: "file.txt",
@@ -46,7 +48,9 @@ describe("FilesDataGrid", () => {
 
     render(
       <FilesDataGrid
-        driveItems={[createItem({ id: "folder-1", name: "Folder A", isFolder: true })]}
+        driveItems={[
+          createItem({ id: "folder-1", name: "Folder A", isFolder: true }),
+        ]}
         selectedRows={new Set()}
         onSelectionChange={vi.fn()}
         onOpenFolder={onOpenFolder}
@@ -67,7 +71,9 @@ describe("FilesDataGrid", () => {
           createItem({
             id: "file-2",
             name: "Recent file.txt",
-            lastModifiedDateTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            lastModifiedDateTime: new Date(
+              Date.now() - 60 * 60 * 1000,
+            ).toISOString(),
           }),
         ]}
         selectedRows={new Set()}

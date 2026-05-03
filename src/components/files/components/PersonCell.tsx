@@ -1,5 +1,5 @@
 import { Avatar, TableCellLayout } from "@fluentui/react-components";
-import { UserPresenceStatus } from "../../../common/types";
+import { IUserPresenceBadgeState } from "../../../common/types";
 
 /**
  * PersonCell 组件属性。
@@ -14,7 +14,7 @@ interface IPersonCellProps {
    * 来自 Graph Presence API 批量拉取，未获取到时为 undefined，
    * 组件将以 "unknown"（灰色未知状态）渲染 PresenceBadge。
    */
-  presenceStatus?: UserPresenceStatus;
+  presenceStatus?: IUserPresenceBadgeState;
 }
 
 /**
@@ -42,9 +42,12 @@ export const PersonCell = ({
         color="colorful"
         size={28}
         image={imageUrl ? { src: imageUrl } : undefined}
-        // badge 插槽内置 PresenceBadge，直接传 status 即可显示正确状态图标
-        badge={{ status: presenceStatus ?? "unknown" }}
-        aria-label={`${name} - ${presenceStatus ?? "unknown"}`}
+        // badge 插槽内置 PresenceBadge，支持基础状态 + OOF 叠加展示。
+        badge={{
+          status: presenceStatus?.status ?? "unknown",
+          outOfOffice: presenceStatus?.outOfOffice ?? false,
+        }}
+        aria-label={`${name} - ${presenceStatus?.status ?? "unknown"}${presenceStatus?.outOfOffice ? " - out of office" : ""}`}
       />
     }
   >

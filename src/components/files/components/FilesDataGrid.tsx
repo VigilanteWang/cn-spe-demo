@@ -19,20 +19,26 @@ import { IDriveItemExtended } from "../../../common/types";
 import { formatDateTimeColumnValue } from "../../../common/dateTime";
 import { PersonCell } from "./PersonCell";
 
+// DataGrid 列宽策略：给每列一个“可拖拽时的最小宽度 + 初始宽度”，
+// 让页面首次渲染时布局稳定，同时允许用户按需调整。
 const columnSizingOptions = {
   driveItemName: {
+    // 名称列通常内容最长，因此给更大的默认宽度，减少换行。
     minWidth: 220,
     defaultWidth: 960,
   },
   lastModifiedTimestamp: {
+    // 时间列内容相对固定（日期/短文本），宽度可比名称列小。
     minWidth: 160,
     defaultWidth: 190,
   },
   lastModifiedBy: {
+    // 人员列需要显示头像+姓名，保持与时间列接近的视觉平衡。
     minWidth: 160,
     defaultWidth: 190,
   },
   actions: {
+    // 操作列包含两个按钮，预留足够空间避免按钮挤压。
     minWidth: 240,
     defaultWidth: 260,
   },
@@ -72,7 +78,7 @@ export const FilesDataGrid = ({
   actionsButtonGroupClassName,
   nameCellContentClassName,
 }: IFilesDataGridProps) => {
-  // useMemo 保证：只要 navigateToFolder 和 styles 引用不变，columns 数组就是同一个引用。
+  // useMemo 保证：依赖不变时，columns 保持同一引用。
   // DataGrid 内部用引用比较检测 columns 是否变化，引用不变则不重置列宽状态。
   const columns = useMemo<TableColumnDefinition<IDriveItemExtended>[]>(
     () => [
@@ -82,6 +88,7 @@ export const FilesDataGrid = ({
         compare: (a, b) => (a.name ?? "").localeCompare(b.name ?? ""),
         renderHeaderCell: () => "Name",
         renderCell: (driveItem) => (
+          // media 会显示在名称前方，这里复用上游准备好的文件/文件夹图标。
           <TableCellLayout media={driveItem.iconElement}>
             {driveItem.isFolder ? (
               <Link
@@ -100,6 +107,7 @@ export const FilesDataGrid = ({
             ) : (
               <Link
                 className={nameCellContentClassName}
+                // 文件点击进入预览；不需要 stopPropagation，因为预览行为可与行选中共存。
                 onClick={() => onPreviewFile(driveItem)}
               >
                 {driveItem.name}
@@ -117,6 +125,7 @@ export const FilesDataGrid = ({
         renderHeaderCell: () => "Last Modified",
         renderCell: (driveItem) => (
           <TableCellLayout>
+            {/* 统一使用公共时间格式化函数，确保整个应用时间文案风格一致。 */}
             {formatDateTimeColumnValue(driveItem.lastModifiedDateTime)}
           </TableCellLayout>
         ),
@@ -127,6 +136,7 @@ export const FilesDataGrid = ({
         compare: (a, b) => a.modifiedByName.localeCompare(b.modifiedByName),
         renderHeaderCell: () => "Last Modified By",
         renderCell: (driveItem) => (
+          // PersonCell 负责头像、姓名、在线状态三者组合展示，避免在表格里重复拼装 UI。
           <PersonCell
             name={driveItem.modifiedByName}
             imageUrl={driveItem.modifiedByPhotoUrl}
@@ -181,6 +191,7 @@ export const FilesDataGrid = ({
     <DataGrid
       items={driveItems}
       columns={columns}
+      // 使用 Graph 返回的 driveItem.id 作为稳定键，避免排序/筛选后行状态错位。
       getRowId={(item) => item.id}
       style={{ width: "100%" }}
       sortable

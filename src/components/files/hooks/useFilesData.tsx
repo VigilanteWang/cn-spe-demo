@@ -25,13 +25,17 @@ interface IUseFilesDataOptions {
  * @returns 文件列表状态与操作方法。
  */
 export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
+  // driveItems 是表格主数据源，任何列表渲染都以它为准。
   const [driveItems, setDriveItems] = useState<IDriveItemExtended[]>([]);
+  // selectedRows 保存 DataGrid 当前多选结果，供批量操作按钮使用。
   const [selectedRows, setSelectedRows] = useState<Set<SelectionItemId>>(
     new Set<SelectionItemId>(),
   );
   // 记录 loadItems 的最新请求序号，避免旧请求因为慢一步返回而覆盖新目录数据。
   const [currentFolderId, setCurrentFolderId] = useState("root");
+  // ref 不会触发重渲染，适合保存“跨异步请求共享”的可变状态。
   const loadRequestSequenceRef = useRef(0);
+  // userId -> object URL 缓存，减少重复请求头像并降低 Graph 压力。
   const photoCacheRef = useRef(new Map<string, string>());
 
   /**
@@ -40,10 +44,13 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
    * 从而允许同一批用户头像在多个目录切换中复用。
    */
   const revokeCachedPhotoUrls = useCallback(() => {
+    // 逐个释放浏览器内存中的 Blob URL，避免长时间使用后内存增长。
     photoCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
+    // 释放后立刻清空缓存，确保后续不会继续引用失效 URL。
     photoCacheRef.current.clear();
   }, []);
 
+  // effect 返回清理函数：组件卸载时自动执行 revokeCachedPhotoUrls。
   useEffect(() => revokeCachedPhotoUrls, [revokeCachedPhotoUrls]);
 
   /**
@@ -60,6 +67,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
   const loadItems = useCallback(
     async (itemId = "root") => {
       try {
+        // 复用 MGT Provider 中已登录态的 Graph client，避免重复初始化客户端。
         const graphClient = Providers.globalProvider.graph.client;
         // 为本次请求分配序号；仅允许最新一次请求落盘。
         const requestSequence = ++loadRequestSequenceRef.current;
@@ -72,17 +80,26 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
           return;
         }
 
+        // 将 Graph 原始 DriveItem 扩展为 UI 直接可用的数据结构（图标、下载链接、展示名称等）。
         const items = (graphResponse.value as IDriveItemWithDownloadUrl[]).map(
           (driveItem) => ({
             ...driveItem,
+            // folder 字段存在即视为文件夹，后续用于点击行为和图标渲染。
             isFolder: Boolean(driveItem.folder),
+            // 用户名缺失时兜底为 unknown，避免界面出现空白。
             modifiedByName:
               driveItem.lastModifiedBy?.user?.displayName ?? "unknown",
             modifiedById: driveItem.lastModifiedBy?.user?.id ?? undefined,
-            iconElement: driveItem.folder ? <FolderRegular /> : <DocumentRegular />,
+            iconElement: driveItem.folder ? (
+              <FolderRegular />
+            ) : (
+              <DocumentRegular />
+            ),
+            // Graph 的下载直链字段名包含特殊字符，这里统一映射到更友好的键名。
             downloadUrl: driveItem["@microsoft.graph.downloadUrl"],
           }),
         );
+        // 收集唯一用户 ID，后续用于批量请求头像和 presence，避免 N 次重复查询。
         const uniqueUserIds = collectModifiedByUserIds(items);
 
         // 先落盘核心列表数据，让导航、返回按钮、面包屑等依赖 loadItems 完成的 UI 立即更新。
@@ -94,6 +111,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
 
         void (async () => {
           try {
+            // 没有可查询用户时直接返回，省掉一次无意义网络请求。
             if (uniqueUserIds.length === 0) {
               return;
             }
@@ -108,6 +126,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
               return;
             }
 
+            // 仅当本次确实拿到头像数据时才触发状态更新，减少不必要重渲染。
             if (photoMap.size > 0) {
               setDriveItems((prev) =>
                 prev.map((item) =>
@@ -151,6 +170,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
                 item.modifiedById && presenceMap.has(item.modifiedById)
                   ? {
                       ...item,
+                      // 将 Presence 服务值挂回每一行，供 PersonCell 显示在线状态徽标。
                       modifiedByPresence: presenceMap.get(item.modifiedById),
                     }
                   : item,
@@ -183,6 +203,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
     _event: React.MouseEvent | React.KeyboardEvent,
     data: OnSelectionChangeData,
   ) => {
+    // DataGrid 已经算好了选中集合，这里只做一次状态同步。
     setSelectedRows(data.selectedItems);
   };
 
@@ -190,6 +211,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
    * 清空当前选中项。
    */
   const clearSelection = useCallback(() => {
+    // 用全新 Set 替换旧引用，确保 React 感知到状态变化并刷新 UI。
     setSelectedRows(new Set<SelectionItemId>());
   }, []);
 
@@ -199,6 +221,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
    */
   const updateSelectedRows = useCallback(
     (nextSelectedRows: Set<SelectionItemId>) => {
+      // 允许外部在批量操作后手动回写选中状态，保持交互一致。
       setSelectedRows(nextSelectedRows);
     },
     [],
