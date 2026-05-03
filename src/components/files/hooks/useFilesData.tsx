@@ -170,7 +170,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
                 item.modifiedById && presenceMap.has(item.modifiedById)
                   ? {
                       ...item,
-                      // 将 Presence 服务值挂回每一行，供 PersonCell 显示在线状态徽标。
+                      // 将 Presence 状态回填到每一行，供 PersonCell 显示在线状态徽标。
                       modifiedByPresence: presenceMap.get(item.modifiedById),
                     }
                   : item,
