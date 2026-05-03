@@ -109,7 +109,7 @@ export default class SpEmbedded {
             `api://${clientConfig.apiEntraAppClientId}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
           ],
         });
-        console.log(`Reusing token: ${accessToken}`);
+        //console.log(`Reusing token: ${accessToken}`);
         return accessToken;
       } catch (error: unknown) {
         console.error("Error getting token from global provider", error);

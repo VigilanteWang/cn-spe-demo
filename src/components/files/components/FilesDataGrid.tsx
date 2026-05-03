@@ -16,6 +16,8 @@ import {
 } from "@fluentui/react-components";
 import { HistoryRegular, PeopleRegular } from "@fluentui/react-icons";
 import { IDriveItemExtended } from "../../../common/types";
+import { formatDateTimeColumnValue } from "../../../common/dateTime";
+import { PersonCell } from "./PersonCell";
 
 const columnSizingOptions = {
   driveItemName: {
@@ -76,6 +78,8 @@ export const FilesDataGrid = ({
     () => [
       createTableColumn({
         columnId: "driveItemName",
+        // 按文件/文件夹名称字母序排序（忽略大小写）
+        compare: (a, b) => (a.name ?? "").localeCompare(b.name ?? ""),
         renderHeaderCell: () => "Name",
         renderCell: (driveItem) => (
           <TableCellLayout media={driveItem.iconElement}>
@@ -106,16 +110,28 @@ export const FilesDataGrid = ({
       }),
       createTableColumn({
         columnId: "lastModifiedTimestamp",
+        // 按最后修改时间排序（早 → 晚）；缺失时间视为 0（最早）
+        compare: (a, b) =>
+          new Date(a.lastModifiedDateTime ?? 0).getTime() -
+          new Date(b.lastModifiedDateTime ?? 0).getTime(),
         renderHeaderCell: () => "Last Modified",
         renderCell: (driveItem) => (
-          <TableCellLayout>{driveItem.lastModifiedDateTime}</TableCellLayout>
+          <TableCellLayout>
+            {formatDateTimeColumnValue(driveItem.lastModifiedDateTime)}
+          </TableCellLayout>
         ),
       }),
       createTableColumn({
         columnId: "lastModifiedBy",
+        // 按修改者姓名字母序排序（忽略大小写）
+        compare: (a, b) => a.modifiedByName.localeCompare(b.modifiedByName),
         renderHeaderCell: () => "Last Modified By",
         renderCell: (driveItem) => (
-          <TableCellLayout>{driveItem.modifiedByName}</TableCellLayout>
+          <PersonCell
+            name={driveItem.modifiedByName}
+            imageUrl={driveItem.modifiedByPhotoUrl}
+            presenceStatus={driveItem.modifiedByPresence}
+          />
         ),
       }),
       createTableColumn({
@@ -167,6 +183,7 @@ export const FilesDataGrid = ({
       columns={columns}
       getRowId={(item) => item.id}
       style={{ width: "100%" }}
+      sortable
       resizableColumns
       columnSizingOptions={columnSizingOptions}
       selectionMode="multiselect"

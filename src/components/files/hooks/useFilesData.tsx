@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import { DocumentRegular, FolderRegular } from "@fluentui/react-icons";
 import {
@@ -8,6 +8,11 @@ import {
 } from "@fluentui/react-components";
 import { IDriveItemExtended } from "../../../common/types";
 import { IDriveItemWithDownloadUrl } from "../filesTypes";
+import {
+  collectModifiedByUserIds,
+  fetchUserPhotoUrlMap,
+  fetchUserPresenceMap,
+} from "../services/peopleEnrichment";
 
 interface IUseFilesDataOptions {
   /** 当前容器 ID。 */
@@ -27,6 +32,19 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
   // 记录 loadItems 的最新请求序号，避免旧请求因为慢一步返回而覆盖新目录数据。
   const [currentFolderId, setCurrentFolderId] = useState("root");
   const loadRequestSequenceRef = useRef(0);
+  const photoCacheRef = useRef(new Map<string, string>());
+
+  /**
+   * 释放当前 hook 生命周期内缓存的头像 object URL。
+   * 这里不再按“每次切目录”清理，而是在组件卸载时统一释放，
+   * 从而允许同一批用户头像在多个目录切换中复用。
+   */
+  const revokeCachedPhotoUrls = useCallback(() => {
+    photoCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
+    photoCacheRef.current.clear();
+  }, []);
+
+  useEffect(() => revokeCachedPhotoUrls, [revokeCachedPhotoUrls]);
 
   /**
    * 加载指定目录的子项。
@@ -36,7 +54,8 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
    * 流程：
    * 1. 调用 Graph API 获取指定文件夹的子项
    * 2. 将 DriveItem 转换为 IDriveItemExtended（添加 UI 辅助属性）
-   * 3. 更新 driveItems 状态和当前 folderId
+   * 3. 批量拉取修改者的 Teams Presence 状态，失败时静默降级
+   * 4. 更新 driveItems 状态和当前 folderId
    */
   const loadItems = useCallback(
     async (itemId = "root") => {
@@ -59,13 +78,91 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
             isFolder: Boolean(driveItem.folder),
             modifiedByName:
               driveItem.lastModifiedBy?.user?.displayName ?? "unknown",
+            modifiedById: driveItem.lastModifiedBy?.user?.id ?? undefined,
             iconElement: driveItem.folder ? <FolderRegular /> : <DocumentRegular />,
             downloadUrl: driveItem["@microsoft.graph.downloadUrl"],
           }),
         );
+        const uniqueUserIds = collectModifiedByUserIds(items);
 
+        // 先落盘核心列表数据，让导航、返回按钮、面包屑等依赖 loadItems 完成的 UI 立即更新。
         setDriveItems(items);
         setCurrentFolderId(itemId);
+
+        // 头像缩略图与 presence 都是增强信息，不阻塞首屏列表展示。
+        // 它们在后台异步回填，本次 loadItems 只负责尽快让核心列表和导航状态就绪。
+
+        void (async () => {
+          try {
+            if (uniqueUserIds.length === 0) {
+              return;
+            }
+
+            const photoMap = await fetchUserPhotoUrlMap({
+              userIds: uniqueUserIds,
+              graphClient,
+              photoCache: photoCacheRef.current,
+            });
+
+            if (requestSequence !== loadRequestSequenceRef.current) {
+              return;
+            }
+
+            if (photoMap.size > 0) {
+              setDriveItems((prev) =>
+                prev.map((item) =>
+                  item.modifiedById && photoMap.has(item.modifiedById)
+                    ? {
+                        ...item,
+                        modifiedByPhotoUrl: photoMap.get(item.modifiedById),
+                      }
+                    : item,
+                ),
+              );
+            }
+          } catch (photoError: unknown) {
+            console.warn(
+              `Failed to fetch user photos: ${photoError instanceof Error ? photoError.message : String(photoError)}`,
+            );
+          }
+        })();
+
+        // 批量拉取修改者的 Teams 在线状态。
+        // 失败时静默降级——presence 不影响文件列表核心功能，只是丰富展示信息。
+        void (async () => {
+          try {
+            if (uniqueUserIds.length === 0) {
+              return;
+            }
+
+            const presenceMap = await fetchUserPresenceMap(
+              graphClient,
+              uniqueUserIds,
+            );
+
+            // 再次检查序号，确保仍然是最新请求，防止旧 presence 覆盖新目录状态
+            if (requestSequence !== loadRequestSequenceRef.current) {
+              return;
+            }
+
+            // 将 presence 状态回写到各条目，触发二次渲染更新 Avatar badge
+            setDriveItems((prev) =>
+              prev.map((item) =>
+                item.modifiedById && presenceMap.has(item.modifiedById)
+                  ? {
+                      ...item,
+                      modifiedByPresence: presenceMap.get(item.modifiedById),
+                    }
+                  : item,
+              ),
+            );
+          } catch (presenceError: unknown) {
+            // presence 拉取失败不影响文件列表，仅记录警告
+            console.warn(
+              `Failed to fetch presence data: ${presenceError instanceof Error ? presenceError.message : String(presenceError)}`,
+            );
+          }
+        })();
       } catch (error: unknown) {
         console.error(
           `Failed to load items: ${error instanceof Error ? error.message : String(error)}`,

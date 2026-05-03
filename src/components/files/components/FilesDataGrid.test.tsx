@@ -33,6 +33,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={onPreviewFile}
         actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
       />,
     );
 
@@ -51,10 +52,33 @@ describe("FilesDataGrid", () => {
         onOpenFolder={onOpenFolder}
         onPreviewFile={vi.fn()}
         actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
       />,
     );
 
     fireEvent.click(screen.getByText("Folder A"));
     expect(onOpenFolder).toHaveBeenCalledWith("folder-1", "Folder A");
+  });
+
+  it("should render formatted relative time for recent timestamps", () => {
+    render(
+      <FilesDataGrid
+        driveItems={[
+          createItem({
+            id: "file-2",
+            name: "Recent file.txt",
+            lastModifiedDateTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          }),
+        ]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    expect(screen.getByText("1 hour ago")).toBeTruthy();
   });
 });

@@ -11,11 +11,29 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 
 /**
+ * 用户在线状态类型
+ *
+ * 对应 Microsoft Graph Presence API 返回的 availability 字段，
+ * 同时与 Fluent UI PresenceBadge 的 status prop 值保持一致。
+ **/
+export type UserPresenceStatus =
+  | "available"
+  | "away"
+  | "busy"
+  | "do-not-disturb"
+  | "offline"
+  | "out-of-office"
+  | "blocked"
+  | "unknown";
+
+/**
  * 扩展的 DriveItem 接口，用于文件列表 DataGrid 展示
  *
  * 继承自 Microsoft Graph 的 DriveItem 基础类型，新增以下 UI 辅助属性：
  * - isFolder: 判断是否为文件夹（DriveItem.folder 存在即为 true）
  * - modifiedByName: 最后修改者的显示名称（从嵌套的 lastModifiedBy.user.displayName 提取）
+ * - modifiedById: 最后修改者的用户 ID（从嵌套的 lastModifiedBy.user.id 提取，用于 presence 查询）
+ * - modifiedByPresence: 最后修改者的 Teams 在线状态（通过 Presence API 批量获取后填入）
  * - iconElement: 文件/文件夹图标的 JSX 元素（FolderRegular 或 DocumentRegular）
  * - downloadUrl: 文件的直接下载链接（来自 @microsoft.graph.downloadUrl 属性）
  *
@@ -24,6 +42,9 @@ import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 export interface IDriveItemExtended extends DriveItem {
   isFolder: boolean;
   modifiedByName: string;
+  modifiedById?: string;
+  modifiedByPresence?: UserPresenceStatus;
+  modifiedByPhotoUrl?: string;
   iconElement: JSX.Element;
   downloadUrl?: string;
 }

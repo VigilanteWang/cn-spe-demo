@@ -46,3 +46,9 @@ export const SPEMBEDDED_CONTAINER_MANAGE = "Container.Manage";
 /** 容器文件操作权限：读写用户授权的容器内文件（委托权限，用于 Graph API 直接调用） */
 export const SPEMBEDDED_FILESTORAGECONTAINER_SELECTED =
   "FileStorageContainer.Selected";
+
+/** 读取组织内所有用户的 Teams 在线状态（委托权限，用于 Presence API 批量查询） */
+export const GRAPH_PRESENCE_READ_ALL = "Presence.Read.All";
+
+/** 读取组织内用户头像缩略图（委托权限，用于头像图片回填） */
+export const GRAPH_PROFILE_PHOTO_READ_ALL = "ProfilePhoto.Read.All";
