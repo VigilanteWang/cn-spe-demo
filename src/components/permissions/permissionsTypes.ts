@@ -3,6 +3,7 @@
  */
 export interface IContainerPermissionDialogProps {
   open: boolean;
+  containerId?: string;
   containerName?: string;
   onClose: () => void;
 }

@@ -4,12 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { FilesDataGrid } from "./FilesDataGrid";
 import { IDriveItemExtended } from "../../../common/types";
 
-if (typeof globalThis.NodeFilter === "undefined") {
-  globalThis.NodeFilter = {
-    SHOW_ELEMENT: 1,
-  } as typeof NodeFilter;
-}
-
 const createItem = (
   overrides: Partial<IDriveItemExtended>,
 ): IDriveItemExtended =>

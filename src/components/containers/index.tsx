@@ -142,6 +142,7 @@ export const Containers = (_props: IContainersProps) => {
           <div className={styles.actionGroup} data-testid="container-actions">
             <Button
               appearance="primary"
+              disabled={!selectedContainer}
               onClick={() => setIsPermissionDialogOpen(true)}
             >
               Manage Permission
@@ -163,6 +164,7 @@ export const Containers = (_props: IContainersProps) => {
       {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}
       <ContainerPermissionDialog
         open={isPermissionDialogOpen}
+        containerId={selectedContainer?.id}
         containerName={selectedContainer?.displayName}
         onClose={() => setIsPermissionDialogOpen(false)}
       />

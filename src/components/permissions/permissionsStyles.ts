@@ -4,30 +4,64 @@ import { makeStyles, shorthands, tokens } from "@fluentui/react-components";
  * 容器权限模块样式。
  */
 export const usePermissionsStyles = makeStyles({
+  surface: {
+    width: "min(560px, calc(100vw - 32px))",
+    maxWidth: "calc(100vw - 32px)",
+  },
   content: {
     display: "flex",
     flexDirection: "column",
     rowGap: "16px",
-    minWidth: "560px",
+    width: "100%",
+    minWidth: 0,
     maxWidth: "100%",
   },
   section: {
     display: "flex",
     flexDirection: "column",
     rowGap: "8px",
+    minWidth: 0,
   },
-  placeholderBox: {
-    border: `1px dashed ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground2,
-    color: tokens.colorNeutralForeground2,
-    minHeight: "72px",
+  principalInputWrapper: {
+    width: "100%",
+    minWidth: 0,
+  },
+  principalCombobox: {
+    width: "100%",
+    minWidth: 0,
+  },
+  dropdownOption: {
     display: "flex",
-    alignItems: "center",
-    ...shorthands.padding("12px"),
-    boxSizing: "border-box",
+    flexDirection: "column",
+    rowGap: "4px",
+    minWidth: 0,
   },
-  listPlaceholder: {
-    minHeight: "160px",
+  tableWrapper: {
+    width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    overflowX: "auto",
+    ...shorthands.padding("8px"),
+  },
+  accessTable: {
+    width: "100%",
+    tableLayout: "fixed",
+  },
+  headerCell: {
+    fontWeight: tokens.fontWeightBold,
+  },
+  principalColumn: {
+    width: "calc(100% - 188px)",
+  },
+  roleColumn: {
+    width: "132px",
+  },
+  actionColumn: {
+    width: "56px",
+  },
+  roleSelect: {
+    width: "120px",
   },
 });

@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import "@testing-library/jest-dom/vitest";
 import {
   cleanup,
   fireEvent,
@@ -11,12 +10,6 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Containers } from "./index";
 import { IContainer } from "../../common/types";
-
-if (typeof globalThis.NodeFilter === "undefined") {
-  globalThis.NodeFilter = {
-    SHOW_ELEMENT: 1,
-  } as typeof NodeFilter;
-}
 
 const { listContainersMock, createContainerMock } = vi.hoisted(() => {
   return {
@@ -74,28 +67,30 @@ describe("Containers", () => {
     expect(
       screen.getByRole("button", { name: "Manage Permission" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Manage Permission" }),
+    ).toBeDisabled();
   });
 
-  it("should open permission dialog when clicking manage button", async () => {
-    listContainersMock.mockResolvedValue([]);
+  it("should keep permission button disabled before a container is selected", async () => {
+    listContainersMock.mockResolvedValue([
+      {
+        id: "container-a",
+        displayName: "Container A",
+        containerTypeId: "type-a",
+        createdDateTime: "2026-05-02T00:00:00Z",
+      },
+    ]);
 
     render(<Containers />);
 
-    const header = await screen.findByTestId("containers-header");
-
-    fireEvent.click(
-      within(header).getByRole("button", {
-        name: "Manage Permission",
-      }),
-    );
+    await waitFor(() => {
+      expect(listContainersMock).toHaveBeenCalledTimes(1);
+    });
 
     expect(
-      screen.getByRole("dialog", { name: "Manage Container Permission" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Container: 未选择容器")).toBeInTheDocument();
-    expect(
-      screen.getByText("静态列表占位：后续将在这里渲染容器权限访问列表。"),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Manage Permission" }),
+    ).toBeDisabled();
   });
 
   it("should keep header controls and files region as separate layout areas", async () => {
@@ -125,7 +120,39 @@ describe("Containers", () => {
     fireEvent.click(await screen.findByText("Container A"));
 
     expect(
+      screen.getByRole("button", { name: "Manage Permission" }),
+    ).toBeEnabled();
+    expect(
       await within(filesRegion).findByTestId("mock-files"),
     ).toHaveTextContent("Files for Container A");
+  });
+
+  it("should open permission dialog after a container is selected", async () => {
+    listContainersMock.mockResolvedValue([
+      {
+        id: "container-a",
+        displayName: "Container A",
+        containerTypeId: "type-a",
+        createdDateTime: "2026-05-02T00:00:00Z",
+      },
+    ]);
+
+    render(<Containers />);
+
+    await waitFor(() => {
+      expect(listContainersMock).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.click(await screen.findByText("Container A"));
+    fireEvent.click(screen.getByRole("button", { name: "Manage Permission" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Manage Container Permission" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Container:/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Add People" }),
+    ).toBeInTheDocument();
   });
 });
