@@ -76,6 +76,7 @@ const createEntryFromCandidate = (
   candidate: IPermissionPrincipalCandidate,
   role: IContainerPermissionEntry["role"] = "Reader",
 ): IContainerPermissionEntry => ({
+  // 用“主体类型 + 主体 ID”生成前端唯一键，方便表格渲染和本地更新定位。
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,
   principalName: candidate.name,
@@ -101,6 +102,8 @@ export const createInitialPermissionEntries = (): PermissionEntriesByTab => ({
 
 /**
  * 从候选项创建一条新的默认权限记录。
+ *
+ * 这个函数用于“从下拉候选加入表格”的场景，默认角色保持 Reader。
  */
 export const createPermissionEntryFromCandidate = (
   candidate: IPermissionPrincipalCandidate,

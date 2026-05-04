@@ -22,9 +22,13 @@ export type ContainerPermissionRole =
  * - 后续接入 Graph 搜索时，可以继续复用这个基础模型。
  */
 export interface IPermissionPrincipalCandidate {
+  /** 候选主体的稳定标识。 */
   id: string;
+  /** 下拉列表和表格里展示的主体名称。 */
   name: string;
+  /** 候选主体属于 people 还是 groups。 */
   type: PermissionTabValue;
+  /** 用于辅助筛选和展示的描述信息。 */
   description: string;
 }
 
@@ -36,11 +40,17 @@ export interface IPermissionPrincipalCandidate {
  * - role 表示当前草稿中的容器级角色。
  */
 export interface IContainerPermissionEntry {
+  /** 当前权限记录在前端列表中的唯一键。 */
   id: string;
+  /** 对应真实主体的稳定标识，用于防止重复添加。 */
   principalId: string;
+  /** 表格中展示的主体名称。 */
   principalName: string;
+  /** 当前权限记录属于 people 还是 groups 页签。 */
   principalType: PermissionTabValue;
+  /** 表格筛选和说明区使用的描述信息。 */
   description: string;
+  /** 当前草稿中的容器权限角色。 */
   role: ContainerPermissionRole;
 }
 
