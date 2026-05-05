@@ -3,8 +3,8 @@
 ## Summary
 
 - 目标仍然是完成 `Container Permission mgmt`，但后续步骤按当前代码状态和 Microsoft Graph 最佳实践重新拆分。
-- 当前结论：步骤 1、步骤 2 已完成；后续建议改为 `步骤 3 → 步骤 4 → 步骤 5`。
-- 这次重整的重点不是“继续沿用原 prompt”，而是先根据已经落地的实现和官方搜索能力修正后续路线。
+- 当前结论：步骤 1、步骤 2 已完成；后续继续保持 `步骤 3 → 步骤 4 → 步骤 5`。
+- 这次重整的重点不是继续沿用旧 prompt，而是把搜索策略、cache 策略、前后端边界和后续实现顺序一次性定清楚。
 
 ## Current Scan
 
@@ -33,202 +33,247 @@
 - 还没有 Fluent UI v9 `TagPicker`。
 - 还没有真实容器权限初始加载。
 - `Apply` 还没有真实 Graph 写回。
-- 现在的“搜索入口”“搜索语义”“请求节流”“后端边界”都还没定型，继续直接做 UI 容易返工。
+- 现在的“搜索入口”“搜索分级策略”“缓存周期”“请求节流”“后端边界”都还没最终落地，继续直接做 UI 容易返工。
 
 ## Best-Practice Adjustments
 
-### 1. People / Group search 建议改为后端实现
+### 1. People / Group search 继续放前端实现
 
-- 结合本项目现状，建议把 `people/group search` 放到后端，而不是前端直接调 Graph。
-- 原因不是“前端一定不能调 Graph”，而是这个仓库已经把容器管理主流程放在后端 OBO 链路里，目录搜索继续走后端更一致：
-  - 前端不需要额外直接持有目录搜索 Graph 调用细节
-  - 后端更容易统一封装 `ConsistencyLevel`、`$count`、`$select`、`$top`
-  - 后端更容易集中做最小长度保护、去抖后的请求语义、查询日志和错误映射
-  - 后续权限读取与写回如果也走后端，权限模块的数据流会更整齐
-- 这仍然符合 Microsoft Graph 的交互式应用最佳实践，因为后端可以继续用 OBO 代表当前登录用户发起委托调用，而不是改成 application permission。
+- 按当前决策，`people/group search` 继续放到前端实现，不新增后端目录搜索路由。
+- 前端直接使用委托权限调用 Graph：
+  - 用户搜索使用 `User.ReadBasic.All`
+  - 组搜索使用 `GroupMember.Read.All`
+- 这样做的边界是：
+  - 搜索分级逻辑、去抖、最小长度门槛、过期请求取消和短周期 cache 都在前端完成
+  - 真实容器权限加载与写回仍然走后端 OBO，不和搜索实现绑定在一起
 
-### 2. 搜索 API 形式建议
+### 2. 搜索 API 形式改为“分级搜索”，而不是单一路径 `$search`
 
-- People 搜索：
-  - 用 `GET /users`
-  - 用 `$search`
-  - 查询语义建议为：
-    - `displayName:{q}`
-    - `mail:{q}`
-    - `userPrincipalName:{q}`
-  - 组合方式：
-    - `$search="displayName:{q}" OR "mail:{q}" OR "userPrincipalName:{q}"`
-- Group 搜索：
-  - 用 `GET /groups`
-  - 用 `$search`
-  - 查询语义建议为：
-    - `displayName:{q}`
-    - `description:{q}`
-    - `mail:{q}`
-  - 组合方式：
-    - `$search="displayName:{q}" OR "description:{q}" OR "mail:{q}"`
-- 两者都要加：
-  - `ConsistencyLevel: eventual`
-  - `$count=true`
-  - 较小的 `$top`，建议先 `10`
-  - 最小化 `$select`
+- 这次需求里，最好的性能路径不是“所有输入都走 `$search`”，而是先识别输入形态，再走最省 Graph 成本的路径。
+- 推荐顺序如下：
+  - 如果 query 是 GUID：
+    - `People` 页签调用 `GET /users/{id}`
+    - `Groups` 页签调用 `GET /groups/{id}`
+  - 如果 query 是完整 UPN / email：
+    - `People` 先调用 `GET /users/{userPrincipalName}`，其中 `userPrincipalName` 必须作为 URL path segment 做 `encodeURIComponent`
+    - 如果 `People` 直取失败，再调用 `/users?$filter=mail eq '{q}'`
+    - `Groups` 调用 `/groups?$filter=mail eq '{q}'`
+  - 如果 query 更像 identifier prefix，例如包含 `@`、`.`、`-`、`_`，或明显不是自然语言姓名：
+    - `People` 用 `startswith(userPrincipalName,'{q}') or startswith(mail,'{q}')`
+    - `Groups` 用 `startswith(mail,'{q}') or startswith(mailNickname,'{q}')`
+  - 其他普通词、姓氏片段或 display name 片段：
+    - `People` 用 `/users?$search="displayName:{q}"`
+    - `Groups` 用 `/groups?$search="displayName:{q}" OR "description:{q}"`
+- 这个策略的核心是：
+  - 精确值尽量走 direct get
+  - identifier 前缀尽量走 `startswith` filter
+  - 普通人名 / 词组再走 `$search`
 
-### 3. 搜索能力边界要按 Graph 官方语义设计
+### 3. Graph 官方语义边界要写进实现和 prompt
 
-- Graph 目录对象 `$search` 不支持真正的 `contains`。
-- `displayName` 和 `description` 走 tokenized search。
-- `mail`、`userPrincipalName` 这类其他字符串字段在 `$search` 中默认更接近 `startswith` 行为。
-- 所以这次需求里：
-  - “可以从姓开始搜”是合理目标，只要姓能作为 `displayName` 的 token 被切出来
+- Graph 目录对象 `$search` 不支持真正的任意位置 `contains`。
+- `displayName` 和 `description` 是 tokenized search。
+- `mail`、`userPrincipalName`、`mailNickname` 这类 identifier 更适合作为 exact / prefix 查询，而不是承诺任意位置模糊命中。
+- Graph 查询构造必须集中处理特殊字符：
+  - URL path segment 用 `encodeURIComponent`，尤其处理 B2B / guest UPN 里的 `#`、空格等字符
+  - OData `$filter` 字符串 literal 里的单引号要按 OData 规则转成两个单引号
+  - `$search` 的 query text 要转义或拒绝会破坏查询语法的双引号、反斜杠等字符，避免用户输入拼坏 query
+  - `normalizedQuery` 只用于 cache key 和输入判定，不直接替代实际发给 Graph 的 escaped query
+- 所以后续实现和 prompt 应明确：
   - “支持 UPN / email / displayName 搜索”是合理目标
-  - 但“UPN / email 任意位置真正 contains”不应该靠大范围拉取后再本地过滤去伪造，这不符合最佳实践，也会明显放大请求和数据量
-- 后续实现和 prompt 里应明确写成：
-  - `displayName` 支持 tokenized match
-  - `mail / userPrincipalName` 按 Graph 官方能力支持搜索，接受其非完全 contains 的限制
+  - “支持姓氏 / 词片段命中 displayName token”是合理目标
+  - “UPN / email 任意位置真正 contains”不应靠拉大列表后本地过滤去伪造
 
-### 4. 请求数量保护要前后端双保险
+### 4. 搜索 cache 建议使用内存 LRU + TTL，不默认落浏览器 storage
+
+- 本功能建议增加前端搜索结果 cache，但默认只做：
+  - 会话内内存 cache
+  - LRU 淘汰
+  - 短周期 TTL
+- 不建议 v1 默认使用：
+  - `localStorage`
+  - `sessionStorage`
+- 原因：
+  - Web Storage 是同步 API，会阻塞主线程
+  - 目录搜索结果包含用户 / 组身份信息，不适合默认长期持久化
+  - 当前 picker 每次只拿很小结果集，跨刷新持久化带来的收益有限
+- 如果未来有明确“跨刷新仍要保留最近搜索”的产品需求，再考虑 `IndexedDB`，但当前版本不需要。
+- cache 建议规则：
+  - key 至少包含：
+    - `tenantId`
+    - `accountId`
+    - `principalKind`
+    - `searchStrategy`
+    - `normalizedQuery`
+  - successful collection search TTL：`5 分钟`
+  - exact id / exact UPN 命中 TTL：`10 分钟`
+  - negative result / 404 TTL：`30 秒`
+  - 每个 `principalKind` 最多保留 `50` 个 query entry
+  - 登出、切换账号、切换 tenant、Graph `401/403` 时清空相关 cache
+
+### 5. 请求数量保护仍然以前端为主
 
 - 前端：
-  - 至少 3 个字符才开始请求
+  - 普通 collection search 至少 3 个字符才开始请求
   - 去抖，建议 `300ms ~ 400ms`
-  - 取消过期请求
-  - 相同页签 + 相同 query 去重
-- 后端：
-  - 长度不足 3 直接拒绝或返回空数组
-  - 限制 `$top`
+  - 取消或忽略过期请求
+  - 相同页签 + 相同 query 由 cache 去重
+  - GUID / 完整 UPN / 完整 email 可以绕过 3 字符门槛，直接走 exact search
+- Graph 请求参数：
+  - 限制 `$top`，建议先 `10`
   - 保持返回字段最小化
-- 这样比“每次输入都打一次 Graph”更稳，也更接近官方关于最小化数据与节流恢复的建议。
+  - `$search` 请求带 `ConsistencyLevel: eventual` 和 `$count=true`
+  - `startswith(...)`、`or` 组合、`$search` 等 advanced directory collection query 再补齐 Graph 要求的 query/header
+  - direct get 和简单 exact `eq` 查询不要无差别地加 advanced query 参数，保持请求最小化
 
-### 5. 权限读写步骤也建议改成后端 OBO 路线
+### 6. SDK 已覆盖基础 Graph retry，不要重复手写通用 retry loop
 
-- 原计划步骤 4 写的是“前端直接调用 Graph，不新增后端权限路由”。
-- 现在看，后续最好改成：
-  - 权限搜索走后端
-  - 容器权限 list / create / update / delete 也走后端
-- 这样权限功能的数据访问边界一致，前端只保留 UI 与状态编排。
+- 本项目当前两条 Graph client 路径都已经有 Microsoft Graph JavaScript SDK 的 `RetryHandler`：
+  - 前端 MGT `Providers.globalProvider.graph.client` 由 MGT 创建，middleware chain 中包含 `RetryHandler`
+  - 后端 `createGraphClient` 使用 `@microsoft/microsoft-graph-client` 的 `Client.init(...)`，会走默认 middleware chain，其中包含 `RetryHandler`
+- 当前 SDK 默认会对 `429`、`503`、`504` 做 retry，优先读取 `Retry-After`，否则使用 backoff；默认 `maxRetries` 为 `3`。
+- 所以后续实现不要再包一层通用 429 retry，避免一次请求被 SDK retry 后又被业务代码二次 retry，造成更长等待和更多重复调用。
+- 应用层仍然需要做的是：
+  - 减少请求次数：最小长度、去抖、cache、取消过期请求
+  - 降低写入并发：顺序写入或小批量写入
+  - 做清晰错误映射：如果 SDK retry 后仍失败，把 `429` / `Retry-After` / request id 等信息转成前端可理解的错误
+  - 避免 JSON batch 里假设 SDK 会自动重试每个子请求；如果未来使用 batch，需要单独处理被 throttled 的子请求
+
+### 7. 权限读写继续保持后端 OBO 路线
+
+- 搜索走前端
+- 容器权限 list / create / update / delete 继续走后端
+- 这样权限功能的数据访问边界更清晰：
+  - 前端负责目录搜索、结果缓存和交互
+  - 后端负责真实权限读写、Graph 编排、重试和错误映射
 - 对这个功能来说，这样也更平衡安全与服务器性能：
-  - 安全上，后端继续走 OBO，只代表当前登录用户使用 delegated permission，不需要为了方便把权限操作暴露成前端直连 Graph 细节
-  - 性能上，权限加载与写回本身是低频操作，通常只是“打开 Dialog 读一次”和“点击 Apply 写一次”，多一跳后端带来的成本通常小于统一节流、重试、错误映射带来的收益
-  - 后端可以集中处理 `429` / `Retry-After`、最小 `$select`、顺序写入或小批量写入策略，避免前端分散实现
-
-### 6. 权限加载与写回应避免“为了省服务器而前端直连”
-
-- 在这个场景里，“把真实权限加载与写入放前端”并不能明显节省真正昂贵的成本，因为真正的外部调用仍然是 Graph。
-- 反而如果前端直连：
-  - Graph 请求构造、重试、节流、审计信息会分散到 UI 层
-  - 更难统一约束最小字段、最小调用次数和错误处理
-  - 后续如果再加权限校验、审计日志或故障排查，改造成本更高
-- 所以后续计划应坚持：
-  - 前端做展示、草稿和交互
-  - 后端做真实数据访问、Graph 编排和稳定性处理
+  - 安全上，后端继续走 OBO，只代表当前登录用户使用 delegated permission
+  - 性能上，权限加载与写回本身是低频操作，通常只是“打开 Dialog 读一次”和“点击 Apply 写一次”
+  - 后端可以集中处理最小 `$select`、顺序写入或小批量写入、SDK retry 后仍失败时的错误映射
 
 ## Revised Step Prompts
 
-### 步骤 3：后端目录搜索 API（People / Groups）
+### 步骤 3：前端目录搜索服务、分级策略与短周期缓存
 
 ```text
-请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的下一步。本步只做后端目录搜索能力，不做前端 TagPicker 接入，不做真实权限写回。
+请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的下一步。本步只做前端目录搜索服务，不做最终 TagPicker 交互收尾，不做真实权限写回。
 
 背景：
 - 步骤 1、2 已完成，当前权限 Dialog 已有本地草稿编辑能力。
-- 本项目已有后端 OBO 架构，容器管理主流程已经通过后端代表用户调用 Graph。
-- 这一步要把 People / Groups 搜索放到后端，作为后续前端选择器的真实数据源。
+- People / Groups 搜索放在前端直接调用 Microsoft Graph。
+- 真实容器权限加载与写回仍保留在后端 OBO。
+- 本步要把目录搜索从单纯 `$search` 升级为分级搜索策略，并加入短周期内存缓存。
 
 要求：
-1. 先阅读当前 `server/`、`src/services/spembedded.ts`、权限模块和现有 OBO 代码，再直接实现。
+1. 先阅读当前权限模块、`src/common/scopes.ts`、前端 Graph 调用方式、现有认证结构和 `AGENTS.md`。
 2. 遵守仓库 `AGENTS.md`：新增注释和 JSDoc 必须是简体中文；TypeScript 严格，不允许 `any`。
-3. 本步新增后端目录搜索 API，建议形态：
-   - 一个统一路由，例如按 `type=people|groups`
-   - 或两个独立路由
-   - 但都必须走现有后端 OBO → Graph 链路
-4. People 搜索必须调用 Microsoft Graph `GET /users`，使用 `$search`，并按官方能力组合：
-   - `displayName:{q}`
-   - `mail:{q}`
-   - `userPrincipalName:{q}`
-5. Groups 搜索必须调用 Microsoft Graph `GET /groups`，使用 `$search`，并按官方能力组合：
-   - `displayName:{q}`
-   - `description:{q}`
-   - `mail:{q}`
-6. 所有目录搜索请求都必须正确带上：
+3. 在前端登录 scopes 中补充并正确使用：
+   - `User.ReadBasic.All`
+   - `GroupMember.Read.All`
+4. 新增独立的前端目录搜索模块或 Hook，不要把 Graph 查询构造、缓存、错误映射堆在 Dialog 组件里。
+5. 搜索策略必须按输入类型分级：
+   - 如果 query 是 GUID：
+     - People tab 调 `GET /users/{id}`
+     - Groups tab 调 `GET /groups/{id}`
+   - 如果 query 是完整 UPN / email：
+     - People 优先调 `GET /users/{userPrincipalName}`，其中 path segment 必须用 `encodeURIComponent`
+     - People 若 404，再用 `/users?$filter=mail eq '{q}'`
+     - Groups 用 `/groups?$filter=mail eq '{q}'`
+   - 如果 query 像 identifier prefix，例如包含 `@`、`.`、`-`、`_` 或明显不是自然语言姓名：
+     - People 用 `startswith(userPrincipalName,'{q}') or startswith(mail,'{q}')`
+     - Groups 用 `startswith(mail,'{q}') or startswith(mailNickname,'{q}')`
+   - 其他普通词或 display name 片段：
+     - People 用 `/users?$search="displayName:{q}"`
+     - Groups 用 `/groups?$search="displayName:{q}" OR "description:{q}"`
+6. 所有 collection 查询都必须使用较小 `$top`，建议 `10`，并使用最小 `$select`。
+7. `$search` 请求必须带：
    - `ConsistencyLevel: eventual`
    - `$count=true`
-   - 较小的 `$top`，建议先 `10`
-   - 最小必要 `$select`
-7. 必须前后端双保险地保护请求量：
-   - query 长度不足 3 时，后端直接返回空结果或明确的 400
-   - 不允许为了“contains”效果去拉大列表后本地过滤
-8. 请把 Graph 查询构造、响应映射、错误处理拆到独立模块，不要把逻辑堆到 `server/index.ts`。
-9. 返回给前端的视图模型要统一，至少包含：
+8. 需要 advanced query 的 `$filter` 请求按 Microsoft Graph 规则补齐必要 header / `$count=true`；不需要 advanced query 的 direct get 或 exact `eq` 不额外加复杂参数。
+9. 必须实现集中 query builder，不允许在组件里手写拼接 Graph query：
+   - URL path segment 用 `encodeURIComponent`
+   - OData `$filter` 字符串 literal 中的单引号转成两个单引号
+   - `$search` query text 要转义或拒绝会破坏语法的双引号、反斜杠等字符
+   - query 参数必须通过 Graph SDK 的 query/select/top/search/filter 等 API 或 `URLSearchParams` 等结构化方式构造，避免裸字符串散落在 UI 组件中
+   - `normalizedQuery` 只用于 cache key 和输入判定，实际请求必须使用 escaped query
+10. 不允许为了模拟任意位置 contains 而拉大列表后前端过滤。
+11. 实现内存 LRU + TTL cache：
+   - cache key 包含 `tenantId`、`accountId`、`principalKind`、`searchStrategy`、`normalizedQuery`
+   - 成功搜索结果 TTL 为 5 分钟
+   - exact id / exact UPN 命中 TTL 为 10 分钟
+   - 404 / 空结果 TTL 为 30 秒
+   - 每个 `principalKind` 最多保留 50 个 query entry，超过后淘汰最旧 entry
+   - 登出、切换账号、切换 tenant、401/403 时清空相关 cache
+12. 不要为前端目录搜索手写通用 429 retry loop；MGT / Graph SDK 的默认 client 已包含 RetryHandler。本步只需要把 SDK retry 后仍失败的错误映射清楚。
+13. 本步不要使用 `localStorage` 或 `sessionStorage` 持久化目录搜索结果；代码注释中说明原因：同步 API 会阻塞主线程，且目录身份信息不应长期保留。
+14. 返回给前端选择器的统一视图模型至少包含：
    - `id`
    - `displayName`
    - `secondaryText`
    - `principalType`
-   - 对 user 返回 `mail` / `userPrincipalName`
-10. 请在代码中明确说明 Graph 搜索语义限制：
-   - `displayName` / `description` 是 tokenized search
-   - `mail` / `userPrincipalName` 不应承诺“任意位置 contains”
-11. 本步不要实现：
-   - 前端 `TagPicker`
-   - 权限初始加载
-   - `Apply` 写回
-12. 请补测试，至少覆盖：
-   - People 搜索 query 构造
-   - Groups 搜索 query 构造
-   - 3 个字符门槛
-   - Graph 响应到前端模型的映射
+   - user 的 `mail` / `userPrincipalName`
+   - group 的 `mail` / `groupTypes` / `mailEnabled` / `securityEnabled`
+15. 明确 group 类型映射：
+   - `groupTypes` 包含 `Unified` 为 Microsoft 365 group
+   - `mailEnabled=true` 且 `securityEnabled=false` 为 DL
+   - `mailEnabled=false` 且 `securityEnabled=true` 为 security group
+   - `mailEnabled=true` 且 `securityEnabled=true` 为 mail-enabled security group
+16. 请补测试，至少覆盖：
+   - GUID 输入走 direct get
+   - 完整 UPN / email 输入走 exact path
+   - identifier prefix 输入走 `startswith` filter
+   - 普通 display name 输入走 `$search`
+   - UPN / email 中 `#`、空格、单引号等特殊字符的 URL encoding / OData escaping
+   - `$search` 输入中双引号、反斜杠等特殊字符不会拼坏 query
+   - `$search` header / `$count=true`
+   - advanced query 和 simple query 的 header / `$count=true` 差异
+   - 最小 `$select` / `$top=10`
+   - cache hit 不重复请求 Graph
+   - TTL 过期后重新请求
+   - 401/403 清空 cache
+   - SDK retry 后仍失败时的错误映射
    - Graph 失败时的错误映射
-13. 最后运行：
+17. 最后运行：
    - `npm test -- --run`
    - `npx tsc --noEmit`
 
-完成后请输出改动摘要、API 设计、Graph 查询语义说明和测试结果。
+完成后请输出改动摘要、分级搜索策略、cache 策略、Graph 查询语义限制、所新增 scopes 和测试结果。
 ```
 
-### 步骤 4：前端 TagPicker 接入真实搜索，并控制请求频率
+### 步骤 4：TagPicker 接入真实搜索服务，并控制交互请求频率
 
 ```text
-请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的下一步。假设后端目录搜索 API 已完成。本步只做前端搜索体验与真实选择器接入，不做真实权限写回。
-
-背景：
-- 当前 Dialog 已有本地草稿编辑。
-- 后端已提供真实 People / Groups 搜索 API。
-- 本步要把本地 `Combobox` 占位替换成 Fluent UI v9 `TagPicker`，并把请求频率保护做好。
+请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的下一步。假设步骤 3 的前端目录搜索服务、分级策略和内存 cache 已完成。本步只做前端搜索体验与 Fluent UI v9 TagPicker 接入，不做真实权限写回。
 
 要求：
-1. 先阅读当前权限模块、现有本地搜索占位逻辑和新增的后端搜索 API，再直接实现。
+1. 先阅读当前权限模块、现有本地搜索占位逻辑和步骤 3 新增的目录搜索服务。
 2. 遵守仓库 `AGENTS.md`：新增注释和 JSDoc 必须是简体中文；新增 UI 用 Fluent UI；TypeScript 严格，不允许 `any`。
-3. 必须把当前占位输入替换为 Fluent UI v9 `TagPicker`。
-4. 搜索源切换规则：
-   - `People` 页签只调用 people 搜索 API
-   - `Groups` 页签只调用 groups 搜索 API
-5. 请求量保护必须落实到前端交互：
-   - 少于 3 个字符不发请求
-   - 去抖，建议 `300ms ~ 400ms`
-   - 输入变化时取消过期请求
-   - 相同 query + 相同 tab 不重复请求
-6. 候选项显示要求：
+3. 把当前本地 `Combobox` 占位替换为 Fluent UI v9 `TagPicker`。
+4. TagPicker 不直接构造 Graph query，只调用步骤 3 的统一搜索接口。
+5. 请求频率保护落实在 UI 层：
+   - 少于 3 个字符不触发 collection search
+   - GUID / 完整 UPN / email 可以绕过 3 字符门槛走 exact search
+   - 去抖 `300ms ~ 400ms`
+   - 输入变化时取消或忽略过期请求
+   - 相同 query + same tab 由搜索服务 cache 去重
+6. People tab 只返回 user；Groups tab 只返回 group。
+7. 候选项显示：
    - 主文本显示 `displayName`
    - 次文本优先显示 `mail` / `userPrincipalName` / group description
    - user 显示头像占位或合理图标
-   - group 显示组图标
-7. 选择与新增规则：
+   - group 显示组图标，并可区分 Microsoft 365 group / DL / security group
+8. 选择与新增规则：
    - 当前 access list 已存在的对象不可重复新增
-   - 如果对象已存在于当前 access list，禁用 `Add`，并把 access list 过滤到匹配项
-   - 无结果时禁用 `Add`，显示明确空态
-   - 只有选择了一个真实候选对象且该对象尚未存在于当前 access list 时，`Add` 才可用
-8. 搜索语义要与后端 Graph 能力一致，不要在前端文案里暗示“任意位置 contains”。
-9. 本步不要实现：
+   - 已存在对象禁用 `Add` 或显示为不可选
+   - 无结果时显示明确空态
+   - 只有选择真实候选对象且未重复时，`Add` 才可用
+9. UI 文案不要暗示支持任意位置 contains；保持与 Graph tokenized search / startswith 限制一致。
+10. 本步不要实现：
    - 真实权限初始加载
    - `Apply` 写回
-10. 请把异步搜索状态拆到独立 Hook，例如：
-   - query
-   - debounce 后的请求时机
-   - loading
-   - empty
-   - error
-   - request cancellation
 11. 请补测试，至少覆盖：
-   - 少于 3 个字符不请求
+   - 少于 3 个字符不触发普通搜索
+   - GUID / 完整 UPN / email 可触发 exact search
    - 去抖后才请求
    - 页签切换时搜索源切换
    - 重复对象导致 `Add` 禁用
@@ -238,75 +283,75 @@
    - `npm test -- --run`
    - `npx tsc --noEmit`
 
-完成后请输出改动摘要、前端请求控制策略、TagPicker 交互说明和测试结果。
+完成后请输出改动摘要、TagPicker 交互说明、请求频率控制、如何复用步骤 3 cache，以及测试结果。
 ```
 
 ### 步骤 5：真实容器权限加载、差异计算与 Apply 写回
 
 ```text
-请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的收尾步骤。假设前 4 步已经完成。本步只做真实容器权限加载、差异计算和 `Apply` 写回。
-
-背景：
-- 现在的搜索能力已经通过后端 OBO 提供。
-- 本步也请保持同一架构方向：容器权限 API 同样通过后端代表用户调用 Graph。
-- 这一步的目标不是“尽量减少服务器参与”，而是在低频权限操作场景下平衡安全与性能：前端保留 UI 状态，后端承接真实 Graph 读写、节流、重试和错误映射。
+请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的收尾步骤。假设前端目录搜索服务和 TagPicker 接入已完成。本步只做真实容器权限加载、差异计算和 `Apply` 写回。
 
 要求：
-1. 先探索当前权限模块、后端目录搜索、容器页面的最新状态，再直接实现。
+1. 先探索当前权限模块、前端目录搜索、TagPicker 接入、容器页面和后端 OBO 结构。
 2. 遵守仓库 `AGENTS.md`：新增注释和 JSDoc 必须是简体中文；TypeScript 严格，不允许 `any`。
-3. 本步接入真实容器权限 API，且继续走后端 OBO 路线；不要改成前端直接调用 Graph：
-   - `list fileStorageContainer permissions`
-   - `create fileStorageContainer permission`
-   - `update fileStorageContainer permission`
-   - `delete fileStorageContainer permission`
-4. 请按最小权限和最小数据原则实现：
-   - 委托权限保持为当前场景所需的最小集合，不要因为实现方便扩大到更高权限
-   - 读取时使用最小必要字段和合理的查询参数
-   - 不要为了减少后端参与而把 Graph 读写改成前端直连
-5. 不要把权限逻辑塞回现有 `src/services/spembedded.ts`；请保持权限功能自己的前后端模块边界。
-6. 后端必须统一处理 Graph 稳定性问题：
-   - `429` / `Retry-After`
-   - 必要的退避重试
+3. 容器权限 list / create / update / delete 继续走后端 OBO，不改成前端直连 Graph。
+4. 前端搜索得到的 principal 必须用稳定 `id` 参与权限写回；UPN / email / displayName 只作为展示和搜索辅助字段。
+5. 后端权限 API 需要集中处理：
+   - 依赖 Graph SDK 默认 RetryHandler 处理基础 `429` / `503` / `504` retry，不重复手写通用 retry loop
+   - SDK retry 后仍失败时，提取 `429` / `Retry-After` / request id 等信息并映射给前端
+   - 最小字段
+   - 顺序写入或小批量写入
    - 面向前端的明确错误映射
-   - 关键请求日志字段（至少保留可排查 request 级别问题的结构）
-7. 实现真实初始加载：
-   - 打开 Dialog 时读取当前容器权限
-   - 映射到本地 access list 视图模型
-   - loading / error 状态完整
-8. 实现 `Apply`：
+6. 实现打开 Dialog 时真实加载当前容器权限，并映射为本地 access list 视图模型。
+7. 实现 `Apply`：
    - 对比初始权限和当前草稿
-   - 正确拆分新增、更新、删除
-   - 默认优先顺序调用或小批量调用，避免为追求表面速度而制造更高 Graph 节流风险
+   - 拆分新增、更新、删除
    - 成功后刷新当前列表并清空脏状态
-   - 失败时给出明确错误提示，不吞错
-9. 保留 `Close` 放弃未提交草稿的保护。
-10. 如果 Graph 权限模型里存在当前 UI 角色名与后端 API 角色名的映射，请把映射收敛到单独模块并写清楚中文注释。
-11. 请补测试，至少覆盖：
+   - 失败时保留草稿并提示明确错误
+8. 保留 `Close` 放弃未提交草稿的保护。
+9. 如果 UI 角色名与 Graph 权限角色名不同，把映射收敛到单独模块并写中文注释。
+10. 请补测试，至少覆盖：
    - 初始权限加载成功后的列表显示
    - 差异拆分逻辑
    - `Apply` 成功
    - `Apply` 失败
-   - `429` 或可重试失败的处理
+   - SDK retry 后仍返回 `429` 时的错误映射
    - 成功后重置脏状态
-12. 最后运行：
+11. 最后运行：
    - `npm test -- --run`
    - `npx tsc --noEmit`
 
-完成后请输出改动摘要、为什么此处采用后端 OBO 而不是前端直连、权限 API 映射说明、差异计算说明和测试结果。
+完成后请输出改动摘要、为什么权限读写继续采用后端 OBO、权限 API 映射说明、差异计算说明和测试结果。
 ```
 
 ## Notes
 
 - 官方搜索依据：
-  - 交互式场景优先使用委托权限，不建议为这类 UI 搜索切到 application permission。
+  - 搜索逻辑当前决定放前端，使用委托权限直接调用 Graph。
+  - 前端将补充 `User.ReadBasic.All` 与 `GroupMember.Read.All`。
   - `/people` 已处于 maintenance mode，且它解决的是“相关人”问题，不适合作为本功能唯一的目录搜索基础。
-  - 当前权限管理场景需要同时支持 users 与 groups，因此后续主路径应以目录对象搜索为主。
-- 因为 Graph 目录搜索语义本身有限制，后续 prompt 应该避免再写“任意位置 contains UPN / email”这类超出官方能力边界的目标。
-- 官方权限与架构依据：
-  - 交互式应用优先使用 delegated permission，而不是为方便而切到 application permission
-  - OBO 适合“前端有用户、后端代用户继续调用 Graph”的链路
-  - `fileStorageContainer permissions` 相关 API 本身支持 delegated `FileStorageContainer.Selected`，因此没有必要为了这个功能改成 app-only 或前端直连优先
-- 性能判断依据：
-  - 权限加载与写回是低频操作，通常不是这个页面的主要吞吐瓶颈
-  - 真正需要严控的是 Graph 请求次数、字段量、重试和节流策略，而这些更适合统一放在后端
-- 如果后续验证发现 `TagPicker` 与现有测试环境的可访问性或交互模型有特殊兼容问题，再把前端步骤纵向细拆，不要把问题强塞进权限写回步骤里。
+  - 当前权限管理场景需要同时支持 users 与 groups，因此主路径仍以目录对象搜索为主。
+- 官方性能与缓存依据：
+  - Microsoft Graph best practices 建议仅在明确场景下本地存储 Graph 数据，并为保留与删除设计策略。
+  - Graph throttling guidance 建议减少请求次数和调用频率，并按 `Retry-After` 处理 `429`。
+  - Microsoft Graph SDK 已内置基于 `Retry-After` 或 backoff 的 retry handler；本项目当前 MGT client 和后端 `Client.init(...)` 路径都会使用 `RetryHandler`。
+  - 因此计划中不再要求业务代码重复实现通用 429 retry；业务代码只负责请求量控制、写入并发控制、SDK retry 后仍失败的错误映射。
+  - Web Storage 的 `localStorage` / `sessionStorage` 是同步 API，会阻塞主线程，因此不适合作为默认目录搜索 cache 方案。
+  - `IndexedDB` 虽然更适合结构化异步缓存，但对当前小结果集 picker 来说属于过度设计。
+- Graph 查询依据：
+  - `GET /users/{id}` 与 `GET /users/{userPrincipalName}` 适合 exact user lookup。
+  - `GET /users/{userPrincipalName}` 的 UPN 必须作为 URL path segment 编码，避免 `#`、空格等字符被浏览器或 HTTP 层误解析。
+  - `GET /groups/{id}` 适合 exact group lookup。
+  - `/users`、`/groups` 的 `$filter` 适合 exact mail 或 prefix filter。
+  - `/users`、`/groups` 的 `$search` 适合 display name / description tokenized search。
+  - 需要 advanced query 的目录对象 collection query 要按 Graph 官方要求补齐相关 header / query 参数。
+  - 所有 `$filter` / `$search` 都必须通过集中 query builder 做 OData escaping 和 search text escaping，不允许在 UI 组件中散落字符串拼接。
+- 架构与边界依据：
+  - 搜索使用前端 delegated permission。
+  - 容器权限读写继续使用后端 OBO。
+  - `fileStorageContainer permissions` 相关 API 本身支持 delegated `FileStorageContainer.Selected`。
+- 当前三步拆分仍然合理：
+  - 步骤 3 是可单测的数据能力与 cache 能力
+  - 步骤 4 是 UI / 交互能力
+  - 步骤 5 是后端 OBO 权限读写能力
+  - 如果把步骤 3 和 4 合并，会让 Graph 策略、cache、TagPicker 可访问性交互混在一起，review 和测试都会更重
