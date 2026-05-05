@@ -76,7 +76,7 @@ const createEntryFromCandidate = (
   candidate: IPermissionPrincipalCandidate,
   role: IContainerPermissionEntry["role"] = "Reader",
 ): IContainerPermissionEntry => ({
-  // 用“主体类型 + 主体 ID”生成前端唯一键，方便表格渲染和本地更新定位。
+  // 用“ principal 类型 +  principal  ID”生成前端唯一键，方便表格渲染和本地更新定位。
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,
   principalName: candidate.name,
@@ -92,12 +92,8 @@ const createEntryFromCandidate = (
  * 方便本步骤验证草稿编辑、回滚和本地 Apply 行为。
  */
 export const createInitialPermissionEntries = (): PermissionEntriesByTab => ({
-  people: [
-    createEntryFromCandidate(LOCAL_PEOPLE_CANDIDATES[0], "Writer"),
-  ],
-  groups: [
-    createEntryFromCandidate(LOCAL_GROUP_CANDIDATES[0], "Manager"),
-  ],
+  people: [createEntryFromCandidate(LOCAL_PEOPLE_CANDIDATES[0], "Writer")],
+  groups: [createEntryFromCandidate(LOCAL_GROUP_CANDIDATES[0], "Manager")],
 });
 
 /**

@@ -4,7 +4,7 @@
  * 本模块负责：
  * 1. 提供“容器级权限管理”弹窗外壳
  * 2. 展示当前容器名称
- * 3. 展示权限页签、输入区和访问列表
+ * 3. 展示权限 tab 、输入区和访问列表
  * 4. 为后续接入真实 Graph 搜索和写回逻辑预留结构
  *
  * 说明：
@@ -57,6 +57,12 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
   "Owner",
 ];
 
+/**
+ * 根据 tab 值返回当前界面要展示的标题文案。
+ *
+ * 这里把 people / groups 到显示名称的映射集中起来，
+ * 避免组件内部重复写条件分支。
+ */
 const getTabTitle = (tab: PermissionTabValue) =>
   tab === "people" ? "People" : "Groups";
 
@@ -69,7 +75,7 @@ const getTabTitle = (tab: PermissionTabValue) =>
  * @param onClose 关闭弹窗的回调
  *
  * 状态管理：
- * - 页签切换、草稿列表、编辑前原始状态、筛选关键字都拆到了独立 Hook。
+ * -  tab 切换、草稿列表、编辑前原始状态、筛选关键字都拆到了独立 Hook。
  * - Close 会放弃未保存草稿并恢复到原始状态。
  * - Apply 目前只在本地确认草稿，不调用真实写回。
  */
@@ -80,7 +86,11 @@ export const ContainerPermissionDialog = ({
   onClose,
 }: IContainerPermissionDialogProps) => {
   const styles = usePermissionsStyles();
+  // 当前步骤没有真实接口，这里先构造“弹窗打开时看到的初始权限状态”。
   const initialEntriesByTab = createInitialPermissionEntries();
+
+  // 这里统一拿到弹窗所需的 tab 、筛选、草稿编辑和关闭/应用操作，
+  // 组件层只负责把这些状态绑定到输入框、表格和按钮。
   const {
     selectedTab,
     setSelectedTab,
@@ -99,19 +109,26 @@ export const ContainerPermissionDialog = ({
     containerId ?? "__no-container__",
   );
 
+  // 当前输入框中的文本。这个值现在既驱动本地候选过滤，也驱动表格本地过滤。
   const currentFilter = filterByTab[selectedTab];
+  // 统一做 trim 和小写化，避免大小写和首尾空格影响本地匹配结果。
   const normalizedFilter = currentFilter.trim().toLowerCase();
+  // 当前 tab 表格里真正要展示的权限项，由 Hook 根据草稿和筛选词计算得到。
   const visibleEntries = getVisibleEntries(selectedTab);
+  // 当前 tab 下拉框里展示的候选项。
+  // 现在只在本地假数据里做过滤，后续接 Graph 搜索时这里会替换成接口返回结果。
   const visibleCandidates = LOCAL_PERMISSION_CANDIDATES[selectedTab].filter(
     (candidate) => {
       if (!normalizedFilter) {
         return true;
       }
 
-      const searchableText = `${candidate.name} ${candidate.description}`.toLowerCase();
+      const searchableText =
+        `${candidate.name} ${candidate.description}`.toLowerCase();
       return searchableText.includes(normalizedFilter);
     },
   );
+  // 只有用户输入了内容才展开候选下拉，避免空输入时直接展示整份本地列表。
   const shouldShowCandidateDropdown = normalizedFilter.length > 0;
 
   /**
@@ -127,7 +144,7 @@ export const ContainerPermissionDialog = ({
   };
 
   /**
-   * 处理从本地下拉候选中选择主体。
+   * 处理从本地下拉候选中选择 principal 。
    *
    * 当前行为：
    * 1. 将候选项追加到本地草稿
@@ -138,12 +155,15 @@ export const ContainerPermissionDialog = ({
     _event,
     data,
   ) => {
+    // Combobox 选中后拿到的是候选项的稳定标识，当前来自本地假数据，
+    // 后续也可以直接换成 Graph 返回的用户/组 ID。
     const candidateId = data.optionValue;
 
     if (!candidateId) {
       return;
     }
 
+    // 根据选中的 ID 回查完整候选对象，再转换成权限草稿行。
     const nextCandidate = LOCAL_PERMISSION_CANDIDATES[selectedTab].find(
       (candidate) => candidate.id === candidateId,
     );
@@ -173,7 +193,7 @@ export const ContainerPermissionDialog = ({
             {/* 当前容器说明区：先展示容器名和本步骤范围，帮助开发者明确这一步只做本地草稿编辑。 */}
             <div className={styles.section}>
               <Text weight="semibold">
-                Container: {containerName ?? "未选择容器"}
+                Container: {containerName ?? "<No container selected>"}
               </Text>
               <Text>
                 这里先实现本地草稿编辑体验。后续步骤再接入真实 Graph
@@ -181,7 +201,7 @@ export const ContainerPermissionDialog = ({
               </Text>
             </div>
 
-            {/* 权限页签：把 People 与 Groups 的草稿列表拆开，避免不同主体类型的编辑混在一起。 */}
+            {/* 权限 tab ：把 People 与 Groups 的草稿列表拆开，避免不同 principal 类型的编辑混在一起。 */}
             <div className={styles.section}>
               <Label>Permission Tabs</Label>
               <TabList
@@ -195,17 +215,20 @@ export const ContainerPermissionDialog = ({
               </TabList>
             </div>
 
-            {/* 输入框当前承载“本地筛选 + 本地下拉候选”，后续可以整体替换为真实主体搜索体验。 */}
+            {/* 输入框当前承载“本地筛选 + 本地下拉候选”，后续可以整体替换为真实 principal 搜索体验。 */}
             <div className={styles.section}>
               <Label htmlFor="permission-principal-input">
                 Add {getTabTitle(selectedTab)}
               </Label>
               <div className={styles.principalInputWrapper}>
+                {/* Combobox 现在承担“输入关键字 + 选择本地候选”两件事。
+                    后续如果切到远程搜索，可以保留这个交互外壳，只替换数据来源和事件处理。 */}
                 <Combobox
                   id="permission-principal-input"
                   aria-label={`Add ${getTabTitle(selectedTab)}`}
                   className={styles.principalCombobox}
-                  placeholder="输入关键字后显示本地候选项，后续会替换为真实主体搜索"
+                  expandIcon={null}
+                  placeholder="输入关键字后显示本地候选项，后续会替换为真实 principal 搜索"
                   freeform
                   selectedOptions={[]}
                   value={currentFilter}
@@ -215,6 +238,8 @@ export const ContainerPermissionDialog = ({
                 >
                   {visibleCandidates.length > 0 ? (
                     visibleCandidates.map((candidate) => {
+                      // 已经加入草稿的候选项仍然保留在列表里，但会禁用，
+                      // 这样用户能看到命中结果，同时避免重复添加。
                       const added = isCandidateAdded(selectedTab, candidate.id);
 
                       return (
@@ -250,6 +275,8 @@ export const ContainerPermissionDialog = ({
             <div className={styles.section}>
               <Label>Access List</Label>
               <div className={styles.tableWrapper}>
+                {/* 表格始终展示“当前 tab + 当前筛选条件”下的草稿视图。
+                    这里的改角色和删除都只改本地草稿，直到用户点击 Apply。 */}
                 <Table
                   aria-label={`${getTabTitle(selectedTab)} access list`}
                   className={styles.accessTable}
@@ -290,7 +317,9 @@ export const ContainerPermissionDialog = ({
                           data-testid={`permission-row-${entry.id}`}
                         >
                           <TableCell className={styles.principalColumn}>
-                            <TableCellLayout>{entry.principalName}</TableCellLayout>
+                            <TableCellLayout>
+                              {entry.principalName}
+                            </TableCellLayout>
                           </TableCell>
                           <TableCell className={styles.roleColumn}>
                             <Select

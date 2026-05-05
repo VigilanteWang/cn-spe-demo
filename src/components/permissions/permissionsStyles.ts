@@ -47,21 +47,27 @@ export const usePermissionsStyles = makeStyles({
   },
   accessTable: {
     width: "100%",
+    minWidth: "360px",
     tableLayout: "fixed",
   },
   headerCell: {
     fontWeight: tokens.fontWeightBold,
+    whiteSpace: "nowrap",
   },
   principalColumn: {
-    width: "calc(100% - 188px)",
+    minWidth: "220px",
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
   roleColumn: {
     width: "132px",
+    minWidth: "132px",
   },
   actionColumn: {
     width: "56px",
+    minWidth: "56px",
   },
   roleSelect: {
-    width: "120px",
+    width: "115px",
   },
 });
