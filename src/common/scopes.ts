@@ -22,6 +22,10 @@
 // Microsoft Graph 权限
 /** 读取当前登录用户的基本信息 */
 export const GRAPH_USER_READ = "User.Read";
+/** 读取组织内用户的基础资料，用于前端目录搜索 People。 */
+export const GRAPH_USER_READ_BASIC_ALL = "User.ReadBasic.All";
+/** 读取组及成员相关基础信息，用于前端目录搜索 Groups。 */
+export const GRAPH_GROUP_MEMBER_READ_ALL = "GroupMember.Read.All";
 // Appraently these 3 scopes are not needed for the app to work
 // only FileStorageContainer.Selected is needed, both application and delegated
 // export const GRAPH_USER_READ_ALL = 'User.Read.All';

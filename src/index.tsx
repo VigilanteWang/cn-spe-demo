@@ -22,6 +22,10 @@ Providers.globalProvider = new Msal2Provider({
     Scopes.GRAPH_PRESENCE_READ_ALL,
     // 读取组织内用户头像缩略图，用于人员列优先显示真实头像
     Scopes.GRAPH_PROFILE_PHOTO_READ_ALL,
+    // 容器权限 People 搜索需要读取组织内用户的基础目录资料。
+    Scopes.GRAPH_USER_READ_BASIC_ALL,
+    // 容器权限 Groups 搜索需要读取组的基础目录资料。
+    Scopes.GRAPH_GROUP_MEMBER_READ_ALL,
   ],
   baseURL: clientConfig.graphBaseUrl as GraphEndpoint,
   customHosts: [new URL(clientConfig.graphBaseUrl).hostname],
