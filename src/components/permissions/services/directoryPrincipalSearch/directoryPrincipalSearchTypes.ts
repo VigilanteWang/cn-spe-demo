@@ -51,11 +51,17 @@ export type DirectorySearchErrorCode =
  *
  * 只声明搜索服务真正用到的方法，可以让单元测试用 fake client 精准替换，
  * 也避免把完整 Graph SDK 类型扩散到权限模块。
- *
+ */
+/*
  * 这些方法都返回同一种请求形状，所以调用方可以写成
  * api(...).select(...).top(...).filter(...).get() 这样的链式代码。
  * 这里的“返回自己”并不要求返回同一个对象实例，只要返回值仍然满足
  * IGraphDirectoryRequest 这个结构即可。
+ *
+ * 如果直接用 Graph SDK 自带类型，通常会有两个代价：一是测试 mock 会更重，
+ * 二是业务代码会被 SDK 的具体形状绑得更紧。
+ * 这里的写法本质上是在做一个适配层，让权限模块只看到需要的“Graph 请求能力”，
+ * 而不是整个 SDK。
  */
 export interface IGraphDirectoryRequest {
   /**

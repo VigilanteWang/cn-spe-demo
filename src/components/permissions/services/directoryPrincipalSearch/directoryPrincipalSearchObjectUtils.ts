@@ -1,7 +1,21 @@
 /**
- * 把 unknown 安全收窄成可索引对象。
+ * 把 graph 的 response 转换成 Record<string, unknown>，这样可以接纳任意数量属性的对象，相当于
+ * type value = {
+ *   [key: string]: unknown;
+ * };
+ */
+/**
+ * Graph SDK 响应形状不一，本模块又没有把它们的完整类型
+ * 全部引进来，所以先将属性类型全设为 unknown，要求读取前，必须进行显式 Type Narrowing ，保证后续
+ * 代码能安全使用。
  *
- * Graph SDK 的错误或响应对象没有在本模块里使用完整类型，因此所有入口先经过这个小工具。
+ * 例如，它接纳以下返回值，因为是 index signature，可以接纳无限数量属性，类型也可任意
+ * 但是，使用前，必须像下面几个 function 那样进行 Type Narrowing ：
+ * {
+ *   objectId: "123",
+ *   upn: "alice@contoso.com",
+ *   enabled: true
+ * }
  */
 export const readRecord = (value: unknown): Record<string, unknown> => {
   if (typeof value === "object" && value !== null) {
