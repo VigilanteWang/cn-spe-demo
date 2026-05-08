@@ -14,8 +14,17 @@ import {
   IDirectoryPrincipalSearchResult,
 } from "./directoryPrincipalSearchTypes";
 
+const GROUP_TYPE_LABELS: Record<DirectoryPrincipalType, string> = {
+  user: "User",
+  microsoft365Group: "Microsoft 365 group",
+  distributionList: "Distribution list",
+  securityGroup: "Security group",
+  mailEnabledSecurityGroup: "Mail-enabled security group",
+  group: "Group",
+};
+
 /**
- * 把 Graph user 响应转换成选择器需要的统一模型。
+ * 把 Graph user 响应转换成 ComboBox 需要的统一模型。
  *
  * Graph 可能缺少 mail 或 displayName，所以这里提供安全回退，避免 UI 因空字段崩溃。
  */
@@ -39,7 +48,7 @@ export const mapGraphUser = (
 };
 
 /**
- * 把 Graph group 响应转换成选择器需要的统一模型。
+ * 把 Graph group 响应转换成 ComboBox 需要的统一模型。
  *
  * groupTypes/mailEnabled/securityEnabled 共同决定 group 类型，不能只看 displayName。
  */
@@ -117,24 +126,8 @@ const getGroupTypeLabel = (
     mailEnabled,
     securityEnabled,
   );
-
-  if (principalType === "microsoft365Group") {
-    return "Microsoft 365 group";
-  }
-
-  if (principalType === "distributionList") {
-    return "Distribution list";
-  }
-
-  if (principalType === "securityGroup") {
-    return "Security group";
-  }
-
-  if (principalType === "mailEnabledSecurityGroup") {
-    return "Mail-enabled security group";
-  }
-
-  return "Group";
+  // 用  lookup table
+  return GROUP_TYPE_LABELS[principalType];
 };
 
 /**

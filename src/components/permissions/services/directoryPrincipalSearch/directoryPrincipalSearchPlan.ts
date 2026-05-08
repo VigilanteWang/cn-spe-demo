@@ -1,4 +1,7 @@
-import { DirectoryPrincipalSearchError, mapGraphError } from "./directoryPrincipalSearchError";
+import {
+  DirectoryPrincipalSearchError,
+  mapGraphError,
+} from "./directoryPrincipalSearchError";
 import {
   isCompleteUpnOrEmailQuery,
   isGuidQuery,
@@ -23,10 +26,9 @@ import {
 } from "./directoryPrincipalSearchTypes";
 
 /**
- * 根据用户输入创建搜索计划。
+ * 根据用户输入创建搜索计划。这里不执行，返回给上层按需调用 execute
  *
  * 这个函数是“分级搜索策略”的核心：先判断输入像什么，再决定请求哪个 Graph API。
- * 组件层不应该复制这些判断，否则后续维护时很容易出现 People 和 Groups 行为不一致。
  */
 export const createDirectorySearchPlan = (
   principalKind: DirectoryPrincipalKind,
@@ -35,6 +37,7 @@ export const createDirectorySearchPlan = (
   const trimmedQuery = query.trim();
   const normalizedQuery = normalizeDirectorySearchQuery(query);
 
+  // 规范化后仍为空，说明输入只有空白字符，后续任何 Graph 请求都没有意义。
   if (!normalizedQuery) {
     throw new DirectoryPrincipalSearchError(
       "emptyQuery",
@@ -42,6 +45,7 @@ export const createDirectorySearchPlan = (
     );
   }
 
+  // GUID 命中率最高且最明确，优先走按 id 直查，避免退化成模糊搜索。
   if (isGuidQuery(normalizedQuery)) {
     return {
       principalKind,
@@ -54,12 +58,14 @@ export const createDirectorySearchPlan = (
     };
   }
 
+  // 完整 UPN/email 属于“精确身份标识”，优先走精确查询，减少同名结果干扰。
   if (isCompleteUpnOrEmailQuery(trimmedQuery)) {
     return principalKind === "people"
       ? createPeopleExactUpnPlan(trimmedQuery, normalizedQuery)
       : createGroupsExactMailPlan(trimmedQuery, normalizedQuery);
   }
 
+  // 像 abc、sales-team 这类前缀输入更适合 startsWith/identifier 类查询。
   if (isIdentifierPrefixQuery(trimmedQuery)) {
     return {
       principalKind,
@@ -72,6 +78,7 @@ export const createDirectorySearchPlan = (
     };
   }
 
+  // 前面都不命中时，再回退到名称/描述搜索，作为兜底的模糊匹配策略。
   return {
     principalKind,
     strategy: "display-name-search",
@@ -98,6 +105,7 @@ const createPeopleExactUpnPlan = (
   normalizedQuery,
   execute: async (graphClient: IDirectorySearchGraphClient) => {
     try {
+      // 先按 UPN 直查，成功时比 filter 更快也更精确。
       return await getUserByUserPrincipalName(graphClient, rawQuery);
     } catch (error: unknown) {
       const mappedError = mapGraphError(error);
@@ -105,6 +113,7 @@ const createPeopleExactUpnPlan = (
         throw mappedError;
       }
 
+      // 用户输入可能长得像 email，但并不是 userPrincipalName，这时退回 mail 精确匹配。
       return listUsersByExactMail(graphClient, rawQuery);
     }
   },

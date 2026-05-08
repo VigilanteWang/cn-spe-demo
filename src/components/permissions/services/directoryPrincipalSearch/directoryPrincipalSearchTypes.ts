@@ -1,7 +1,7 @@
 import { PermissionTabValue } from "../../models/permissionModels";
 
 /**
- * 目录搜索支持的主体类型。
+ * 目录搜索支持的 principal 类型。
  *
  * 这里复用权限弹窗已有的 tab 值，避免 UI 层和服务层维护两套 People / Groups 枚举。
  */
@@ -20,7 +20,7 @@ export type DirectorySearchStrategy =
   | "display-name-search";
 
 /**
- * 前端选择器最终关心的 principal 类型。
+ * 前端 ComboBox 最终关心的 principal 类型。
  *
  * Groups 在 Graph 中都来自 /groups，但 UI 需要区分 Microsoft 365 group、
  * DL、security group 等类型，所以这里提供更细的视图层枚举。
@@ -94,7 +94,7 @@ export interface IDirectorySearchGraphClient {
 }
 
 /**
- * 前端选择器消费的统一 principal 视图模型。
+ * 前端 ComboBox 使用的统一结果模型。
  *
  * user 和 group 的 Graph 字段不完全一样，因此公共字段放前面，类型专属字段保持 optional。
  */

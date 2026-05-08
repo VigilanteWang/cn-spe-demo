@@ -98,7 +98,7 @@ export const useContainerPermissionDialogState = (
    * });
    *
    * @param tab 要新增到哪个 tab 。
-   * @param candidate 待添加的候选主体。
+   * @param candidate 待添加的候选 principal 。
    */
   const addCandidate = (
     tab: PermissionTabValue,
@@ -154,7 +154,7 @@ export const useContainerPermissionDialogState = (
   };
 
   /**
-   * 判断候选主体是否已经存在于指定 tab 的草稿中。
+   * 判断候选 principal 是否已经存在于指定 tab 的草稿中。
    *
    * 这个方法通常用于禁用“重复添加”的按钮或候选项。
    *
@@ -162,8 +162,8 @@ export const useContainerPermissionDialogState = (
    * const alreadyAdded = isCandidateAdded("groups", "group-123");
    *
    * @param tab 要检查的 tab 。
-   * @param candidateId 候选主体的唯一标识。
-   * @returns 如果草稿里已存在该主体，返回 true。
+   * @param candidateId 候选 principal 的唯一标识。
+   * @returns 如果草稿里已存在该 principal ，返回 true。
    */
   const isCandidateAdded = (
     tab: PermissionTabValue,

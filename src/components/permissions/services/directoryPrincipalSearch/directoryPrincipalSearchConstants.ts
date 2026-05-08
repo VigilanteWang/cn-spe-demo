@@ -14,7 +14,7 @@ export const EXACT_RESULT_TTL_MS = 10 * 60 * 1000;
 /** 404 或空结果只短暂缓存，避免刚创建的用户或组长期不可见。 */
 export const EMPTY_RESULT_TTL_MS = 30 * 1000;
 
-/** 每类主体最多保留 50 个 query entry，防止长时间输入产生无限内存增长。 */
+/** 每类 principal 最多保留 50 个 query entry，防止长时间输入产生无限内存增长。 */
 export const MAX_CACHE_ENTRIES_PER_KIND = 50;
 
 /** Microsoft Graph advanced query 所需 header。 */

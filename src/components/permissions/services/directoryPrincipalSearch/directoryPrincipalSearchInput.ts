@@ -1,10 +1,13 @@
 import { DirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
 
 /**
- * 规范化输入，仅用于 cache key 和策略判定。
- *
- * 注意：真实 Graph 请求不能直接使用 normalizedQuery，因为 URL、OData literal、
- * $search text 各自有不同的转义规则。
+ * 这是个 目录搜索输入进行规范化与识别 工具模块
+ * 它把 GUID、email、前缀和搜索文本分别识别出来，供后续搜索计划选择不同策略。
+ */
+
+/**
+ * 规范化输入：去掉首尾空白、把连续空白压成一个空格，并统一转成小写。
+ * 它只用于 cache key 和策略判定，不直接用于真正的 Graph 请求。
  */
 export const normalizeDirectorySearchQuery = (query: string): string =>
   query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -60,7 +63,7 @@ export const escapeSearchQueryText = (value: string): string => {
   if (/["\\]/.test(value)) {
     throw new DirectoryPrincipalSearchError(
       "invalidSearchSyntax",
-      'Search text cannot contain double quotes or backslashes.',
+      "Search text cannot contain double quotes or backslashes.",
     );
   }
 
