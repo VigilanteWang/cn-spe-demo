@@ -193,7 +193,7 @@ const withAdvancedQuery = (
 ): IGraphDirectoryRequest =>
   request
     .header(EVENTUAL_CONSISTENCY_HEADER, EVENTUAL_CONSISTENCY_VALUE)
-    .query({ $count: true });
+    .query({ $count: "true" });
 
 /**
  * 读取 collection 响应，并把 value 数组映射成统一视图模型。

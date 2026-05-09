@@ -6,16 +6,16 @@ export type PermissionTabValue = "people" | "groups";
 /**
  * 容器级权限角色。
  *
- * 本步骤先与 UI 展示保持一致，直接使用最终要显示的角色名。
+ * 当前阶段先保持与 UI 展示一致，直接使用最终会显示给用户的角色名。
  */
 export type ContainerPermissionRole = "Reader" | "Writer" | "Manager" | "Owner";
 
 /**
- * 本地 principal 候选项。
+ * 下拉搜索候选项。
  *
  * 说明：
- * - 本步骤只使用本地假数据驱动交互。
- * - 后续接入 Graph 搜索时，可以继续复用这个基础模型。
+ * - 本地假数据和真实 Graph 搜索结果都会先统一成这个模型。
+ * - 这样 Dialog 只关心如何渲染与选择，不需要知道原始数据来自哪里。
  */
 export interface IPermissionPrincipalCandidate {
   /** 候选 principal 的稳定标识。 */
@@ -24,8 +24,10 @@ export interface IPermissionPrincipalCandidate {
   name: string;
   /** 候选 principal 属于 people 还是 groups。 */
   type: PermissionTabValue;
-  /** 用于辅助筛选和展示的描述信息。 */
-  description: string;
+  /** 下拉候选项的次文本，优先显示 email 等目录辅助信息。 */
+  secondaryText: string;
+  /** 只用于 Avatar 的首字母缩写。 */
+  initials: string;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface IContainerPermissionEntry {
   principalName: string;
   /** 当前权限记录属于 people 还是 groups 页签。 */
   principalType: PermissionTabValue;
-  /** 表格筛选和说明区使用的描述信息。 */
+  /** 用于后续展示或筛选的辅助说明文本。 */
   description: string;
   /** 当前草稿中的容器权限角色。 */
   role: ContainerPermissionRole;

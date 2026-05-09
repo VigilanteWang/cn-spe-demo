@@ -31,10 +31,41 @@ export const usePermissionsStyles = makeStyles({
     minWidth: 0,
   },
   dropdownOption: {
+    display: "grid",
+    gridTemplateColumns: "32px 1fr auto",
+    alignItems: "center",
+    columnGap: "10px",
+    width: "100%",
+    minWidth: 0,
+  },
+  dropdownOptionText: {
     display: "flex",
     flexDirection: "column",
-    rowGap: "4px",
+    rowGap: "2px",
     minWidth: 0,
+  },
+  dropdownOptionSecondary: {
+    color: tokens.colorNeutralForeground3,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  dropdownOptionMeta: {
+    color: tokens.colorPaletteCornflowerForeground2,
+  },
+  loadingOption: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "10px",
+  },
+  searchStatusText: {
+    color: tokens.colorNeutralForeground3,
+  },
+  duplicateStatusText: {
+    color: tokens.colorPaletteMarigoldForeground2,
+  },
+  errorStatusText: {
+    color: tokens.colorPaletteRedForeground1,
   },
   tableWrapper: {
     width: "100%",

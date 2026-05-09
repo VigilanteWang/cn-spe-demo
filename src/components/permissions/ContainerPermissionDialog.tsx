@@ -4,15 +4,18 @@
  * 本模块负责：
  * 1. 提供“容器级权限管理”弹窗外壳
  * 2. 展示当前容器名称
- * 3. 展示权限 tab 、输入区和访问列表
- * 4. 为后续接入真实 Graph 搜索和写回逻辑预留结构
+ * 3. 展示权限页签、搜索输入区和 access list
+ * 4. 接入真实 Graph 搜索交互，但暂不做真实权限初始加载和 Apply 写回
  *
  * 说明：
- * - 本步骤只实现本地草稿编辑能力。
- * - 不请求真实权限数据，不做 Graph 搜索，也不做写回。
+ * - 本步骤已经不再使用本地候选列表做最终搜索来源
+ * - 真实目录搜索、debounce、搜索状态和结果映射都拆到了独立 Hook / 服务中
+ * - Apply 仍然只确认本地草稿，不调用真实写回
  */
 
 import {
+  Avatar,
+  Button,
   Combobox,
   Dialog,
   DialogActions,
@@ -20,11 +23,12 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Button,
   Label,
-  mergeClasses,
   Option,
   Select,
+  Spinner,
+  Tab,
+  TabList,
   Table,
   TableBody,
   TableCell,
@@ -32,9 +36,8 @@ import {
   TableHeader,
   TableHeaderCell,
   TableRow,
-  Tab,
-  TabList,
   Text,
+  mergeClasses,
 } from "@fluentui/react-components";
 import type { ComboboxProps } from "@fluentui/react-components";
 import { DeleteRegular } from "@fluentui/react-icons";
@@ -42,11 +45,9 @@ import {
   ContainerPermissionRole,
   PermissionTabValue,
 } from "./models/permissionModels";
-import {
-  LOCAL_PERMISSION_CANDIDATES,
-  createInitialPermissionEntries,
-} from "./services/localPermissionData";
+import { createInitialPermissionEntries } from "./services/localPermissionData";
 import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
+import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
 import { IContainerPermissionDialogProps } from "./permissionsTypes";
 import { usePermissionsStyles } from "./permissionsStyles";
 
@@ -58,10 +59,10 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
 ];
 
 /**
- * 根据 tab 值返回当前界面要展示的标题文案。
+ * 根据页签值返回当前界面要显示的标题文案。
  *
- * 这里把 people / groups 到显示名称的映射集中起来，
- * 避免组件内部重复写条件分支。
+ * 这里集中维护 people / groups 的显示映射，
+ * 避免组件内部重复散落条件判断。
  */
 const getTabTitle = (tab: PermissionTabValue) =>
   tab === "people" ? "People" : "Groups";
@@ -69,15 +70,13 @@ const getTabTitle = (tab: PermissionTabValue) =>
 /**
  * 容器权限管理弹窗。
  *
- * @param open 对话框是否打开
- * @param containerId 当前容器 ID，用于隔离每个容器的本地草稿状态
- * @param containerName 当前选中的容器名称；未选择容器时显示占位文案
- * @param onClose 关闭弹窗的回调
+ * 当前步骤只实现：
+ * - 人员与组的真实 Graph 搜索交互
+ * - 选择结果后直接加入本地 access list 草稿
  *
- * 状态管理：
- * -  tab 切换、草稿列表、编辑前原始状态、筛选关键字都拆到了独立 Hook。
- * - Close 会放弃未保存草稿并恢复到原始状态。
- * - Apply 目前只在本地确认草稿，不调用真实写回。
+ * 当前步骤仍不实现：
+ * - 打开弹窗时真实读取容器权限
+ * - Apply 时写回 Graph
  */
 export const ContainerPermissionDialog = ({
   open,
@@ -86,11 +85,12 @@ export const ContainerPermissionDialog = ({
   onClose,
 }: IContainerPermissionDialogProps) => {
   const styles = usePermissionsStyles();
-  // 当前步骤没有真实接口，这里先构造“弹窗打开时看到的初始权限状态”。
+
+  // 当前步骤还没有真实容器权限初始加载，这里先构造弹窗打开时的本地初始状态。
   const initialEntriesByTab = createInitialPermissionEntries();
 
-  // 这里统一拿到弹窗所需的 tab 、筛选、草稿编辑和关闭/应用操作，
-  // 组件层只负责把这些状态绑定到输入框、表格和按钮。
+  // 这里统一拿到弹窗所需的页签、草稿列表和关闭 / 应用动作，
+  // 让组件层主要负责渲染和事件绑定。
   const {
     selectedTab,
     setSelectedTab,
@@ -109,71 +109,54 @@ export const ContainerPermissionDialog = ({
     containerId ?? "__no-container__",
   );
 
-  // 当前输入框中的文本。这个值现在既驱动本地候选过滤，也驱动表格本地过滤。
-  const currentFilter = filterByTab[selectedTab];
-  // 统一做 trim 和小写化，避免大小写和首尾空格影响本地匹配结果。
-  const normalizedFilter = currentFilter.trim().toLowerCase();
-  // 当前 tab 表格里真正要展示的权限项，由 Hook 根据草稿和筛选词计算得到。
-  const visibleEntries = getVisibleEntries(selectedTab);
-  // 当前 tab 下拉框里展示的候选项。
-  // 现在只在本地假数据里做过滤，后续接 Graph 搜索时这里会替换成接口返回结果。
-  const visibleCandidates = LOCAL_PERMISSION_CANDIDATES[selectedTab].filter(
-    (candidate) => {
-      if (!normalizedFilter) {
-        return true;
-      }
+  // 搜索相关状态单独交给独立 Hook：
+  // - 负责最小字符数判断
+  // - 负责 debounce
+  // - 负责真实 Graph 搜索
+  // - 负责把候选项加入 access list
+  const {
+    query,
+    results,
+    status,
+    feedbackMessage,
+    errorMessage,
+    isDropdownOpen,
+    handleQueryChange,
+    handleCandidateSelect,
+  } = usePermissionPrincipalSearch({
+    selectedTab,
+    queryByTab: filterByTab,
+    setQuery: setFilter,
+    addCandidate,
+    isCandidateAdded,
+  });
 
-      const searchableText =
-        `${candidate.name} ${candidate.description}`.toLowerCase();
-      return searchableText.includes(normalizedFilter);
-    },
-  );
-  // 只有用户输入了内容才展开候选下拉，避免空输入时直接展示整份本地列表。
-  const shouldShowCandidateDropdown = normalizedFilter.length > 0;
+  // 当前页签下真正要显示在 access list 表格里的权限项。
+  const visibleEntries = getVisibleEntries(selectedTab);
 
   /**
-   * 处理输入框文本变化。
+   * 处理 Combobox 输入变化。
    *
-   * 当前先把输入内容当成本地筛选关键字，
-   * 后续替换为真实搜索时可以沿用这个入口。
+   * 当前输入值不会再用于过滤 access list，
+   * 而是专门驱动目录搜索流程。
    */
   const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
     event,
   ) => {
-    setFilter(selectedTab, event.target.value);
+    handleQueryChange(event.target.value);
   };
 
   /**
-   * 处理从本地下拉候选中选择 principal 。
+   * 处理用户从下拉结果里选中某个候选对象。
    *
-   * 当前行为：
-   * 1. 将候选项追加到本地草稿
-   * 2. 默认角色为 Reader
-   * 3. 选择后清空输入框，收起下拉面板
+   * 选中后会直接尝试加入 access list，
+   * 不再保留额外的 Add 按钮。
    */
-  const handleCandidateSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
+  const handleOptionSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
     _event,
     data,
   ) => {
-    // Combobox 选中后拿到的是候选项的稳定标识，当前来自本地假数据，
-    // 后续也可以直接换成 Graph 返回的用户/组 ID。
-    const candidateId = data.optionValue;
-
-    if (!candidateId) {
-      return;
-    }
-
-    // 根据选中的 ID 回查完整候选对象，再转换成权限草稿行。
-    const nextCandidate = LOCAL_PERMISSION_CANDIDATES[selectedTab].find(
-      (candidate) => candidate.id === candidateId,
-    );
-
-    if (!nextCandidate) {
-      return;
-    }
-
-    addCandidate(selectedTab, nextCandidate);
-    setFilter(selectedTab, "");
+    handleCandidateSelect(data.optionValue);
   };
 
   return (
@@ -190,18 +173,20 @@ export const ContainerPermissionDialog = ({
           <DialogTitle>Manage Container Permission</DialogTitle>
 
           <DialogContent className={styles.content}>
-            {/* 当前容器说明区：先展示容器名和本步骤范围，帮助开发者明确这一步只做本地草稿编辑。 */}
+            {/* 当前容器说明区：
+                先说明当前选中的容器，以及本步骤实现范围，帮助后续维护者快速定位边界。 */}
             <div className={styles.section}>
               <Text weight="semibold">
                 Container: {containerName ?? "<No container selected>"}
               </Text>
               <Text>
-                这里先实现本地草稿编辑体验。后续步骤再接入真实 Graph
-                搜索、容器权限读取和 Apply 写回。
+                当前先完成最终的目录搜索交互与本地 access list 草稿编辑。真实权限初始加载和
+                Apply 写回会在后续步骤接入。
               </Text>
             </div>
 
-            {/* 权限 tab ：把 People 与 Groups 的草稿列表拆开，避免不同 principal 类型的编辑混在一起。 */}
+            {/* 权限页签：
+                把 People 和 Groups 分开编辑，避免不同 principal 类型混在同一视图里。 */}
             <div className={styles.section}>
               <Label>Permission Tabs</Label>
               <TabList
@@ -215,68 +200,154 @@ export const ContainerPermissionDialog = ({
               </TabList>
             </div>
 
-            {/* 输入框当前承载“本地筛选 + 本地下拉候选”，后续可以整体替换为真实 principal 搜索体验。 */}
+            {/* 搜索输入区：
+                Combobox 负责“输入关键字 + 展示目录搜索结果 + 直接选择加入列表”整条链路。 */}
             <div className={styles.section}>
               <Label htmlFor="permission-principal-input">
                 Add {getTabTitle(selectedTab)}
               </Label>
               <div className={styles.principalInputWrapper}>
-                {/* Combobox 现在承担“输入关键字 + 选择本地候选”两件事。
-                    后续如果切到远程搜索，可以保留这个交互外壳，只替换数据来源和事件处理。 */}
                 <Combobox
                   id="permission-principal-input"
                   aria-label={`Add ${getTabTitle(selectedTab)}`}
                   className={styles.principalCombobox}
                   expandIcon={null}
-                  placeholder="输入关键字后显示本地候选项，后续会替换为真实 principal 搜索"
+                  placeholder={`输入至少 3 个字符后搜索 ${getTabTitle(selectedTab)}`}
                   freeform
                   selectedOptions={[]}
-                  value={currentFilter}
-                  open={shouldShowCandidateDropdown}
+                  value={query}
+                  open={isDropdownOpen}
                   onChange={handleComboboxChange}
-                  onOptionSelect={handleCandidateSelect}
+                  onOptionSelect={handleOptionSelect}
                 >
-                  {visibleCandidates.length > 0 ? (
-                    visibleCandidates.map((candidate) => {
-                      // 已经加入草稿的候选项仍然保留在列表里，但会禁用，
-                      // 这样用户能看到命中结果，同时避免重复添加。
-                      const added = isCandidateAdded(selectedTab, candidate.id);
-
-                      return (
-                        <Option
-                          key={candidate.id}
-                          value={candidate.id}
-                          text={candidate.name}
-                          disabled={added}
-                        >
-                          <div
-                            className={styles.dropdownOption}
-                            data-testid={`candidate-option-${candidate.id}`}
-                          >
-                            <Text weight="semibold">{candidate.name}</Text>
-                            <Text size={200}>{candidate.description}</Text>
-                          </div>
-                        </Option>
-                      );
-                    })
-                  ) : (
-                    <Option disabled text="No local candidates">
-                      <Text size={200}>没有匹配的本地候选项</Text>
+                  {status === "waitingForMoreInput" ? (
+                    <Option disabled text="Need more input">
+                      <Text size={200}>请至少输入 3 个字符后再开始搜索。</Text>
                     </Option>
-                  )}
+                  ) : null}
+
+                  {status === "debouncing" ? (
+                    <Option disabled text="Debouncing">
+                      <Text size={200}>正在整理输入，稍后开始搜索...</Text>
+                    </Option>
+                  ) : null}
+
+                  {status === "loading" ? (
+                    <Option disabled text="Searching">
+                      <div
+                        className={styles.loadingOption}
+                        data-testid="directory-search-loading"
+                      >
+                        <Spinner size="tiny" />
+                        <Text>正在搜索目录对象...</Text>
+                      </div>
+                    </Option>
+                  ) : null}
+
+                  {status === "success"
+                    ? results.map((candidate) => {
+                        // 已存在于当前 access list 的对象仍然保留在结果里，
+                        // 这样用户能看见“命中了谁”，同时获得明确的重复反馈。
+                        const alreadyAdded = isCandidateAdded(
+                          selectedTab,
+                          candidate.id,
+                        );
+
+                        return (
+                          <Option
+                            key={candidate.id}
+                            value={candidate.id}
+                            text={candidate.name}
+                          >
+                            <div
+                              className={styles.dropdownOption}
+                              data-testid={`candidate-option-${candidate.id}`}
+                            >
+                              {/* 这里只显示 initials，不在结果列表里额外请求头像，
+                                  这样既满足设计要求，也避免引入额外网络依赖。 */}
+                              <Avatar
+                                name={candidate.name}
+                                initials={candidate.initials}
+                                size={32}
+                              />
+                              <div className={styles.dropdownOptionText}>
+                                <Text weight="semibold">{candidate.name}</Text>
+                                <Text
+                                  size={200}
+                                  className={styles.dropdownOptionSecondary}
+                                >
+                                  {candidate.secondaryText}
+                                </Text>
+                              </div>
+                              {alreadyAdded ? (
+                                <Text
+                                  size={200}
+                                  className={styles.dropdownOptionMeta}
+                                >
+                                  已存在
+                                </Text>
+                              ) : null}
+                            </div>
+                          </Option>
+                        );
+                      })
+                    : null}
+
+                  {status === "empty" ? (
+                    <Option disabled text="No results">
+                      <Text
+                        size={200}
+                        data-testid="directory-search-empty-state"
+                      >
+                        没有找到匹配的目录对象。请尝试更完整的姓名、邮箱或组名关键字。
+                      </Text>
+                    </Option>
+                  ) : null}
+
+                  {status === "error" ? (
+                    <Option disabled text="Search failed">
+                      <Text size={200}>{errorMessage}</Text>
+                    </Option>
+                  ) : null}
                 </Combobox>
               </div>
-              <Text size={200}>
-                输入关键字后会弹出本地候选下拉列表，当前只演示本地草稿交互，后续再接入真实搜索。
-              </Text>
+
+              {/* 搜索框下方的说明 / 反馈区：
+                  - 有重复反馈时优先显示重复反馈
+                  - 有错误时显示错误
+                  - 都没有时显示默认使用说明 */}
+              {feedbackMessage ? (
+                <Text
+                  size={200}
+                  role="status"
+                  aria-live="polite"
+                  className={styles.duplicateStatusText}
+                >
+                  {feedbackMessage}
+                </Text>
+              ) : null}
+              {!feedbackMessage && errorMessage ? (
+                <Text
+                  size={200}
+                  role="status"
+                  aria-live="polite"
+                  className={styles.errorStatusText}
+                >
+                  {errorMessage}
+                </Text>
+              ) : null}
+              {!feedbackMessage && !errorMessage ? (
+                <Text size={200} className={styles.searchStatusText}>
+                  选择结果后会直接加入当前页签的 access list，重复对象不会再次加入。
+                </Text>
+              ) : null}
             </div>
 
-            {/* 访问列表由本地草稿状态驱动，支持行内改权限与删除。 */}
+            {/* access list：
+                这里展示的是本地草稿视图，支持行内改角色和删除。 */}
             <div className={styles.section}>
               <Label>Access List</Label>
               <div className={styles.tableWrapper}>
-                {/* 表格始终展示“当前 tab + 当前筛选条件”下的草稿视图。
-                    这里的改角色和删除都只改本地草稿，直到用户点击 Apply。 */}
                 <Table
                   aria-label={`${getTabTitle(selectedTab)} access list`}
                   className={styles.accessTable}
@@ -356,7 +427,7 @@ export const ContainerPermissionDialog = ({
                       <TableRow>
                         <TableCell colSpan={3}>
                           <TableCellLayout>
-                            当前没有权限项。可以先在上方输入关键字并从下拉候选中添加一条。
+                            当前没有权限项。可以先在上方输入关键字并从搜索结果中选择一条加入。
                           </TableCellLayout>
                         </TableCell>
                       </TableRow>
@@ -368,14 +439,14 @@ export const ContainerPermissionDialog = ({
           </DialogContent>
 
           <DialogActions>
-            {/* Close 会丢弃当前未保存草稿，确保用户可以安全退出本地编辑。 */}
+            {/* Close 会放弃当前未保存草稿，恢复到弹窗打开时的状态。 */}
             <Button
               appearance="secondary"
               onClick={() => discardDraftAndClose(onClose)}
             >
               Close
             </Button>
-            {/* Apply 当前仅做本地确认，先把草稿提升为“编辑后状态”，后续步骤再接真实写回。 */}
+            {/* Apply 当前仍然只确认本地草稿，真实 Graph 写回会在后续步骤实现。 */}
             <Button
               appearance="primary"
               disabled={!hasUnsavedChanges}

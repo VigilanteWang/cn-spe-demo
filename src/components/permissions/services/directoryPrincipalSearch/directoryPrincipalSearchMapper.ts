@@ -59,6 +59,7 @@ export const mapGraphGroup = (
   const id = readRequiredString(group.id, "Group");
   const displayName = readOptionalString(group.displayName) ?? id;
   const mail = readOptionalString(group.mail);
+  const mailNickname = readOptionalString(group.mailNickname);
   const description = readOptionalString(group.description);
   const groupTypes = readStringArray(group.groupTypes);
   const mailEnabled = readOptionalBoolean(group.mailEnabled);
@@ -69,6 +70,7 @@ export const mapGraphGroup = (
     displayName,
     secondaryText:
       mail ??
+      mailNickname ??
       description ??
       getGroupTypeLabel(groupTypes, mailEnabled, securityEnabled),
     principalType: mapGroupPrincipalType(

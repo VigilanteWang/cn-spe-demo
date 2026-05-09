@@ -12,7 +12,7 @@ interface IRecordedGraphRequest {
   tops: number[];
   filters: string[];
   searches: string[];
-  queries: Array<Record<string, string | number | boolean>>;
+  queries: Array<string | Record<string, string | number>>;
   headers: Array<{ name: string; value: string }>;
 }
 
@@ -58,7 +58,9 @@ class FakeGraphRequest {
     return this;
   }
 
-  query(parameters: Record<string, string | number | boolean>): FakeGraphRequest {
+  query(
+    parameters: string | Record<string, string | number>,
+  ): FakeGraphRequest {
     this.recordedRequest.queries.push(parameters);
     return this;
   }
@@ -78,7 +80,9 @@ class FakeGraphClient implements IDirectorySearchGraphClient {
 
   private readonly getMock = vi.fn<(path: string) => Promise<unknown>>();
 
-  constructor(private readonly responseByPath: Map<string, unknown> = new Map()) {
+  constructor(
+    private readonly responseByPath: Map<string, unknown> = new Map(),
+  ) {
     this.getMock.mockImplementation((path) => {
       const response = this.responseByPath.get(path);
 
@@ -137,7 +141,9 @@ const search = (
     query,
   });
 
-const getSingleRequest = (graphClient: FakeGraphClient): IRecordedGraphRequest => {
+const getSingleRequest = (
+  graphClient: FakeGraphClient,
+): IRecordedGraphRequest => {
   expect(graphClient.requests).toHaveLength(1);
   return graphClient.requests[0];
 };
@@ -205,7 +211,7 @@ describe("directoryPrincipalSearch", () => {
     expect(request.headers).toEqual([
       { name: "ConsistencyLevel", value: "eventual" },
     ]);
-    expect(request.queries).toEqual([{ $count: true }]);
+    expect(request.queries).toEqual([{ $count: "true" }]);
   });
 
   it("should use displayName search for ordinary display name input", async () => {
@@ -227,7 +233,7 @@ describe("directoryPrincipalSearch", () => {
     expect(request.headers).toEqual([
       { name: "ConsistencyLevel", value: "eventual" },
     ]);
-    expect(request.queries).toEqual([{ $count: true }]);
+    expect(request.queries).toEqual([{ $count: "true" }]);
   });
 
   it("should encode exact UPN path and escape fallback OData mail literal", async () => {
@@ -291,7 +297,7 @@ describe("directoryPrincipalSearch", () => {
     expect(request.headers).toEqual([
       { name: "ConsistencyLevel", value: "eventual" },
     ]);
-    expect(request.queries).toEqual([{ $count: true }]);
+    expect(request.queries).toEqual([{ $count: "true" }]);
   });
 
   it("should not add advanced query options to exact eq mail filter", async () => {
@@ -378,7 +384,9 @@ describe("directoryPrincipalSearch", () => {
 
     const unauthorized = new Error("token expired");
     Object.assign(unauthorized, { statusCode: 401 });
-    const failingClient = new FakeGraphClient(new Map([["/users", unauthorized]]));
+    const failingClient = new FakeGraphClient(
+      new Map([["/users", unauthorized]]),
+    );
 
     await expect(search(failingClient, "Megan")).rejects.toMatchObject({
       code: "unauthorized",

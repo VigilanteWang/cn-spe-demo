@@ -73,8 +73,16 @@ export interface IGraphDirectoryRequest {
   top: (count: number) => IGraphDirectoryRequest;
   filter: (filter: string) => IGraphDirectoryRequest;
   search: (search: string) => IGraphDirectoryRequest;
+  /**
+   * 这里对齐 GraphRequest.query 的常见调用形状：
+   * - 传入完整 query string
+   * - 传入键值对象（值为 string/number）
+   *
+   * 这样 MGT 暴露的 graph client 可以直接满足该接口，
+   * Hook 不需要再单独做一层参数适配。
+   */
   query: (
-    parameters: Record<string, string | number | boolean>,
+    parameters: string | Record<string, string | number>,
   ) => IGraphDirectoryRequest;
   header: (name: string, value: string) => IGraphDirectoryRequest;
   /**
