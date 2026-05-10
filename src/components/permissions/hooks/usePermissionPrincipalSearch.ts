@@ -64,13 +64,13 @@ type SearchDirectoryPrincipalsFn = (
  * 让 Hook 只负责搜索流程，不负责页面其他业务状态。
  */
 interface IUsePermissionPrincipalSearchOptions {
-  // 当前正在操作的是 People 还是 Groups 页签。
+  // 当前正在操作的是 People 还是 Groups  tab 。
   selectedTab: PermissionTabValue;
 
-  // 两个页签各自的输入框内容，切页签后也能保留原来的输入。
+  // 两个 tab 各自的输入框内容，切 tab 后也能保留原来的输入。
   queryByTab: Record<PermissionTabValue, string>;
 
-  // 把新的输入值写回到对应页签。
+  // 把新的输入值写回到对应 tab 。
   setQuery: (tab: PermissionTabValue, value: string) => void;
 
   // 把选中的候选人加到权限列表里。
@@ -93,10 +93,14 @@ interface IUsePermissionPrincipalSearchOptions {
  * 输入框的值、搜索结果、当前状态，以及两个用户交互处理函数。
  */
 interface IUsePermissionPrincipalSearchResult {
-  // 当前页签里输入框展示的内容。
+  // 当前 tab 里输入框展示的内容。
+  // 这里直接返回当前 query，而不是让组件自己去读 queryByTab[selectedTab]，
+  // 是为了把 Hook 对外抽象成“当前 tab 的完整搜索视图模型”。
+  // 这样复用方只需要消费当前 query / results / status / handlers，
+  // 不需要知道内部是按 tab 分桶保存输入值，降低对底层状态结构的耦合。
   query: string;
 
-  // 当前页签已经搜索出来、可以展示在下拉列表里的候选项。
+  // 当前 tab 已经搜索出来、可以展示在下拉列表里的候选项。
   results: IPermissionPrincipalCandidate[];
 
   // 当前搜索流程走到哪一步了，比如空闲、加载中、成功、失败。
@@ -123,7 +127,7 @@ interface IUsePermissionPrincipalSearchResult {
  *
  * 这个 Hook 专注在搜索体验：
  * - 管理最小输入长度和 debounce
- * - 根据当前页签切换 People / Groups 搜索源
+ * - 根据当前 tab 切换 People / Groups 搜索源
  * - 把目录搜索结果统一映射成 UI 候选项
  * - 处理重复添加反馈
  *
@@ -135,9 +139,9 @@ export const usePermissionPrincipalSearch = ({
   setQuery,
   addCandidate,
   isCandidateAdded,
-  searchPrincipals = searchDirectoryPrincipals,
+  searchPrincipals = searchDirectoryPrincipals, // 使用默认实现，但允许外部覆盖
 }: IUsePermissionPrincipalSearchOptions): IUsePermissionPrincipalSearchResult => {
-  // 每个页签都维护自己的搜索结果，切换页签时不会互相覆盖。
+  // 每个 tab 都维护自己的搜索结果，切换 tab 时不会互相覆盖。
   const [resultsByTab, setResultsByTab] = useState<
     Record<PermissionTabValue, IPermissionPrincipalCandidate[]>
   >({
@@ -145,7 +149,7 @@ export const usePermissionPrincipalSearch = ({
     groups: [],
   });
 
-  // 每个页签都保留独立状态，便于 UI 正确显示“加载中”或“空结果”。
+  // 每个 tab 都保留独立状态，便于 UI 正确显示“加载中”或“空结果”。
   const [statusByTab, setStatusByTab] = useState<
     Record<PermissionTabValue, PermissionPrincipalSearchStatus>
   >({
@@ -153,23 +157,21 @@ export const usePermissionPrincipalSearch = ({
     groups: "idle",
   });
 
-  // 这个提示主要用于“重复添加”的场景。
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-
-  // 搜索错误按页签分别记录，避免一个页签的错误提示串到另一个页签。
+  // 搜索错误按 tab 分别记录，避免一个 tab 的错误提示串到另一个 tab 。
   const [errorMessageByTab, setErrorMessageByTab] = useState<
     Record<PermissionTabValue, string | null>
   >({
     people: null,
     groups: null,
   });
-
+  // 这个提示主要用于“重复添加”的场景。
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   /**
    * 每次发起异步搜索时递增一个序号。useRef 除非组件卸载，否则一直保持同一个对象，
    * 所以这个序号在多次搜索中会持续递增。
    *
    * 这样晚返回的旧请求就不会把新请求的结果覆盖掉，
-   * 能避免快速输入或切页签时出现“结果倒灌”。
+   * 能避免快速输入或切 tab 时出现“结果倒灌”。
    */
   const requestSequence = useRef(0);
 
@@ -177,10 +179,8 @@ export const usePermissionPrincipalSearch = ({
   const trimmedQuery = currentQuery.trim();
 
   useEffect(() => {
-    const normalizedQuery = currentQuery.trim();
-
-    // 输入为空时，回到最干净的初始状态，并清掉当前页签的旧结果。
-    if (normalizedQuery.length === 0) {
+    // 输入为空时，回到最干净的初始状态，并清掉选中 tab 的旧结果，同时不影响其他 tab。
+    if (trimmedQuery.length === 0) {
       setStatusByTab((currentStatus) => ({
         ...currentStatus,
         [selectedTab]: "idle",
@@ -196,8 +196,9 @@ export const usePermissionPrincipalSearch = ({
       return;
     }
 
-    // 本步骤要求至少输入 3 个字符后才允许真正发起搜索。
-    if (normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+    // 本步骤要求至少输入 3 个字符后才允许真正发起搜索。显示提示，还
+    // 要把旧结果和错误清空
+    if (trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
       setStatusByTab((currentStatus) => ({
         ...currentStatus,
         [selectedTab]: "waitingForMoreInput",
@@ -234,15 +235,18 @@ export const usePermissionPrincipalSearch = ({
         }));
         setErrorMessageByTab((currentErrors) => ({
           ...currentErrors,
-          [selectedTab]: "当前未登录，无法执行目录搜索。",
+          [selectedTab]:
+            "You are not signed in, so directory search is unavailable.",
         }));
         return;
       }
 
       const activeAccount = provider.getActiveAccount?.();
+      // 为本次请求生成一个递增编号，后面用它识别“这是不是最新的一次搜索”。
       const requestId = requestSequence.current + 1;
       requestSequence.current = requestId;
 
+      // 请求正式开始后，先把切换状态到 loading，并清掉上一次残留的错误提示。
       setStatusByTab((currentStatus) => ({
         ...currentStatus,
         [selectedTab]: "loading",
@@ -252,12 +256,13 @@ export const usePermissionPrincipalSearch = ({
         [selectedTab]: null,
       }));
 
+      // 带上当前账号和 tab 信息，发起本次目录搜索。
       void searchPrincipals({
         graphClient: provider.graph.client,
         tenantId: activeAccount?.tenantId ?? FALLBACK_TENANT_ID,
         accountId: activeAccount?.id ?? FALLBACK_ACCOUNT_ID,
         principalKind: selectedTab,
-        query: normalizedQuery,
+        query: trimmedQuery,
       })
         .then((results) => {
           // 如果这不是最新一次请求，说明用户又输入了新内容，旧结果直接丢弃。
@@ -270,6 +275,7 @@ export const usePermissionPrincipalSearch = ({
             mapDirectorySearchResultToCandidate(result, selectedTab),
           );
 
+          // 用最新结果刷新当前 tab，并根据是否有结果决定显示 success 还是 empty。
           setResultsByTab((currentResults) => ({
             ...currentResults,
             [selectedTab]: mappedResults,
@@ -285,6 +291,7 @@ export const usePermissionPrincipalSearch = ({
             return;
           }
 
+          // 搜索失败时清空当前结果，并把状态和错误提示切到失败态。
           setResultsByTab((currentResults) => ({
             ...currentResults,
             [selectedTab]: [],
@@ -295,21 +302,22 @@ export const usePermissionPrincipalSearch = ({
           }));
           setErrorMessageByTab((currentErrors) => ({
             ...currentErrors,
-            [selectedTab]: "目录搜索失败，请稍后重试。",
+            [selectedTab]: "Directory search failed. Please try again later.",
           }));
         });
     }, SEARCH_DEBOUNCE_MS);
 
     return () => {
-      // 输入继续变化或组件卸载时，清掉上一次尚未触发的 debounce 定时器。
+      // 函数 return 给 React，在下一次 effect 执行前或组件卸载时调用。
+      // 这里具体是，输入继续变化（trimmedQuery 变化，或其它依赖变化）或组件卸载时，清掉上一次尚未触发的 debounce 定时器。
       window.clearTimeout(timeoutId);
     };
-  }, [currentQuery, searchPrincipals, selectedTab]);
+  }, [searchPrincipals, selectedTab, trimmedQuery]);
 
   /**
-   * 更新当前页签的输入值。
+   * 输入 query 变化时的 handler
    *
-   * 用户继续输入时，先清掉“重复添加”的提示，
+   * 用户继续输入时，先清掉“已添加”的提示，
    * 避免旧反馈残留在新的搜索过程里。
    */
   const handleQueryChange = (value: string) => {
@@ -318,7 +326,7 @@ export const usePermissionPrincipalSearch = ({
   };
 
   /**
-   * 处理从下拉列表中选中某个候选对象。
+   * 在搜索结果列表中，选中某个候选对象时的 handler。
    *
    * - 已存在：不给重复加，只提示一次
    * - 不存在：直接加入 access list，并清空输入
@@ -338,7 +346,9 @@ export const usePermissionPrincipalSearch = ({
     }
 
     if (isCandidateAdded(selectedTab, candidateId)) {
-      setFeedbackMessage(`${selectedCandidate.name} 已在 access list 中`);
+      setFeedbackMessage(
+        `${selectedCandidate.name} is already in the access list.`,
+      );
       return;
     }
 

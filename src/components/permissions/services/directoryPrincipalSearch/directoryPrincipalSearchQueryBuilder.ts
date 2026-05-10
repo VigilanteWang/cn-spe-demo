@@ -17,6 +17,7 @@ import {
   IGraphDirectoryRequest,
 } from "./directoryPrincipalSearchTypes";
 
+// Query builder这里才是真正使用client 执行 graph 请求的地方
 /**
  * 根据 user id 精确读取用户。
  */

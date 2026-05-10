@@ -137,8 +137,6 @@ export const ContainerPermissionDialog = ({
   /**
    * 处理 Combobox 输入变化。
    *
-   * 当前输入值不会再用于过滤 access list，
-   * 而是专门驱动目录搜索流程。
    */
   const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
     event,
@@ -149,8 +147,7 @@ export const ContainerPermissionDialog = ({
   /**
    * 处理用户从下拉结果里选中某个候选对象。
    *
-   * 选中后会直接尝试加入 access list，
-   * 不再保留额外的 Add 按钮。
+   * 选中后会直接尝试加入 access list
    */
   const handleOptionSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
     _event,
@@ -180,8 +177,8 @@ export const ContainerPermissionDialog = ({
                 Container: {containerName ?? "<No container selected>"}
               </Text>
               <Text>
-                当前先完成最终的目录搜索交互与本地 access list 草稿编辑。真实权限初始加载和
-                Apply 写回会在后续步骤接入。
+                Search for people or groups and add them to the access list.
+                Changes take effect when you click Apply.
               </Text>
             </div>
 
@@ -212,7 +209,7 @@ export const ContainerPermissionDialog = ({
                   aria-label={`Add ${getTabTitle(selectedTab)}`}
                   className={styles.principalCombobox}
                   expandIcon={null}
-                  placeholder={`输入至少 3 个字符后搜索 ${getTabTitle(selectedTab)}`}
+                  placeholder={`Search for ${getTabTitle(selectedTab)} (type at least 3 characters)`}
                   freeform
                   selectedOptions={[]}
                   value={query}
@@ -222,13 +219,15 @@ export const ContainerPermissionDialog = ({
                 >
                   {status === "waitingForMoreInput" ? (
                     <Option disabled text="Need more input">
-                      <Text size={200}>请至少输入 3 个字符后再开始搜索。</Text>
+                      <Text size={200}>
+                        Keep typing — at least 3 characters to search.
+                      </Text>
                     </Option>
                   ) : null}
 
                   {status === "debouncing" ? (
                     <Option disabled text="Debouncing">
-                      <Text size={200}>正在整理输入，稍后开始搜索...</Text>
+                      <Text size={200}>Getting ready to search...</Text>
                     </Option>
                   ) : null}
 
@@ -239,7 +238,7 @@ export const ContainerPermissionDialog = ({
                         data-testid="directory-search-loading"
                       >
                         <Spinner size="tiny" />
-                        <Text>正在搜索目录对象...</Text>
+                        <Text>Searching...</Text>
                       </div>
                     </Option>
                   ) : null}
@@ -284,7 +283,7 @@ export const ContainerPermissionDialog = ({
                                   size={200}
                                   className={styles.dropdownOptionMeta}
                                 >
-                                  已存在
+                                  Already added
                                 </Text>
                               ) : null}
                             </div>
@@ -299,7 +298,8 @@ export const ContainerPermissionDialog = ({
                         size={200}
                         data-testid="directory-search-empty-state"
                       >
-                        没有找到匹配的目录对象。请尝试更完整的姓名、邮箱或组名关键字。
+                        No results found. Try a more complete name, email, or
+                        group name.
                       </Text>
                     </Option>
                   ) : null}
@@ -338,7 +338,8 @@ export const ContainerPermissionDialog = ({
               ) : null}
               {!feedbackMessage && !errorMessage ? (
                 <Text size={200} className={styles.searchStatusText}>
-                  选择结果后会直接加入当前页签的 access list，重复对象不会再次加入。
+                  Select someone from the results to add them. Duplicates won't
+                  be added twice.
                 </Text>
               ) : null}
             </div>
@@ -427,7 +428,8 @@ export const ContainerPermissionDialog = ({
                       <TableRow>
                         <TableCell colSpan={3}>
                           <TableCellLayout>
-                            当前没有权限项。可以先在上方输入关键字并从搜索结果中选择一条加入。
+                            No entries yet. Search above and pick someone to add
+                            them.
                           </TableCellLayout>
                         </TableCell>
                       </TableRow>

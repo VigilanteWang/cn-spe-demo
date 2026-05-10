@@ -61,13 +61,12 @@ export const clearDirectoryPrincipalSearchCacheForAuthContext = (
 };
 
 /**
- * 主入口只负责编排三件事：
+ * 对搜索进行 orchestrate：
  * 1. 创建搜索计划；
  * 2. 读取或写入短周期内存缓存；
  * 3. 把 Graph 错误映射成稳定错误类型。
  *
  * 真正的 URL 构造、OData 转义、$search 语法和结果映射都放在独立模块里，
- * 这样 Dialog 或未来 TagPicker 不会被 Graph 查询细节污染。
  */
 export const searchDirectoryPrincipals = async ({
   graphClient,
