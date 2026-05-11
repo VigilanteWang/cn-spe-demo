@@ -37,6 +37,10 @@ import {
   createGraphClient,
   getGraphToken,
 } from "./auth";
+import {
+  applyContainerPermissions,
+  listContainerPermissions,
+} from "./containerPermissions";
 
 /**
  * Handler 风格说明（重要）
@@ -152,6 +156,44 @@ server.post("/api/createContainer", async (req, res) => {
     res.send(500, { message: `Error in API server: ${msg}` });
   }
 });
+
+/**
+ * GET /api/containerPermissions/:containerId
+ *
+ * 这个接口用于读取指定容器当前的容器级权限，并把 Graph 原始 permission
+ * 映射成前端 access list 可直接消费的最小字段。
+ *
+ * 前端不会直接连接 Graph，而是继续通过后端 OBO：
+ * 1. 统一做 token 校验和 OBO 令牌交换
+ * 2. 集中处理 Graph 节流、错误映射和最小字段收敛
+ * 3. 避免把容器权限写回细节散落到前端
+ */
+server.get("/api/containerPermissions/:containerId", async (req, res) => {
+  try {
+    await listContainerPermissions(req, res);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error in listContainerPermissions: ${msg}` });
+  }
+});
+
+/**
+ * POST /api/containerPermissions/:containerId/apply
+ *
+ * 这个接口接收前端已经拆好的新增 / 更新 / 删除差异，
+ * 再由服务端顺序写入 Graph，并在成功后返回最新权限列表。
+ */
+server.post(
+  "/api/containerPermissions/:containerId/apply",
+  async (req, res) => {
+    try {
+      await applyContainerPermissions(req, res);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.send(500, { message: `Error in applyContainerPermissions: ${msg}` });
+    }
+  },
+);
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────
 /**

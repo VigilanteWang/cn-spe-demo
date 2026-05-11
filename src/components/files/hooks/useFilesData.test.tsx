@@ -18,7 +18,7 @@ const createDeferred = <T,>() => {
 
 describe("useFilesData", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("should resolve loadItems before photo and presence enrichment completes", async () => {

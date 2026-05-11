@@ -39,6 +39,18 @@ describe("Containers", () => {
   beforeEach(() => {
     listContainersMock.mockReset();
     createContainerMock.mockReset();
+
+    if (!("NodeFilter" in globalThis)) {
+      Object.defineProperty(globalThis, "NodeFilter", {
+        configurable: true,
+        value: {
+          SHOW_ELEMENT: 1,
+          FILTER_ACCEPT: 1,
+          FILTER_REJECT: 2,
+          FILTER_SKIP: 3,
+        },
+      });
+    }
   });
 
   afterEach(() => {

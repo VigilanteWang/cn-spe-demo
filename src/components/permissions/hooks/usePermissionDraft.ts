@@ -9,11 +9,11 @@ import {
 /**
  * 复制权限列表，避免不同快照共享同一份引用。
  *
- * 这里会同时用于 original 和 draft：
- * - original 代表“上一次确认后的基线快照”，用于 Close / Reset 回滚。
- * - draft 代表“当前正在编辑的草稿快照”，用于页面内的增删改。
+ * 这里会同时用于 `original` 和 `draft`：
+ * - `original` 代表“最近一次确认后的基线快照”，用于 Close / Reset 回滚。
+ * - `draft` 代表“当前正在编辑的草稿快照”，用于页面内的增删改。
  *
- * 两份列表必须互相独立，也不能直接引用外部传入的 initial 数据，
+ * 两份列表必须互相独立，也不能直接引用外部传入的 `initial` 数据。
  */
 const cloneEntriesByTab = (
   entriesByTab: PermissionEntriesByTab,
@@ -33,29 +33,15 @@ const areEntriesByTabEqual = (
 /**
  * 管理草稿权限列表与“编辑前原始状态”。
  *
- * 说明：
- * - originalEntriesByTab 表示上一次确认后的状态。
- * - draftEntriesByTab 表示当前正在 Dialog 中编辑的草稿。
- * - Close 会丢弃 draft，回到 original。
- * - Apply 先只做本地确认，不调用任何后端接口。
- */
-/**
- * 管理草稿权限列表与“编辑前原始状态”。
- *
  * 这里保留两份列表，不是为了重复存储，而是为了把“基线”和“编辑中状态”拆开：
- * - initialEntriesByTab 是外部传进来的初始值，只负责初始化这次弹窗会话。
- * - originalEntriesByTab 保存本地维护的确认基线，Apply 后会前移到最新草稿。
- * - draftEntriesByTab 保存当前编辑过程中的变化，只影响弹窗内的临时编辑体验。
- * ---
- * 需要 original 拷贝的理由:弹窗内部的编辑、确认、撤销逻辑形成自洽的闭环，
+ * - `initialEntriesByTab` 是外部传进来的初始值，只负责初始化这次弹窗会话。
+ * - `originalEntriesByTab` 保存本地维护的确认基线，成功写回后会前移到最新快照。
+ * - `draftEntriesByTab` 保存当前编辑过程中的变化，只影响弹窗内的临时编辑体验。
  *
- * - 假设没有，只保留draft和initial，如果后台数据更新了，initial也变了，用户点击reset
- * 发现数据变了，可能会困惑，使用 original 进行快照符合 Reset 的预期语义。
- *
- * - 假设 Apply 提交后，网络延迟，虽然成功了，此时别人立刻又改了权限，如果直接对照 initial，就会发现
- * 又变了，又有未保存的更改，用户可能也会疑惑：究竟有没有保存？
- *
- * - initial 依靠父组件的 re-render 来更新，apply 后会没来得及更新至最新值，用户也会看到还有未保存更改
+ * 需要 `original` 快照的原因：
+ * - Close 要丢弃未提交修改，必须知道“恢复到哪里”。
+ * - Apply 成功后要清空脏状态，也必须刷新新的“已确认基线”。
+ * - 当容器切换或后端重新加载成功时，也需要把最新服务端结果同步成新的基线。
  */
 export const usePermissionDraft = (
   initialEntriesByTab: PermissionEntriesByTab,
@@ -71,8 +57,7 @@ export const usePermissionDraft = (
   );
 
   useEffect(() => {
-    // resetKey 一般对应容器 ID。容器切换时，同时重建基线和草稿，避免不同容器串数据。
-    // 这里把 initial 当作“新会话的起点”，而不是自动同步的全局真值。
+    // `resetKey` 一般对应容器 ID。容器切换时，同时重建基线和草稿，避免不同容器串数据。
     const nextEntriesByTab = cloneEntriesByTab(initialEntriesByTab);
     setOriginalEntriesByTab(nextEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextEntriesByTab));
@@ -80,6 +65,7 @@ export const usePermissionDraft = (
 
   /**
    * 向指定页签追加一条新的草稿权限记录。
+   * 这里要返回新数组而不是直接修改原数组，这样才能符合 React state 的“不可变”更新要求。
    */
   const addEntry = (
     tab: PermissionTabValue,
@@ -93,6 +79,7 @@ export const usePermissionDraft = (
 
   /**
    * 更新指定权限项的角色，用于表格里的行内角色切换。
+   * 这里用 map 生成一个新数组，逐项检查后只替换命中的 entry，其余 entry 保持原样。
    */
   const updateEntryRole = (
     tab: PermissionTabValue,
@@ -109,6 +96,7 @@ export const usePermissionDraft = (
 
   /**
    * 从指定页签的草稿列表中删除一条权限项。
+   * 这里用 filter 生成一个新的数组，只需要留下的 entry，而不是直接在原数组上删除。
    */
   const removeEntry = (tab: PermissionTabValue, entryId: string) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
@@ -118,20 +106,33 @@ export const usePermissionDraft = (
   };
 
   /**
-   * 放弃本次编辑，把草稿恢复到上一次确认后的状态。
+   * 放弃本次编辑，把草稿恢复到最近一次确认后的状态。
    */
   const resetDraft = () => {
     setDraftEntriesByTab(cloneEntriesByTab(originalEntriesByTab));
   };
 
   /**
-   * 确认当前草稿，并把它提升为新的基线快照。
+   * 仅在本地把当前草稿提升成新的确认快照。
    *
-   * 这样下一轮编辑、回滚和未保存判断，都会以这次 Apply 后的结果为准。
-   * 如果未来接入后端写回，这里还会和 ETag / version 校验配合，避免静默覆盖更新。
+   * 这仍然保留给纯本地场景或单元测试使用；
+   * 真正的容器权限写回完成后，会优先使用 `replaceEntries` 把服务端最新结果同步回来。
    */
   const applyDraft = () => {
     const nextOriginalEntriesByTab = cloneEntriesByTab(draftEntriesByTab);
+    setOriginalEntriesByTab(nextOriginalEntriesByTab);
+    setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
+  };
+
+  /**
+   * 用服务端最新确认的权限快照同时重置 original 和 draft。
+   *
+   * 这个方法主要用于两种场景：
+   * 1. Dialog 初次打开后，加载回来的真实容器权限；
+   * 2. Apply 成功后，用后端最新结果覆盖本地草稿，清空脏状态。
+   */
+  const replaceEntries = (entriesByTab: PermissionEntriesByTab) => {
+    const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
     setOriginalEntriesByTab(nextOriginalEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
   };
@@ -148,5 +149,6 @@ export const usePermissionDraft = (
     removeEntry,
     resetDraft,
     applyDraft,
+    replaceEntries,
   };
 };

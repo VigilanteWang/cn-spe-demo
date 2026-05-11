@@ -1,4 +1,4 @@
-import { makeStyles, shorthands, tokens } from "@fluentui/react-components";
+import { makeStyles, tokens } from "@fluentui/react-components";
 
 /**
  * 容器权限模块样式。
@@ -7,6 +7,14 @@ export const usePermissionsStyles = makeStyles({
   surface: {
     width: "min(560px, calc(100vw - 32px))",
     maxWidth: "calc(100vw - 32px)",
+    height: "650px",
+    maxHeight: "calc(100vh - 32px)",
+  },
+  body: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    minHeight: 0,
   },
   content: {
     display: "flex",
@@ -15,6 +23,8 @@ export const usePermissionsStyles = makeStyles({
     width: "100%",
     minWidth: 0,
     maxWidth: "100%",
+    flex: 1,
+    minHeight: 0,
   },
   section: {
     display: "flex",
@@ -67,38 +77,87 @@ export const usePermissionsStyles = makeStyles({
   errorStatusText: {
     color: tokens.colorPaletteRedForeground1,
   },
+  accessListSection: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "8px",
+    minWidth: 0,
+    flex: 1,
+    minHeight: 0,
+  },
   tableWrapper: {
+    flex: 1,
+    minHeight: 0,
     width: "100%",
     maxWidth: "100%",
     boxSizing: "border-box",
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
     overflowX: "auto",
-    ...shorthands.padding("8px"),
+    overflowY: "auto",
   },
   accessTable: {
     width: "100%",
     minWidth: "360px",
     tableLayout: "fixed",
-  },
-  headerCell: {
-    fontWeight: tokens.fontWeightBold,
-    whiteSpace: "nowrap",
+    height: "auto",
   },
   principalColumn: {
     minWidth: "220px",
     overflowWrap: "anywhere",
     wordBreak: "break-word",
+    paddingTop: "8px",
+    paddingBottom: "8px",
   },
   roleColumn: {
     width: "132px",
     minWidth: "132px",
+    paddingTop: "8px",
+    paddingBottom: "8px",
   },
   actionColumn: {
     width: "56px",
     minWidth: "56px",
+    paddingTop: "8px",
+    paddingBottom: "8px",
   },
   roleSelect: {
     width: "115px",
+  },
+  footerActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    minWidth: 0,
+    marginTop: "0",
+  },
+  applyFeedbackWrapper: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: "24px",
+    minWidth: 0,
+  },
+  applySuccessFeedback: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "6px",
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  applySavingFeedback: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "6px",
+    color: tokens.colorNeutralForeground3,
+  },
+  applyErrorFeedback: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "6px",
+    color: tokens.colorPaletteRedForeground1,
+  },
+  footerButtons: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "12px",
+    marginLeft: "auto",
   },
 });

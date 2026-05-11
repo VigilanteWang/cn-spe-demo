@@ -80,7 +80,10 @@ interface IUsePermissionPrincipalSearchOptions {
   ) => void;
 
   // 判断某个候选人是不是已经被加进列表了。
-  isCandidateAdded: (tab: PermissionTabValue, candidateId: string) => boolean;
+  isCandidateAdded: (
+    tab: PermissionTabValue,
+    candidate: IPermissionPrincipalCandidate,
+  ) => boolean;
 
   // 真正执行目录搜索的函数；不传时默认使用内置实现。
   searchPrincipals?: SearchDirectoryPrincipalsFn;
@@ -345,7 +348,7 @@ export const usePermissionPrincipalSearch = ({
       return;
     }
 
-    if (isCandidateAdded(selectedTab, candidateId)) {
+    if (isCandidateAdded(selectedTab, selectedCandidate)) {
       setFeedbackMessage(
         `${selectedCandidate.name} is already in the access list.`,
       );

@@ -15,5 +15,6 @@
     "strict": true,
     // 跳过第三方包 d.ts 类型检查，避免 @lit/task 等包的嵌套 const 泛型报错
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["./dist", "./**/*.test.ts"]
 }

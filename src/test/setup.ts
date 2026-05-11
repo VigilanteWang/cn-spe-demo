@@ -19,8 +19,22 @@ const nodeFilterShim = {
  */
 vi.stubGlobal("NodeFilter", nodeFilterShim);
 
+Object.defineProperty(globalThis, "NodeFilter", {
+  value: nodeFilterShim,
+  configurable: true,
+  writable: true,
+});
+
 if (typeof window !== "undefined") {
   Object.defineProperty(window, "NodeFilter", {
+    value: nodeFilterShim,
+    configurable: true,
+    writable: true,
+  });
+}
+
+if (typeof self !== "undefined") {
+  Object.defineProperty(self, "NodeFilter", {
     value: nodeFilterShim,
     configurable: true,
     writable: true,

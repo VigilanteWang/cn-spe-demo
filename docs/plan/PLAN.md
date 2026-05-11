@@ -289,39 +289,54 @@
 ### 步骤 5：真实容器权限加载、差异计算与 Apply 写回
 
 ```text
-请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的收尾步骤。假设前端目录搜索服务和 TagPicker 接入已完成。本步只做真实容器权限加载、差异计算和 `Apply` 写回。
+请在仓库 `E:\cache\GitRepos\cn-spe-demo` 中继续实现“容器级权限管理”的收尾步骤。假设前端 `Combobox` 搜索交互、真实目录搜索、以及本地草稿编辑已经完成。本步只做真实容器权限加载、差异计算和 `Apply` 写回，不要回退或重写前面已经完成的搜索交互。
 
 要求：
-1. 先探索当前权限模块、前端目录搜索、TagPicker 接入、容器页面和后端 OBO 结构。
+1. 先探索当前代码现状，重点阅读这些位置，再直接实现：
+   - `src/components/permissions/ContainerPermissionDialog.tsx`
+   - `src/components/permissions/hooks/useContainerPermissionDialogState.ts`
+   - `src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
+   - `src/components/permissions/services/directoryPrincipalSearch/`
+   - `server/auth.ts`
+   - `server/common/scopes.ts`
+   - `server/index.ts`
 2. 遵守仓库 `AGENTS.md`：新增注释和 JSDoc 必须是简体中文；TypeScript 严格，不允许 `any`。
-3. 容器权限 list / create / update / delete 继续走后端 OBO，不改成前端直连 Graph。
-4. 前端搜索得到的 principal 必须用稳定 `id` 参与权限写回；UPN / email / displayName 只作为展示和搜索辅助字段。
-5. 后端权限 API 需要集中处理：
+3. 特别强调：不要删除现有 comments。对于当前代码里已经存在的中文注释、JSDoc 和面向初级开发者的解释，只能按改后代码现状做增补或修订，不能为了“清理代码”而删除；如果某段逻辑迁移了，要把原有解释一起迁移到对应新位置。
+4. 保持当前已经完成的前端交互不变：
+   - 继续使用 `Combobox`
+   - 搜索期间保留 loading 状态
+   - 搜索结果点击后直接加入 `access list`
+   - 不要重新引入 `TagPicker`
+   - 不要恢复 `Add` 按钮
+5. 容器权限 list / create / update / delete 继续走后端 OBO，不改成前端直连 Graph。
+6. 前端搜索得到的 principal 必须用稳定 `id` 参与权限写回；UPN / email / displayName 只作为展示和搜索辅助字段。
+7. 由于当前后端还没有容器权限相关路由和处理逻辑，本步需要补齐最小可用后端能力。后端权限 API 需要集中处理：
    - 依赖 Graph SDK 默认 RetryHandler 处理基础 `429` / `503` / `504` retry，不重复手写通用 retry loop
    - SDK retry 后仍失败时，提取 `429` / `Retry-After` / request id 等信息并映射给前端
    - 最小字段
    - 顺序写入或小批量写入
    - 面向前端的明确错误映射
-6. 实现打开 Dialog 时真实加载当前容器权限，并映射为本地 access list 视图模型。
-7. 实现 `Apply`：
+8. 实现打开 Dialog 时真实加载当前容器权限，并映射为当前已存在的本地 `access list` 视图模型。
+9. 实现 `Apply`：
    - 对比初始权限和当前草稿
    - 拆分新增、更新、删除
    - 成功后刷新当前列表并清空脏状态
    - 失败时保留草稿并提示明确错误
-8. 保留 `Close` 放弃未提交草稿的保护。
-9. 如果 UI 角色名与 Graph 权限角色名不同，把映射收敛到单独模块并写中文注释。
-10. 请补测试，至少覆盖：
+10. 保留 `Close` 放弃未提交草稿的保护。
+11. 如果 UI 角色名与 Graph 权限角色名不同，把映射收敛到单独模块并写中文注释。
+12. 请特别确认：第 3、4 步中已经完成的 `Combobox` 搜索与本地草稿逻辑，在接入真实权限加载和真实写回后仍然可用，不能因为数据源切换把已有交互破坏掉。
+13. 请补测试，至少覆盖：
    - 初始权限加载成功后的列表显示
    - 差异拆分逻辑
    - `Apply` 成功
    - `Apply` 失败
    - SDK retry 后仍返回 `429` 时的错误映射
    - 成功后重置脏状态
-11. 最后运行：
+14. 最后运行：
    - `npm test -- --run`
    - `npx tsc --noEmit`
 
-完成后请输出改动摘要、为什么权限读写继续采用后端 OBO、权限 API 映射说明、差异计算说明和测试结果。
+完成后请输出改动摘要、为什么权限读写继续采用后端 OBO、权限 API 映射说明、差异计算说明、对现有 comments 的处理方式和测试结果。
 ```
 
 ## Notes
