@@ -30,13 +30,7 @@ export interface IPermissionPrincipalCandidate {
   /** 只用于 Avatar 的首字母缩写。 */
   initials: string;
   /**
-   * 用于本地去重的辅助键，通常是规范化后的 email / UPN / loginName。
-   *
-   * 搜索结果写回时仍然只使用稳定 `id`，
-   * 这个字段只用于“已有权限列表里缺少 Graph object id”时的本地重复判断。
-   */
-  lookupKey?: string;
-  /**
+
    * 当候选项是用户时，对应的 userPrincipalName。
    *
    * Graph 的容器权限创建接口在新增用户权限时要求提供这个字段，
@@ -49,9 +43,8 @@ export interface IPermissionPrincipalCandidate {
  * 容器权限访问项。
  *
  * 说明：
- * - `principalId` 对应真实用户或组的稳定 id，用于新增写回和优先去重。
+ * - `principalId`：people tab 存放基于 UPN 的合成 id，groups tab 存放 AAD group object id。
  * - `permissionId` 对应已有的容器权限记录，用于 update / delete。
- * - `principalLookupKey` 是缺少 Graph object id 时的本地辅助键，不参与新增写回。
  * - `role` 表示当前草稿中的容器级角色。
  */
 export interface IContainerPermissionEntry {
@@ -59,10 +52,8 @@ export interface IContainerPermissionEntry {
   id: string;
   /** 对应后端 / Graph 权限记录的稳定标识，用于更新和删除。 */
   permissionId?: string;
-  /** 对应真实 principal 的稳定标识，用于新增写回和优先去重。 */
+  /** people tab: 基于 UPN 的合成 id；groups tab: AAD group object id。 */
   principalId: string;
-  /** 缺少 Graph object id 时用于本地去重的辅助键。 */
-  principalLookupKey?: string;
   /** 当该条权限对应用户时，保留下来的 userPrincipalName。 */
   principalUserPrincipalName?: string;
   /** 表格中显示的 principal 名称。 */

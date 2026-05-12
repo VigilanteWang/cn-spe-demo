@@ -60,7 +60,10 @@ describe("computeContainerPermissionChanges", () => {
     };
 
     expect(
-      computeContainerPermissionChanges(originalEntriesByTab, draftEntriesByTab),
+      computeContainerPermissionChanges(
+        originalEntriesByTab,
+        draftEntriesByTab,
+      ),
     ).toEqual({
       create: [
         {
@@ -81,7 +84,7 @@ describe("computeContainerPermissionChanges", () => {
           role: "Owner",
         },
       ],
-      delete: [
+      remove: [
         {
           permissionId: "perm-group-existing",
         },

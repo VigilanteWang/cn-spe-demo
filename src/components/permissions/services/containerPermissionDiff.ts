@@ -56,19 +56,11 @@ export interface IDeleteContainerPermissionChange {
 export interface IContainerPermissionChangeSet {
   create: ICreateContainerPermissionChange[];
   update: IUpdateContainerPermissionChange[];
-  delete: IDeleteContainerPermissionChange[];
+  remove: IDeleteContainerPermissionChange[];
 }
 
 /**
- * 计算当前草稿相对初始权限的新增、更新、删除差异。
- *
- * 设计说明：
- * - “同一个 principal 是不是同一条权限”使用 `entry.id` 判断，
- *   因为它由 `principalType + principalId` 组成，能稳定区分 people/groups。
- * - 真正发给后端做更新 / 删除时，则一律使用 `permissionId`，
- *   避免靠展示字段位置或文本去找对应权限。
- * - 新增时则按 principalType 分成两条链路：
- *   people 需要 `userPrincipalName`，groups 继续使用 `principalId`。
+ * 计算权限草稿相对初始快照的差异。
  */
 export const computeContainerPermissionChanges = (
   originalEntriesByTab: PermissionEntriesByTab,
@@ -81,13 +73,16 @@ export const computeContainerPermissionChanges = (
   for (const tab of ["people", "groups"] as const) {
     const originalEntries = originalEntriesByTab[tab];
     const draftEntries = draftEntriesByTab[tab];
+    // 同一个 principal 是否算同一条权限，统一用 entry.id 判断。
     const originalEntryById = new Map(
       originalEntries.map((entry) => [entry.id, entry] as const),
     );
+    // 草稿侧也建立索引，便于快速判断新增、更新和删除。
     const draftEntryById = new Map(
       draftEntries.map((entry) => [entry.id, entry] as const),
     );
 
+    // 先扫草稿：不存在于初始快照里的项，视为新增。
     for (const draftEntry of draftEntries) {
       const originalEntry = originalEntryById.get(draftEntry.id);
 
@@ -96,6 +91,7 @@ export const computeContainerPermissionChanges = (
         continue;
       }
 
+      // 已存在的权限如果角色变了，就只发更新角色所需的 permissionId。
       if (originalEntry.role !== draftEntry.role) {
         update.push({
           permissionId: requirePermissionId(
@@ -107,6 +103,7 @@ export const computeContainerPermissionChanges = (
       }
     }
 
+    // 再扫初始快照：草稿里找不到的项，视为删除。
     for (const originalEntry of originalEntries) {
       if (!draftEntryById.has(originalEntry.id)) {
         remove.push({
@@ -122,15 +119,14 @@ export const computeContainerPermissionChanges = (
   return {
     create,
     update,
-    delete: remove,
+    remove,
   };
 };
 
 /**
- * 更新和删除必须需要真实的 permissionId。
+ * 读取更新和删除所需的 permissionId。
  *
- * 如果这里缺少，说明服务端权限快照没有被完整映射进本地模型，
- * 继续写回会导致后端无法精确定目标，因此直接抛错更安全。
+ * 缺失时直接抛错，避免把不完整的权限快照写回后端。
  */
 const requirePermissionId = (
   entry: IContainerPermissionEntry,
@@ -146,12 +142,13 @@ const requirePermissionId = (
 };
 
 /**
- * 把一条新的本地草稿权限项转换成后端可直接消费的 create 差异。
+ * 把草稿权限转换成 create 差异。
  */
 const createContainerPermissionChangeFromEntry = (
   entry: IContainerPermissionEntry,
 ): ICreateContainerPermissionChange => {
   if (entry.principalType === "people") {
+    // people 分支必须带 userPrincipalName，后端创建接口才够用。
     return {
       principalType: "people",
       principalId: entry.principalId,
@@ -160,6 +157,7 @@ const createContainerPermissionChangeFromEntry = (
     };
   }
 
+  // groups 继续用稳定的 principalId 即可。
   return {
     principalType: "groups",
     principalId: entry.principalId,
@@ -168,7 +166,7 @@ const createContainerPermissionChangeFromEntry = (
 };
 
 /**
- * 新增用户权限时，Graph 要求我们提供 userPrincipalName。
+ * 读取 people 创建所需的 userPrincipalName。
  */
 const requireUserPrincipalName = (entry: IContainerPermissionEntry): string => {
   if (entry.principalUserPrincipalName) {

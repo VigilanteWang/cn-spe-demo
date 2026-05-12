@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 import {
-  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Containers } from "./index";
 import { IContainer } from "../../common/types";
 
@@ -39,22 +38,6 @@ describe("Containers", () => {
   beforeEach(() => {
     listContainersMock.mockReset();
     createContainerMock.mockReset();
-
-    if (!("NodeFilter" in globalThis)) {
-      Object.defineProperty(globalThis, "NodeFilter", {
-        configurable: true,
-        value: {
-          SHOW_ELEMENT: 1,
-          FILTER_ACCEPT: 1,
-          FILTER_REJECT: 2,
-          FILTER_SKIP: 3,
-        },
-      });
-    }
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("should render create and permission buttons", async () => {

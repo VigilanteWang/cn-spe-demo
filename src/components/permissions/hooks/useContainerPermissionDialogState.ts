@@ -57,7 +57,9 @@ export const useContainerPermissionDialogState = (
   } = usePermissionDraft(initialEntriesByTab, resetKey);
 
   // 两个 tab 共用一个输入框外壳，但分别保存 people / groups 自己的输入值。
-  const [filterByTab, setFilterByTab] = useState<Record<PermissionTabValue, string>>({
+  const [filterByTab, setFilterByTab] = useState<
+    Record<PermissionTabValue, string>
+  >({
     people: "",
     groups: "",
   });
@@ -118,19 +120,16 @@ export const useContainerPermissionDialogState = (
     tab: PermissionTabValue,
     candidate: IPermissionPrincipalCandidate,
   ): boolean => {
-    const normalizedCandidateLookupKey = candidate.lookupKey?.trim().toLowerCase();
-
     return draftEntriesByTab[tab].some((entry) => {
-      if (entry.principalId === candidate.id) {
-        return true;
+      // groups tab：双方都有稳定的 AAD group object id，直接比较。
+      if (tab === "groups") {
+        return entry.principalId === candidate.id;
       }
 
-      const normalizedEntryLookupKey = entry.principalLookupKey?.trim().toLowerCase();
-      return Boolean(
-        normalizedCandidateLookupKey &&
-          normalizedEntryLookupKey &&
-          normalizedCandidateLookupKey === normalizedEntryLookupKey,
-      );
+      // people tab：用规范化后的 UPN 比较，兼容大小写差异。
+      const candidateUpn = candidate.userPrincipalName?.trim().toLowerCase();
+      const entryUpn = entry.principalUserPrincipalName?.trim().toLowerCase();
+      return Boolean(candidateUpn && entryUpn && candidateUpn === entryUpn);
     });
   };
 
@@ -164,7 +163,6 @@ const createPermissionEntryFromCandidate = (
   // 使用“principal 类型 + principal ID”生成前端唯一键，方便表格渲染和本地更新定位。
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,
-  principalLookupKey: candidate.lookupKey,
   principalUserPrincipalName: candidate.userPrincipalName,
   principalName: candidate.name,
   principalType: candidate.type,

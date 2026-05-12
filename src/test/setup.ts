@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 import { vi } from "vitest";
 
 const nodeFilterShim = {
@@ -40,3 +42,8 @@ if (typeof self !== "undefined") {
     writable: true,
   });
 }
+
+// 统一在全局 setup 中做组件清理，避免各测试文件重复维护。
+afterEach(() => {
+  cleanup();
+});

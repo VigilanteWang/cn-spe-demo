@@ -21,7 +21,6 @@ interface IContainerPermissionEntryDto {
   id: string;
   permissionId: string;
   principalId: string;
-  principalLookupKey?: string;
   principalUserPrincipalName?: string;
   principalName: string;
   principalType: PermissionTabValue;
@@ -72,7 +71,7 @@ interface IDeleteContainerPermissionChange {
 interface IContainerPermissionChangeSet {
   create: ICreateContainerPermissionChange[];
   update: IUpdateContainerPermissionChange[];
-  delete: IDeleteContainerPermissionChange[];
+  remove: IDeleteContainerPermissionChange[];
 }
 
 interface IGraphRequest {
@@ -92,17 +91,13 @@ interface IGraphPermissionIdentity {
   graphId?: string;
   displayName: string;
   description: string;
-  lookupKey?: string;
   userPrincipalName?: string;
 }
 
 /**
  * 读取指定容器的真实权限列表，并映射成前端 access list 视图模型。
  */
-export const listContainerPermissions = async (
-  req: Request,
-  res: Response,
-) => {
+export const listContainerPermissions = async (req: Request, res: Response) => {
   const authorizationResult = await authorizeContainerManageRequest(req);
 
   if (!authorizationResult.ok) {
@@ -123,8 +118,13 @@ export const listContainerPermissions = async (
 
   try {
     const graphToken = await getGraphToken(authorizationResult.token);
-    const graphClient = createGraphClient(graphToken) as unknown as IGraphClient;
-    const entries = await fetchContainerPermissionEntries(graphClient, containerId);
+    const graphClient = createGraphClient(
+      graphToken,
+    ) as unknown as IGraphClient;
+    const entries = await fetchContainerPermissionEntries(
+      graphClient,
+      containerId,
+    );
 
     const responseBody: IContainerPermissionsResponse = { entries };
     res.send(200, responseBody);
@@ -163,7 +163,7 @@ export const applyContainerPermissions = async (
   if (!changeSet) {
     res.send(400, {
       code: "invalidRequest",
-      message: "create, update and delete arrays are required.",
+      message: "create, update and remove arrays are required.",
       statusCode: 400,
     });
     return;
@@ -171,11 +171,20 @@ export const applyContainerPermissions = async (
 
   try {
     const graphToken = await getGraphToken(authorizationResult.token);
-    const graphClient = createGraphClient(graphToken) as unknown as IGraphClient;
+    const graphClient = createGraphClient(
+      graphToken,
+    ) as unknown as IGraphClient;
 
-    await applyContainerPermissionChangeSet(graphClient, containerId, changeSet);
+    await applyContainerPermissionChangeSet(
+      graphClient,
+      containerId,
+      changeSet,
+    );
 
-    const entries = await fetchContainerPermissionEntries(graphClient, containerId);
+    const entries = await fetchContainerPermissionEntries(
+      graphClient,
+      containerId,
+    );
     const responseBody: IContainerPermissionsResponse = { entries };
     res.send(200, responseBody);
   } catch (error: unknown) {
@@ -223,9 +232,14 @@ export const applyContainerPermissionChangeSet = async (
   changeSet: IContainerPermissionChangeSet,
 ): Promise<void> => {
   try {
-    for (const deleteChange of changeSet.delete) {
+    for (const deleteChange of changeSet.remove) {
       await graphClient
-        .api(getSingleContainerPermissionPath(containerId, deleteChange.permissionId))
+        .api(
+          getSingleContainerPermissionPath(
+            containerId,
+            deleteChange.permissionId,
+          ),
+        )
         .version("v1.0")
         .header("Prefer", "onlyRemoveContainerScopedPermission")
         .delete();
@@ -233,7 +247,12 @@ export const applyContainerPermissionChangeSet = async (
 
     for (const updateChange of changeSet.update) {
       await graphClient
-        .api(getSingleContainerPermissionPath(containerId, updateChange.permissionId))
+        .api(
+          getSingleContainerPermissionPath(
+            containerId,
+            updateChange.permissionId,
+          ),
+        )
         .version("v1.0")
         .patch({
           roles: [mapUiContainerPermissionRoleToGraph(updateChange.role)],
@@ -268,7 +287,9 @@ const mapGraphPermissionToEntry = (
     readGraphPermissionIdentity(grantedToV2.siteGroup);
 
   if (!principal) {
-    throw new Error(`Permission ${permissionId} is missing grantedToV2 identity.`);
+    throw new Error(
+      `Permission ${permissionId} is missing grantedToV2 identity.`,
+    );
   }
 
   const principalType =
@@ -285,8 +306,7 @@ const mapGraphPermissionToEntry = (
     // groups 的真实响应通常会带 group.id，因此仍然优先保留稳定 id。
     principalId:
       principal.graphId ??
-      createFallbackPrincipalId(principalType, permissionId, principal.lookupKey),
-    principalLookupKey: principal.lookupKey,
+      createFallbackPrincipalId(principalType, permissionId),
     principalUserPrincipalName:
       principalType === "people" ? principal.userPrincipalName : undefined,
     principalName: principal.displayName,
@@ -309,12 +329,6 @@ const readGraphPermissionIdentity = (
   const record = readRecord(identity);
   const graphId = readOptionalString(record.id);
   const userPrincipalName = readOptionalString(record.userPrincipalName);
-  const lookupKey = normalizeLookupKey(
-    userPrincipalName ??
-      readOptionalString(record.email) ??
-      readOptionalString(record.mail) ??
-      readOptionalString(record.loginName),
-  );
   const displayName =
     readOptionalString(record.displayName) ??
     readOptionalString(record.email) ??
@@ -334,7 +348,6 @@ const readGraphPermissionIdentity = (
     graphId,
     displayName,
     description,
-    lookupKey,
     userPrincipalName,
   };
 };
@@ -348,12 +361,7 @@ const readGraphPermissionIdentity = (
 const createFallbackPrincipalId = (
   principalType: PermissionTabValue,
   permissionId: string,
-  lookupKey?: string,
 ): string => {
-  if (lookupKey) {
-    return `${principalType}:lookup:${lookupKey}`;
-  }
-
   return `${principalType}:permission:${permissionId}`;
 };
 
@@ -397,10 +405,7 @@ const createGraphCreatePermissionBody = (
 /**
  * 统一发送映射后的错误响应。
  */
-const sendMappedContainerPermissionError = (
-  res: Response,
-  error: unknown,
-) => {
+const sendMappedContainerPermissionError = (res: Response, error: unknown) => {
   const mappedError = mapContainerPermissionsGraphError(error);
   res.send(
     getContainerPermissionsErrorStatus(mappedError),
@@ -423,16 +428,21 @@ const readChangeSet = (body: unknown): IContainerPermissionChangeSet | null => {
   const bodyRecord = readRecord(body);
   const create = bodyRecord.create;
   const update = bodyRecord.update;
-  const remove = bodyRecord.delete;
+  // 为了平滑升级，后端同时兼容新字段 remove 和历史字段 delete。
+  const remove = bodyRecord.remove ?? bodyRecord.delete;
 
-  if (!Array.isArray(create) || !Array.isArray(update) || !Array.isArray(remove)) {
+  if (
+    !Array.isArray(create) ||
+    !Array.isArray(update) ||
+    !Array.isArray(remove)
+  ) {
     return null;
   }
 
   return {
     create: create.map(mapCreateChange),
     update: update.map(mapUpdateChange),
-    delete: remove.map(mapDeleteChange),
+    remove: remove.map(mapDeleteChange),
   };
 };
 
@@ -463,7 +473,10 @@ const mapUpdateChange = (change: unknown): IUpdateContainerPermissionChange => {
   const record = readRecord(change);
 
   return {
-    permissionId: readRequiredString(record.permissionId, "update permissionId"),
+    permissionId: readRequiredString(
+      record.permissionId,
+      "update permissionId",
+    ),
     role: readUiRole(record.role),
   };
 };
@@ -472,7 +485,10 @@ const mapDeleteChange = (change: unknown): IDeleteContainerPermissionChange => {
   const record = readRecord(change);
 
   return {
-    permissionId: readRequiredString(record.permissionId, "delete permissionId"),
+    permissionId: readRequiredString(
+      record.permissionId,
+      "delete permissionId",
+    ),
   };
 };
 
@@ -516,15 +532,6 @@ const readRecord = (value: unknown): Record<string, unknown> => {
 
 const readOptionalString = (value: unknown): string | undefined =>
   typeof value === "string" && value ? value : undefined;
-
-const normalizeLookupKey = (value: string | undefined): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalizedValue = value.trim().toLowerCase();
-  return normalizedValue.length > 0 ? normalizedValue : undefined;
-};
 
 const readStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {

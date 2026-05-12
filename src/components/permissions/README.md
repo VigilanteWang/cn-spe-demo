@@ -305,6 +305,28 @@ flowchart TD
 
 这里的重点不是业务，而是“选中的容器上下文”被传进了权限模块。
 
+```tsx
+const [selectedContainer, setSelectedContainer] = useState<
+  IContainer | undefined
+>(undefined);
+const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+
+<Button
+  appearance="primary"
+  disabled={!selectedContainer}
+  onClick={() => setIsPermissionDialogOpen(true)}
+>
+  Manage Permission
+</Button>
+
+<ContainerPermissionDialog
+  open={isPermissionDialogOpen}
+  containerId={selectedContainer?.id}
+  containerName={selectedContainer?.displayName}
+  onClose={() => setIsPermissionDialogOpen(false)}
+/>
+```
+
 ### 第 2 步：`ContainerPermissionDialog` 监听 `open` 和 `containerId`
 
 文件：`src/components/permissions/ContainerPermissionDialog.tsx`
@@ -322,6 +344,48 @@ flowchart TD
 - 而是先去后端读取“当前真实权限”
 - 读取成功后，把它同时作为 `original` 和 `draft` 的起点
 
+```tsx
+useEffect(() => {
+  if (!open) {
+    return;
+  }
+
+  if (!containerId) {
+    replaceEntries(createEmptyPermissionEntries());
+    setPermissionRequestErrorMessage("No container selected.");
+    return;
+  }
+
+  let cancelled = false;
+
+  void listContainerPermissions(containerId)
+    .then((entriesByTab) => {
+      if (cancelled) {
+        return;
+      }
+
+      replaceEntries(entriesByTab);
+    })
+    .catch((error: unknown) => {
+      if (cancelled) {
+        return;
+      }
+
+      replaceEntries(createEmptyPermissionEntries());
+      setPermissionRequestErrorMessage(
+        getPermissionRequestErrorMessage(
+          error,
+          "Unable to load current container permissions.",
+        ),
+      );
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [open, containerId]);
+```
+
 ### 第 3 步：前端 API 层发起请求
 
 文件：`src/components/permissions/services/containerPermissionApi.ts`
@@ -338,6 +402,22 @@ flowchart TD
 
 也就是说，前端不是直接访问 Graph，而是先访问自己的后端。
 
+```ts
+export const listContainerPermissions = async (
+  containerId: string,
+): Promise<PermissionEntriesByTab> => {
+  const response = await sendAuthorizedRequest(
+    `/api/containerPermissions/${encodeURIComponent(containerId)}`,
+    {
+      method: "GET",
+    },
+  );
+
+  const payload = (await response.json()) as IContainerPermissionsResponse;
+  return mapEntriesToTabs(payload.entries);
+};
+```
+
 ### 第 4 步：后端路由接住请求
 
 文件：`server/index.ts`
@@ -350,6 +430,17 @@ flowchart TD
 
 - 文件：`server/containerPermissions.ts`
 - 函数：`listContainerPermissions`
+
+```ts
+server.get("/api/containerPermissions/:containerId", async (req, res) => {
+  try {
+    await listContainerPermissions(req, res);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    res.send(500, { message: `Error in listContainerPermissions: ${msg}` });
+  }
+});
+```
 
 ### 第 5 步：后端鉴权并创建 Graph client
 
@@ -367,6 +458,27 @@ flowchart TD
 - 再把当前请求上下文转换成可调用 Graph 的 client
 
 这也是前端不直接访问 Graph 的原因之一：鉴权细节放在后端更安全。
+
+```ts
+export const listContainerPermissions = async (
+  req: Request,
+  res: Response,
+) => {
+  const authorizationResult = await authorizeContainerManageRequest(req);
+
+  if (!authorizationResult.ok) {
+    res.send(authorizationResult.status, authorizationResult.body);
+    return;
+  }
+
+  const containerId = readContainerId(req);
+  const graphToken = await getGraphToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as unknown as IGraphClient;
+  const entries = await fetchContainerPermissionEntries(graphClient, containerId);
+
+  res.send(200, { entries });
+};
+```
 
 ### 第 6 步：后端从 Graph 读取权限
 
@@ -390,6 +502,63 @@ flowchart TD
 - 提取主体名字、描述、`principalId`
 - 使用 `mapGraphContainerPermissionRoleToUi` 把 Graph 角色翻译成前端角色
 
+```ts
+export const fetchContainerPermissionEntries = async (
+  graphClient: IGraphClient,
+  containerId: string,
+): Promise<IContainerPermissionEntryDto[]> => {
+  try {
+    const response = await graphClient
+      .api(getContainerPermissionsPath(containerId))
+      .version("v1.0")
+      .get();
+
+    const responseRecord = readRecord(response);
+    const permissionItems = responseRecord.value;
+
+    if (!Array.isArray(permissionItems)) {
+      return [];
+    }
+
+    return permissionItems.map(mapGraphPermissionToEntry);
+  } catch (error: unknown) {
+    throw mapContainerPermissionsGraphError(error);
+  }
+};
+```
+
+```ts
+const mapGraphPermissionToEntry = (
+  permission: unknown,
+): IContainerPermissionEntryDto => {
+  const permissionRecord = readRecord(permission);
+  const permissionId = readRequiredString(permissionRecord.id, "permission id");
+  const roles = readStringArray(permissionRecord.roles);
+  const grantedToV2 = readRecord(permissionRecord.grantedToV2);
+  const principal =
+    readGraphPermissionIdentity(grantedToV2.user) ??
+    readGraphPermissionIdentity(grantedToV2.siteUser) ??
+    readGraphPermissionIdentity(grantedToV2.group) ??
+    readGraphPermissionIdentity(grantedToV2.siteGroup);
+
+  const principalType =
+    grantedToV2.user || grantedToV2.siteUser ? "people" : "groups";
+  const primaryRole = roles[0] ?? "reader";
+
+  return {
+    id: `permission:${permissionId}`,
+    permissionId,
+    principalId: principal.graphId ?? createFallbackPrincipalId(principalType, permissionId, principal),
+    principalLookupKey: principal.lookupKey,
+    principalUserPrincipalName: principal.userPrincipalName,
+    principalName: principal.displayName,
+    principalType,
+    description: principal.description,
+    role: mapGraphContainerPermissionRoleToUi(primaryRole),
+  };
+};
+```
+
 ### 第 7 步：后端返回前端统一模型
 
 文件：`server/containerPermissions.ts`
@@ -400,6 +569,24 @@ flowchart TD
 - `IContainerPermissionsResponse`
 
 前端拿到的是“已经被整理好的权限项数组”，而不是 Graph 原始结构。
+
+```ts
+interface IContainerPermissionEntryDto {
+  id: string;
+  permissionId: string;
+  principalId: string;
+  principalLookupKey?: string;
+  principalUserPrincipalName?: string;
+  principalName: string;
+  principalType: PermissionTabValue;
+  description: string;
+  role: ContainerPermissionUiRole;
+}
+
+interface IContainerPermissionsResponse {
+  entries: IContainerPermissionEntryDto[];
+}
+```
 
 ### 第 8 步：前端建立草稿基线
 
@@ -416,6 +603,21 @@ flowchart TD
 
 从这里开始，用户后续所有编辑都只改 `draft`。
 
+```ts
+const [originalEntriesByTab, setOriginalEntriesByTab] = useState(
+  cloneEntriesByTab(initialEntriesByTab),
+);
+const [draftEntriesByTab, setDraftEntriesByTab] = useState(
+  cloneEntriesByTab(initialEntriesByTab),
+);
+
+const replaceEntries = (entriesByTab: PermissionEntriesByTab) => {
+  const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
+  setOriginalEntriesByTab(nextOriginalEntriesByTab);
+  setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
+};
+```
+
 ---
 
 ## 6. Code Walkthrough 二：添加一个新用户或新组
@@ -430,6 +632,21 @@ flowchart TD
 
 - 搜索框的输入事件最终交给 `handleQueryChange`
 - 这些逻辑由 `usePermissionPrincipalSearch` 接管
+
+```tsx
+const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
+  event,
+) => {
+  handleQueryChange(event.target.value);
+};
+
+<Combobox
+  value={query}
+  open={isDropdownOpen && !interactionDisabled}
+  onChange={handleComboboxChange}
+  onOptionSelect={handleOptionSelect}
+>
+```
 
 ### 第 2 步：搜索 Hook 决定是否发起目录搜索
 
@@ -447,6 +664,49 @@ flowchart TD
 - 每敲一个字都打一次远程请求
 - 输入太短时返回过多无关结果
 
+```ts
+const MIN_SEARCH_QUERY_LENGTH = 3;
+
+if (trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+  setStatusByTab((currentStatus) => ({
+    ...currentStatus,
+    [selectedTab]: "waitingForMoreInput",
+  }));
+  setResultsByTab((currentResults) => ({
+    ...currentResults,
+    [selectedTab]: [],
+  }));
+  return;
+}
+
+setStatusByTab((currentStatus) => ({
+  ...currentStatus,
+  [selectedTab]: "debouncing",
+}));
+```
+
+```ts
+const timeoutId = window.setTimeout(() => {
+  const provider = Providers.globalProvider;
+  const activeAccount = provider.getActiveAccount?.();
+  const requestId = requestSequence.current + 1;
+  requestSequence.current = requestId;
+
+  setStatusByTab((currentStatus) => ({
+    ...currentStatus,
+    [selectedTab]: "loading",
+  }));
+
+  void searchPrincipals({
+    graphClient: provider.graph.client,
+    tenantId: activeAccount?.tenantId ?? FALLBACK_TENANT_ID,
+    accountId: activeAccount?.id ?? FALLBACK_ACCOUNT_ID,
+    principalKind: selectedTab,
+    query: trimmedQuery,
+  });
+}, SEARCH_DEBOUNCE_MS);
+```
+
 ### 第 3 步：目录搜索服务调用 Graph
 
 文件：`src/components/permissions/services/directoryPrincipalSearch/directoryPrincipalSearch.ts`
@@ -459,6 +719,26 @@ flowchart TD
 - 返回标准化搜索结果
 
 这一层的职责是“找到主体”，不是“写权限”。
+
+```ts
+void searchPrincipals({
+  graphClient: provider.graph.client,
+  tenantId: activeAccount?.tenantId ?? FALLBACK_TENANT_ID,
+  accountId: activeAccount?.id ?? FALLBACK_ACCOUNT_ID,
+  principalKind: selectedTab,
+  query: trimmedQuery,
+})
+  .then((results) => {
+    const mappedResults = results.map((result) =>
+      mapDirectorySearchResultToCandidate(result, selectedTab),
+    );
+
+    setResultsByTab((currentResults) => ({
+      ...currentResults,
+      [selectedTab]: mappedResults,
+    }));
+  });
+```
 
 ### 第 4 步：搜索结果映射成权限候选项
 
@@ -484,6 +764,18 @@ flowchart TD
 - `people` 新增权限时，后端创建请求需要 `userPrincipalName`
 - 所以这个字段必须从搜索结果一路保留到 `Apply`
 
+```ts
+export interface IPermissionPrincipalCandidate {
+  id: string;
+  name: string;
+  type: PermissionTabValue;
+  secondaryText: string;
+  initials: string;
+  lookupKey?: string;
+  userPrincipalName?: string;
+}
+```
+
 ### 第 5 步：用户从结果中选中一个候选人
 
 文件：`src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
@@ -497,6 +789,33 @@ flowchart TD
 1. 从当前搜索结果里找到被选中的候选项
 2. 先检查 `isCandidateAdded(...)`，避免重复添加
 3. 如果没重复，就调用 `addCandidate(selectedTab, selectedCandidate)`
+
+```ts
+const handleCandidateSelect = (candidateId: string | undefined) => {
+  if (!candidateId) {
+    return;
+  }
+
+  const selectedCandidate = resultsByTab[selectedTab].find(
+    (candidate) => candidate.id === candidateId,
+  );
+
+  if (!selectedCandidate) {
+    return;
+  }
+
+  if (isCandidateAdded(selectedTab, selectedCandidate)) {
+    setFeedbackMessage(
+      `${selectedCandidate.name} is already in the access list.`,
+    );
+    return;
+  }
+
+  addCandidate(selectedTab, selectedCandidate);
+  setFeedbackMessage(null);
+  setQuery(selectedTab, "");
+};
+```
 
 ### 第 6 步：候选项被转换成一条本地权限草稿
 
@@ -515,6 +834,28 @@ flowchart TD
 
 所以你在 UI 上看到“选中一个人后，表格里立刻出现一行”，本质上就是这一层在向 `draftEntriesByTab` 追加新条目。
 
+```ts
+const addCandidate = (
+  tab: PermissionTabValue,
+  candidate: IPermissionPrincipalCandidate,
+) => {
+  addEntry(tab, createPermissionEntryFromCandidate(candidate));
+};
+
+const createPermissionEntryFromCandidate = (
+  candidate: IPermissionPrincipalCandidate,
+): IContainerPermissionEntry => ({
+  id: `${candidate.type}:${candidate.id}`,
+  principalId: candidate.id,
+  principalLookupKey: candidate.lookupKey,
+  principalUserPrincipalName: candidate.userPrincipalName,
+  principalName: candidate.name,
+  principalType: candidate.type,
+  description: candidate.secondaryText,
+  role: "Reader",
+});
+```
+
 ### 第 7 步：用户点击 `Apply`
 
 文件：`src/components/permissions/ContainerPermissionDialog.tsx`
@@ -526,6 +867,34 @@ flowchart TD
 这里不会整表提交，而是先调用：
 
 - `computeContainerPermissionChanges(originalEntriesByTab, draftEntriesByTab)`
+
+```tsx
+const handleApply = async () => {
+  if (!containerId) {
+    return;
+  }
+
+  const changes = computeContainerPermissionChanges(
+    originalEntriesByTab,
+    draftEntriesByTab,
+  );
+
+  if (
+    changes.create.length === 0 &&
+    changes.update.length === 0 &&
+    changes.delete.length === 0
+  ) {
+    return;
+  }
+
+  const refreshedEntries = await applyContainerPermissionChanges(
+    containerId,
+    changes,
+  );
+
+  replaceEntries(refreshedEntries);
+};
+```
 
 ### 第 8 步：前端计算出 `create` 差异
 
@@ -545,6 +914,57 @@ flowchart TD
 
 这正是为什么前端模型里要保存 `principalUserPrincipalName`。
 
+```ts
+export const computeContainerPermissionChanges = (
+  originalEntriesByTab: PermissionEntriesByTab,
+  draftEntriesByTab: PermissionEntriesByTab,
+): IContainerPermissionChangeSet => {
+  const create: ICreateContainerPermissionChange[] = [];
+  const update: IUpdateContainerPermissionChange[] = [];
+  const remove: IDeleteContainerPermissionChange[] = [];
+
+  for (const tab of ["people", "groups"] as const) {
+    const originalEntries = originalEntriesByTab[tab];
+    const draftEntries = draftEntriesByTab[tab];
+    const originalEntryById = new Map(
+      originalEntries.map((entry) => [entry.id, entry] as const),
+    );
+
+    for (const draftEntry of draftEntries) {
+      const originalEntry = originalEntryById.get(draftEntry.id);
+
+      if (!originalEntry) {
+        create.push(createContainerPermissionChangeFromEntry(draftEntry));
+        continue;
+      }
+    }
+  }
+
+  return { create, update, delete: remove };
+};
+```
+
+```ts
+const createContainerPermissionChangeFromEntry = (
+  entry: IContainerPermissionEntry,
+): ICreateContainerPermissionChange => {
+  if (entry.principalType === "people") {
+    return {
+      principalType: "people",
+      principalId: entry.principalId,
+      userPrincipalName: requireUserPrincipalName(entry),
+      role: entry.role,
+    };
+  }
+
+  return {
+    principalType: "groups",
+    principalId: entry.principalId,
+    role: entry.role,
+  };
+};
+```
+
 ### 第 9 步：前端把差异提交给后端
 
 文件：`src/components/permissions/services/containerPermissionApi.ts`
@@ -562,6 +982,27 @@ flowchart TD
 - `create`
 - `update`
 - `delete`
+
+```ts
+export const applyContainerPermissionChanges = async (
+  containerId: string,
+  changes: IContainerPermissionChangeSet,
+): Promise<PermissionEntriesByTab> => {
+  const response = await sendAuthorizedRequest(
+    `/api/containerPermissions/${encodeURIComponent(containerId)}/apply`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(changes),
+    },
+  );
+
+  const payload = (await response.json()) as IContainerPermissionsResponse;
+  return mapEntriesToTabs(payload.entries);
+};
+```
 
 ### 第 10 步：后端顺序执行权限变更
 
@@ -595,6 +1036,68 @@ flowchart TD
 - 组分支使用 `id`
 - 角色用 `mapUiContainerPermissionRoleToGraph(...)` 转回 Graph 角色名
 
+```ts
+export const applyContainerPermissionChangeSet = async (
+  graphClient: IGraphClient,
+  containerId: string,
+  changeSet: IContainerPermissionChangeSet,
+): Promise<void> => {
+  try {
+    for (const deleteChange of changeSet.delete) {
+      await graphClient
+        .api(getSingleContainerPermissionPath(containerId, deleteChange.permissionId))
+        .version("v1.0")
+        .header("Prefer", "onlyRemoveContainerScopedPermission")
+        .delete();
+    }
+
+    for (const updateChange of changeSet.update) {
+      await graphClient
+        .api(getSingleContainerPermissionPath(containerId, updateChange.permissionId))
+        .version("v1.0")
+        .patch({
+          roles: [mapUiContainerPermissionRoleToGraph(updateChange.role)],
+        });
+    }
+
+    for (const createChange of changeSet.create) {
+      await graphClient
+        .api(getContainerPermissionsPath(containerId))
+        .version("v1.0")
+        .post(createGraphCreatePermissionBody(createChange));
+    }
+  } catch (error: unknown) {
+    throw mapContainerPermissionsGraphError(error);
+  }
+};
+```
+
+```ts
+const createGraphCreatePermissionBody = (
+  createChange: ICreateContainerPermissionChange,
+) => {
+  if (createChange.principalType === "people") {
+    return {
+      roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
+      grantedToV2: {
+        user: {
+          userPrincipalName: createChange.userPrincipalName,
+        },
+      },
+    };
+  }
+
+  return {
+    roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
+    grantedToV2: {
+      group: {
+        id: createChange.principalId,
+      },
+    },
+  };
+};
+```
+
 ### 第 11 步：后端重新读取最新权限列表并返回
 
 文件：`server/containerPermissions.ts`
@@ -605,6 +1108,26 @@ flowchart TD
 - 把最新状态返回前端
 
 这一步非常重要，因为它不是“盲信前端刚才改成功了”，而是重新以服务端真实状态为准。
+
+```ts
+export const applyContainerPermissions = async (
+  req: Request,
+  res: Response,
+) => {
+  const authorizationResult = await authorizeContainerManageRequest(req);
+  const containerId = readContainerId(req);
+  const changeSet = readChangeSet(req.body);
+
+  const graphToken = await getGraphToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as unknown as IGraphClient;
+
+  await applyContainerPermissionChangeSet(graphClient, containerId, changeSet);
+
+  const entries = await fetchContainerPermissionEntries(graphClient, containerId);
+  const responseBody: IContainerPermissionsResponse = { entries };
+  res.send(200, responseBody);
+};
+```
 
 ### 第 12 步：前端刷新基线并清空脏状态
 
@@ -625,6 +1148,23 @@ flowchart TD
 
 这就是一次“新增权限”的完整闭环。
 
+```ts
+const replaceEntries = (entriesByTab: PermissionEntriesByTab) => {
+  const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
+  setOriginalEntriesByTab(nextOriginalEntriesByTab);
+  setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
+};
+
+return {
+  originalEntriesByTab,
+  draftEntriesByTab,
+  hasUnsavedChanges: !areEntriesByTabEqual(
+    originalEntriesByTab,
+    draftEntriesByTab,
+  ),
+};
+```
+
 ---
 
 ## 7. Code Walkthrough 三：修改角色或删除已有授权
@@ -642,6 +1182,19 @@ flowchart TD
 - 表格每一行都有一个 `Select`
 - `onChange` 调用 `updateEntryRole(selectedTab, entry.id, role)`
 
+```tsx
+<Select
+  value={entry.role}
+  onChange={(event) =>
+    updateEntryRole(
+      selectedTab,
+      entry.id,
+      event.currentTarget.value as ContainerPermissionRole,
+    )
+  }
+>
+```
+
 ### 第 2 步：本地草稿被更新
 
 文件：`src/components/permissions/hooks/usePermissionDraft.ts`
@@ -651,6 +1204,21 @@ flowchart TD
 - `updateEntryRole`
 
 它只改 `draftEntriesByTab`，不会立即请求后端。
+
+```ts
+const updateEntryRole = (
+  tab: PermissionTabValue,
+  entryId: string,
+  role: ContainerPermissionRole,
+) => {
+  setDraftEntriesByTab((currentEntriesByTab) => ({
+    ...currentEntriesByTab,
+    [tab]: currentEntriesByTab[tab].map((entry) =>
+      entry.id === entryId ? { ...entry, role } : entry,
+    ),
+  }));
+};
+```
 
 ### 第 3 步：点击 `Apply` 后，差异被识别为 `update`
 
@@ -668,6 +1236,18 @@ flowchart TD
 
 因为后端更新时，真正定位的是“哪一条权限记录”，不是“这个人叫什么名字”。
 
+```ts
+if (originalEntry.role !== draftEntry.role) {
+  update.push({
+    permissionId: requirePermissionId(
+      originalEntry,
+      "update current permission role",
+    ),
+    role: draftEntry.role,
+  });
+}
+```
+
 ### 第 4 步：后端调用 Graph `patch`
 
 文件：`server/containerPermissions.ts`
@@ -679,6 +1259,15 @@ flowchart TD
 
 也就是说，前端改的是 UI 角色名，后端会先把它翻译成 Graph 角色名，再发 PATCH。
 
+```ts
+await graphClient
+  .api(getSingleContainerPermissionPath(containerId, updateChange.permissionId))
+  .version("v1.0")
+  .patch({
+    roles: [mapUiContainerPermissionRoleToGraph(updateChange.role)],
+  });
+```
+
 ## 场景 B：删除已有授权
 
 ### 第 1 步：用户点击删除按钮
@@ -689,6 +1278,15 @@ flowchart TD
 
 - `onClick={() => removeEntry(selectedTab, entry.id)}`
 
+```tsx
+<Button
+  appearance="subtle"
+  icon={<DeleteRegular />}
+  aria-label={`Remove ${entry.principalName}`}
+  onClick={() => removeEntry(selectedTab, entry.id)}
+/>
+```
+
 ### 第 2 步：本地草稿移除这一行
 
 文件：`src/components/permissions/hooks/usePermissionDraft.ts`
@@ -698,6 +1296,15 @@ flowchart TD
 - `removeEntry`
 
 同样只是先改本地草稿。
+
+```ts
+const removeEntry = (tab: PermissionTabValue, entryId: string) => {
+  setDraftEntriesByTab((currentEntriesByTab) => ({
+    ...currentEntriesByTab,
+    [tab]: currentEntriesByTab[tab].filter((entry) => entry.id !== entryId),
+  }));
+};
+```
 
 ### 第 3 步：点击 `Apply` 后，差异被识别为 `delete`
 
@@ -711,6 +1318,19 @@ flowchart TD
 
 这里同样要求存在 `permissionId`。
 
+```ts
+for (const originalEntry of originalEntries) {
+  if (!draftEntryById.has(originalEntry.id)) {
+    remove.push({
+      permissionId: requirePermissionId(
+        originalEntry,
+        "delete a removed permission",
+      ),
+    });
+  }
+}
+```
+
 ### 第 4 步：后端调用 Graph `delete`
 
 文件：`server/containerPermissions.ts`
@@ -722,6 +1342,14 @@ flowchart TD
 - 同时附带 `Prefer: onlyRemoveContainerScopedPermission`
 
 这一步的目的，是只移除当前容器范围内的权限。
+
+```ts
+await graphClient
+  .api(getSingleContainerPermissionPath(containerId, deleteChange.permissionId))
+  .version("v1.0")
+  .header("Prefer", "onlyRemoveContainerScopedPermission")
+  .delete();
+```
 
 ---
 
@@ -749,6 +1377,22 @@ flowchart TD
 
 这样后续排障更方便。
 
+```ts
+const response = await fetch(`${readApiServerUrl()}${path}`, {
+  ...init,
+  headers: {
+    ...(init.headers ?? {}),
+    Authorization: `Bearer ${token}`,
+  },
+});
+
+if (response.ok) {
+  return response;
+}
+
+throw await buildPermissionApiError(response);
+```
+
 ## 后端错误处理
 
 文件：
@@ -765,6 +1409,49 @@ flowchart TD
 5. `sendMappedContainerPermissionError(...)` 返回给前端
 
 这样前后端各自都只面对“自己能稳定理解的错误模型”。
+
+```ts
+export const mapContainerPermissionsGraphError = (
+  error: unknown,
+): ContainerPermissionsGraphError => {
+  const statusCode = readGraphStatusCode(error);
+
+  if (statusCode === 401) {
+    return new ContainerPermissionsGraphError(
+      "unauthorized",
+      "Container permission authentication expired. Please sign in again.",
+      { statusCode },
+    );
+  }
+
+  if (statusCode === 429) {
+    return new ContainerPermissionsGraphError(
+      "throttled",
+      "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
+      { statusCode, retryAfterSeconds: readRetryAfterSeconds(error) },
+    );
+  }
+
+  return new ContainerPermissionsGraphError(
+    "graphFailure",
+    `Microsoft Graph container permission request failed: ${readGraphErrorMessage(error)}`,
+    { statusCode },
+  );
+};
+```
+
+```ts
+const sendMappedContainerPermissionError = (
+  res: Response,
+  error: unknown,
+) => {
+  const mappedError = mapContainerPermissionsGraphError(error);
+  res.send(
+    getContainerPermissionsErrorStatus(mappedError),
+    toContainerPermissionsApiErrorBody(mappedError),
+  );
+};
+```
 
 ---
 

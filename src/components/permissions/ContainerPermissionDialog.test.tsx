@@ -1,12 +1,5 @@
 // @vitest-environment jsdom
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
@@ -19,17 +12,19 @@ import {
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
 import type { IDirectoryPrincipalSearchResult } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
 
-vi.mock("./services/directoryPrincipalSearch/directoryPrincipalSearch", async () => {
-  const actual =
-    await vi.importActual<
+vi.mock(
+  "./services/directoryPrincipalSearch/directoryPrincipalSearch",
+  async () => {
+    const actual = await vi.importActual<
       typeof import("./services/directoryPrincipalSearch/directoryPrincipalSearch")
     >("./services/directoryPrincipalSearch/directoryPrincipalSearch");
 
-  return {
-    ...actual,
-    searchDirectoryPrincipals: vi.fn(),
-  };
-});
+    return {
+      ...actual,
+      searchDirectoryPrincipals: vi.fn(),
+    };
+  },
+);
 
 vi.mock("./services/containerPermissionApi", () => ({
   ContainerPermissionApiError: class ContainerPermissionApiError extends Error {
@@ -158,18 +153,6 @@ describe("ContainerPermissionDialog", () => {
       groups: [],
     });
 
-    if (!("NodeFilter" in globalThis)) {
-      Object.defineProperty(globalThis, "NodeFilter", {
-        configurable: true,
-        value: {
-          SHOW_ELEMENT: 1,
-          FILTER_ACCEPT: 1,
-          FILTER_REJECT: 2,
-          FILTER_SKIP: 3,
-        },
-      });
-    }
-
     // 这里模拟一个已登录的最小 MGT Provider，
     // 让权限弹窗可以拿到 active account 和 Graph client。
     Providers.globalProvider = {
@@ -192,7 +175,6 @@ describe("ContainerPermissionDialog", () => {
   });
 
   afterEach(() => {
-    cleanup();
     vi.useRealTimers();
   });
 
@@ -317,7 +299,7 @@ describe("ContainerPermissionDialog", () => {
           },
         ],
         update: [],
-        delete: [],
+        remove: [],
       },
     );
   });
@@ -405,7 +387,7 @@ describe("ContainerPermissionDialog", () => {
       {
         create: [],
         update: [{ permissionId: "perm-adele", role: "Manager" }],
-        delete: [],
+        remove: [],
       },
     );
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();

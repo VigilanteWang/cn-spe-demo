@@ -259,7 +259,7 @@ export const ContainerPermissionDialog = ({
     if (
       changes.create.length === 0 &&
       changes.update.length === 0 &&
-      changes.delete.length === 0
+      changes.remove.length === 0
     ) {
       return;
     }
@@ -598,14 +598,14 @@ export const ContainerPermissionDialog = ({
               ) : null}
             </div>
             <div className={styles.footerButtons}>
-            {/* Close 会放弃当前未保存草稿，恢复到最近一次加载或成功写回后的状态。 */}
-            <Button
-              appearance="secondary"
-              onClick={() => discardDraftAndClose(onClose)}
-            >
-              Close
-            </Button>
-            {/* Apply 负责真实写回，并在成功后刷新当前列表与清空脏状态。 */}
+              {/* Close 会放弃当前未保存草稿，恢复到最近一次加载或成功写回后的状态。 */}
+              <Button
+                appearance="secondary"
+                onClick={() => discardDraftAndClose(onClose)}
+              >
+                Close
+              </Button>
+              {/* Apply 负责真实写回，并在成功后刷新当前列表与清空脏状态。 */}
               <Button
                 appearance="primary"
                 disabled={!hasUnsavedChanges || interactionDisabled}
