@@ -17,7 +17,7 @@ import {
 } from "@fluentui/react-components";
 import Preview from "../preview";
 import { IDriveItemExtended } from "../../common/types";
-import SpEmbedded from "../../services/spembedded";
+import { deleteItems } from "../../services/backendApi";
 import { useFilesStyles } from "./filesStyles";
 import { IFilesProps } from "./filesTypes";
 import { toProgressValue } from "./filesUtils";
@@ -61,7 +61,7 @@ import { Providers } from "@microsoft/mgt-element";
  * - POST /drives/{driveId}/items/{itemId}/children  → 创建子文件夹
  * - PUT  /drives/{driveId}/items/{itemId}:/{name}:/content  → 上传文件
  *
- * 后端 API 调用（通过 SpEmbedded 服务层）：
+ * 后端 API 调用（通过 backendApi 模块）：
  * - deleteItems()            → 批量删除文件
  * - startDownloadArchive()   → 启动 ZIP 归档任务
  * - getArchivePreparationProgress() → 轮询归档准备进度
@@ -70,7 +70,6 @@ import { Providers } from "@microsoft/mgt-element";
  * 前端归档模块调用（通过 archiveDownloader 模块）：
  * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
-const spEmbedded = new SpEmbedded();
 
 /**
  * Files 文件管理组件。
@@ -192,7 +191,7 @@ export const Files = ({ container }: IFilesProps) => {
     const folderIdSnapshot = folderId || "root";
 
     try {
-      const result = await spEmbedded.deleteItems(container.id, selectedIds);
+      const result = await deleteItems(container.id, selectedIds);
 
       if (result.failed.length > 0) {
         console.warn(
@@ -282,9 +281,7 @@ export const Files = ({ container }: IFilesProps) => {
     const folderIdSnapshot = folderId || "root";
 
     try {
-      await spEmbedded.deleteItems(container.id, [
-        currentPreviewFile.id as string,
-      ]);
+      await deleteItems(container.id, [currentPreviewFile.id as string]);
     } catch (error: unknown) {
       console.error(
         "Preview delete failed:",

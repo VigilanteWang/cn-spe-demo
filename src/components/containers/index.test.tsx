@@ -17,12 +17,10 @@ const { listContainersMock, createContainerMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../services/spembedded", () => {
+vi.mock("../../services/backendApi", () => {
   return {
-    default: class MockSpEmbedded {
-      listContainers = listContainersMock;
-      createContainer = createContainerMock;
-    },
+    listContainers: listContainersMock,
+    createContainer: createContainerMock,
   };
 });
 

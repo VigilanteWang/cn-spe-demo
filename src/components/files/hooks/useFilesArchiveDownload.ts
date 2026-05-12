@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
 import { readErrorMessage } from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
-import SpEmbedded, {
+import {
   ArchiveSaveTargetSelectionCancelledError,
-} from "../../../services/spembedded";
+  startDownloadArchive,
+  getArchivePreparationProgress,
+  getDownloadManifest,
+  selectArchiveSaveTarget,
+} from "../../../services/backendApi";
 import { downloadArchiveFromManifest } from "../../../services/archiveDownloader";
 import { IDownloadProgress } from "../filesTypes";
 import {
@@ -13,8 +17,6 @@ import {
   getArchiveProgressPercentText,
   getArchiveProgressText,
 } from "../filesUtils";
-
-const spEmbedded = new SpEmbedded();
 
 interface IUseFilesArchiveDownloadOptions {
   /** 当前容器 ID。 */
@@ -134,7 +136,7 @@ export const useFilesArchiveDownload = ({
       // 并不等待打包完成，打包结果需要后续轮询获取。
       let jobId: string;
       try {
-        jobId = await spEmbedded.startDownloadArchive(containerId, itemIds, {
+        jobId = await startDownloadArchive(containerId, itemIds, {
           requestAbortSignal: downloadAbortSignal,
         });
       } catch (error: unknown) {
@@ -173,12 +175,9 @@ export const useFilesArchiveDownload = ({
         try {
           isPolling = true;
           // 查询后端当前的打包进度（已处理文件数、总文件数、状态等）。
-          const progress = await spEmbedded.getArchivePreparationProgress(
-            jobId,
-            {
-              requestAbortSignal: downloadAbortSignal,
-            },
-          );
+          const progress = await getArchivePreparationProgress(jobId, {
+            requestAbortSignal: downloadAbortSignal,
+          });
 
           // await 返回后再次检查：用户可能在请求进行中点击 Abort。
           // 因为 await 期间 JS 会交出控制权，用户有机会触发取消操作。
@@ -202,7 +201,7 @@ export const useFilesArchiveDownload = ({
             // 进入 manifest 阶段前检查一次，避免取消后继续触发下游下载。
             // 获取文件清单（manifest）：包含每个待下载文件的 URL 和元数据。
             // 前端将根据这份清单逐个下载文件并在本地实时压缩成 ZIP。
-            const manifest = await spEmbedded.getDownloadManifest(jobId, {
+            const manifest = await getDownloadManifest(jobId, {
               requestAbortSignal: downloadAbortSignal,
             });
 
@@ -363,8 +362,7 @@ export const useFilesArchiveDownload = ({
        * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互触发。
        * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。
        */
-      const saveTarget =
-        await spEmbedded.selectArchiveSaveTarget(defaultFilename);
+      const saveTarget = await selectArchiveSaveTarget(defaultFilename);
       await startZipDownload(selectedIds, saveTarget);
     } catch (error: unknown) {
       setDownloadProgress(

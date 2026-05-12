@@ -43,10 +43,7 @@ import {
   makeStyles,
 } from "@fluentui/react-components";
 import { IContainer } from "../../../common/types";
-import SpEmbedded from "../../../services/spembedded";
-
-/** SpEmbedded 服务实例（全局单例），用于调用后端容器创建 API */
-const spe = new SpEmbedded();
+import { createContainer } from "../../../services/backendApi";
 
 /**
  * 创建容器对话框内部样式
@@ -142,7 +139,7 @@ export const CreateContainerDialog = ({
     setCreatingContainer(true);
 
     try {
-      const nextContainer = await spe.createContainer(name, description);
+      const nextContainer = await createContainer(name, description);
 
       if (!nextContainer) {
         return;
@@ -203,7 +200,11 @@ export const CreateContainerDialog = ({
 
           <DialogActions>
             {/* 关闭按钮：创建中禁用，避免在请求过程中打断交互状态 */}
-            <Button appearance="secondary" onClick={closeDialog} disabled={creatingContainer}>
+            <Button
+              appearance="secondary"
+              onClick={closeDialog}
+              disabled={creatingContainer}
+            >
               Close
             </Button>
             {/* 创建按钮：name 为空或正在创建时禁用，避免空提交和重复提交 */}

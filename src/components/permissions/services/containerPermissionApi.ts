@@ -1,4 +1,4 @@
-import SpEmbedded from "../../../services/spembedded";
+import { getApiAccessToken } from "../../../services/backendApi";
 import {
   FrontendApiError,
   FrontendConfigError,
@@ -47,8 +47,6 @@ export class ContainerPermissionApiError extends FrontendApiError {
   }
 }
 
-const spe = new SpEmbedded();
-
 /**
  * 加载指定容器的当前权限列表。
  */
@@ -95,7 +93,7 @@ const sendAuthorizedRequest = async (
   path: string,
   init: RequestInit,
 ): Promise<Response> => {
-  const token = await spe.getApiAccessToken();
+  const token = await getApiAccessToken();
 
   if (!token) {
     throw new ContainerPermissionApiError(

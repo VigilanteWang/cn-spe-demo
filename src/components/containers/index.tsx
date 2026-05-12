@@ -35,14 +35,11 @@ import type {
   SelectionEvents,
 } from "@fluentui/react-combobox";
 import { IContainer } from "../../common/types";
-import SpEmbedded from "../../services/spembedded";
+import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";
 import { CreateContainerDialog } from "./components/CreateContainerDialog";
 import { ContainerPermissionDialog } from "../permissions";
-
-/** SpEmbedded 服务实例（全局单例），用于调用后端容器管理 API */
-const spe = new SpEmbedded();
 
 /**
  * Containers 组件属性接口（当前无属性，预留未来扩展）
@@ -84,7 +81,7 @@ export const Containers = (_props: IContainersProps) => {
   // 组件挂载时立即调用后端 API 获取容器列表
   useEffect(() => {
     (async () => {
-      const nextContainers = await spe.listContainers();
+      const nextContainers = await listContainers();
 
       if (nextContainers) {
         setContainers(nextContainers);
