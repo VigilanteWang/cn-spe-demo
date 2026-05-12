@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
-import {
-  IArchiveSaveTarget,
-  IDriveItemExtended,
-} from "../../../common/types";
-import SpEmbedded from "../../../services/spembedded";
+import { readErrorMessage } from "../../../common/errors.ts";
+import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
+import SpEmbedded, {
+  ArchiveSaveTargetSelectionCancelledError,
+} from "../../../services/spembedded";
 import { downloadArchiveFromManifest } from "../../../services/archiveDownloader";
 import { IDownloadProgress } from "../filesTypes";
 import {
@@ -173,9 +173,12 @@ export const useFilesArchiveDownload = ({
         try {
           isPolling = true;
           // 查询后端当前的打包进度（已处理文件数、总文件数、状态等）。
-          const progress = await spEmbedded.getArchivePreparationProgress(jobId, {
-            requestAbortSignal: downloadAbortSignal,
-          });
+          const progress = await spEmbedded.getArchivePreparationProgress(
+            jobId,
+            {
+              requestAbortSignal: downloadAbortSignal,
+            },
+          );
 
           // await 返回后再次检查：用户可能在请求进行中点击 Abort。
           // 因为 await 期间 JS 会交出控制权，用户有机会触发取消操作。
@@ -343,7 +346,9 @@ export const useFilesArchiveDownload = ({
     }
 
     if (selectedIds.length === 1) {
-      const selectedItem = driveItems.find((item) => item.id === selectedIds[0]);
+      const selectedItem = driveItems.find(
+        (item) => item.id === selectedIds[0],
+      );
 
       if (selectedItem && !selectedItem.isFolder && selectedItem.downloadUrl) {
         onDirectDownload(selectedItem.downloadUrl);
@@ -358,19 +363,20 @@ export const useFilesArchiveDownload = ({
        * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互触发。
        * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。
        */
-      const saveTarget = await spEmbedded.selectArchiveSaveTarget(defaultFilename);
+      const saveTarget =
+        await spEmbedded.selectArchiveSaveTarget(defaultFilename);
       await startZipDownload(selectedIds, saveTarget);
     } catch (error: unknown) {
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
           errorMessage:
-            error instanceof Error &&
-            error.message === "Download cancelled by user."
+            error instanceof ArchiveSaveTargetSelectionCancelledError
               ? "Download cancelled."
-              : `Failed to open save dialog: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
+              : `Failed to open save dialog: ${readErrorMessage(
+                  error,
+                  "Unknown error.",
+                )}`,
         }),
       );
     }

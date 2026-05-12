@@ -24,7 +24,6 @@ import {
 export type {
   DirectoryPrincipalKind,
   DirectoryPrincipalType,
-  DirectorySearchErrorCode,
   DirectorySearchStrategy,
   IDirectoryPrincipalSearchResult,
   IDirectorySearchGraphClient,

@@ -42,6 +42,7 @@ import {
   DeleteRegular,
   DismissCircleRegular,
 } from "@fluentui/react-icons";
+import { readErrorMessage } from "../../common/errors.ts";
 import {
   ContainerPermissionRole,
   PermissionTabValue,
@@ -95,11 +96,7 @@ const getPermissionRequestErrorMessage = (
     return error.message;
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallbackMessage;
+  return readErrorMessage(error, fallbackMessage);
 };
 
 /**
@@ -251,10 +248,23 @@ export const ContainerPermissionDialog = ({
       return;
     }
 
-    const changes = computeContainerPermissionChanges(
-      originalEntriesByTab,
-      draftEntriesByTab,
-    );
+    let changes;
+
+    try {
+      changes = computeContainerPermissionChanges(
+        originalEntriesByTab,
+        draftEntriesByTab,
+      );
+    } catch (error: unknown) {
+      setPermissionRequestErrorMessage(
+        getPermissionRequestErrorMessage(
+          error,
+          "Unable to prepare container permission changes.",
+        ),
+      );
+      setApplyFeedbackStatus("error");
+      return;
+    }
 
     if (
       changes.create.length === 0 &&

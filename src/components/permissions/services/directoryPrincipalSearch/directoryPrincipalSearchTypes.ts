@@ -34,19 +34,6 @@ export type DirectoryPrincipalType =
   | "group";
 
 /**
- * 目录搜索错误码。
- *
- * UI 层应该优先根据 code 做分支，而不是解析英文 message。
- */
-export type DirectorySearchErrorCode =
-  | "emptyQuery"
-  | "invalidSearchSyntax"
-  | "unauthorized"
-  | "forbidden"
-  | "notFound"
-  | "graphFailure";
-
-/**
  * Graph SDK 请求对象的最小能力集合。
  *
  * 只声明搜索服务真正用到的方法，可以让单元测试用 fake client 精准替换，

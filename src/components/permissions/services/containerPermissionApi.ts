@@ -1,25 +1,20 @@
 import SpEmbedded from "../../../services/spembedded";
 import {
+  FrontendApiError,
+  FrontendConfigError,
+} from "../../../common/errors.ts";
+import {
   IContainerPermissionEntry,
   PermissionEntriesByTab,
 } from "../models/permissionModels";
 import { IContainerPermissionChangeSet } from "./containerPermissionDiff";
-
-type PermissionApiErrorCode =
-  | "invalidRequest"
-  | "unauthorized"
-  | "forbidden"
-  | "notFound"
-  | "throttled"
-  | "serviceUnavailable"
-  | "graphFailure";
 
 interface IContainerPermissionsResponse {
   entries: IContainerPermissionEntry[];
 }
 
 interface IContainerPermissionErrorResponse {
-  code?: PermissionApiErrorCode;
+  code?: string;
   message?: string;
   retryAfterSeconds?: number;
   requestId?: string;
@@ -29,17 +24,13 @@ interface IContainerPermissionErrorResponse {
 /**
  * 容器权限后端 API 失败时抛出的稳定错误类型。
  */
-export class ContainerPermissionApiError extends Error {
-  readonly code: PermissionApiErrorCode;
-
+export class ContainerPermissionApiError extends FrontendApiError {
   readonly retryAfterSeconds?: number;
 
   readonly requestId?: string;
 
-  readonly statusCode?: number;
-
   constructor(
-    code: PermissionApiErrorCode,
+    code: string,
     message: string,
     options?: {
       retryAfterSeconds?: number;
@@ -47,12 +38,12 @@ export class ContainerPermissionApiError extends Error {
       statusCode?: number;
     },
   ) {
-    super(message);
-    this.name = "ContainerPermissionApiError";
-    this.code = code;
+    super(code, message, {
+      name: "ContainerPermissionApiError",
+      statusCode: options?.statusCode,
+    });
     this.retryAfterSeconds = options?.retryAfterSeconds;
     this.requestId = options?.requestId;
-    this.statusCode = options?.statusCode;
   }
 }
 
@@ -135,10 +126,18 @@ const sendAuthorizedRequest = async (
  * 延迟读取 API 服务地址，避免仅仅 import 权限模块时就要求测试环境注入完整配置。
  */
 const readApiServerUrl = (): string => {
-  const apiServerUrl = import.meta.env.VITE_API_SERVER_URL as string | undefined;
+  const apiServerUrl = import.meta.env.VITE_API_SERVER_URL as
+    | string
+    | undefined;
 
   if (!apiServerUrl) {
-    throw new Error("[config] Missing required env var: VITE_API_SERVER_URL");
+    throw new FrontendConfigError(
+      "missingEnvVar",
+      "[config] Missing required env var: VITE_API_SERVER_URL",
+      {
+        name: "ContainerPermissionApiConfigError",
+      },
+    );
   }
 
   return apiServerUrl;
@@ -168,7 +167,8 @@ const buildPermissionApiError = async (
   const payload = await tryReadErrorPayload(response);
   const code = payload?.code ?? "graphFailure";
   const message =
-    payload?.message ?? `Container permission request failed: ${response.status}`;
+    payload?.message ??
+    `Container permission request failed: ${response.status}`;
 
   return new ContainerPermissionApiError(code, message, {
     retryAfterSeconds: payload?.retryAfterSeconds,

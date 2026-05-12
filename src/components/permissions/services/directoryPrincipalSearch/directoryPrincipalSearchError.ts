@@ -1,5 +1,5 @@
+import { FrontendBusinessError } from "../../../../common/errors.ts";
 import { readRecord } from "./directoryPrincipalSearchObjectUtils";
-import { DirectorySearchErrorCode } from "./directoryPrincipalSearchTypes";
 
 /**
  * Graph 搜索失败时抛出的业务化错误。
@@ -7,22 +7,29 @@ import { DirectorySearchErrorCode } from "./directoryPrincipalSearchTypes";
  * message 统一使用英文，便于和 Microsoft Graph / SDK 原始错误放在一起排查；
  * code 保持稳定，方便 UI 做本地化或分支处理。
  */
-export class DirectoryPrincipalSearchError extends Error {
-  readonly code: DirectorySearchErrorCode;
-
-  readonly statusCode?: number;
-
-  constructor(
-    code: DirectorySearchErrorCode,
-    message: string,
-    statusCode?: number,
-  ) {
-    super(message);
-    this.name = "DirectoryPrincipalSearchError";
-    this.code = code;
-    this.statusCode = statusCode;
+export class DirectoryPrincipalSearchError extends FrontendBusinessError {
+  constructor(code: string, message: string, statusCode?: number) {
+    super({
+      name: "DirectoryPrincipalSearchError",
+      category: getDirectorySearchErrorCategory(code),
+      code,
+      message,
+      statusCode,
+    });
   }
 }
+
+/**
+ * 目录搜索错误同时覆盖输入校验和 Graph 请求失败，
+ * 因此这里按 code 映射成更稳定的错误类别。
+ */
+const getDirectorySearchErrorCategory = (code: string) => {
+  if (code === "emptyQuery" || code === "invalidSearchSyntax") {
+    return "validation" as const;
+  }
+
+  return "api" as const;
+};
 
 /**
  * 把 Graph SDK 抛出的 unknown 错误映射为本模块的稳定错误类型。

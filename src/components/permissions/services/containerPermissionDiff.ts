@@ -1,8 +1,31 @@
+import { FrontendValidationError } from "../../../common/errors.ts";
 import {
   ContainerPermissionRole,
   IContainerPermissionEntry,
   PermissionEntriesByTab,
 } from "../models/permissionModels";
+
+/**
+ * 容器权限草稿计算阶段的验证错误。
+ *
+ * 这类错误说明前端当前持有的权限快照不完整，
+ * 应该阻止继续写回后端，并把上下文反馈给 UI。
+ */
+export class ContainerPermissionValidationError extends FrontendValidationError {
+  constructor(code: string, message: string, entryId: string) {
+    super(code, message, {
+      name: "ContainerPermissionValidationError",
+      details: { entryId },
+    });
+  }
+}
+
+interface IRequiredEntryFieldOptions {
+  code: string;
+  operation: string;
+  fieldName: keyof IContainerPermissionEntry;
+  entryId: string;
+}
 
 /**
  * 新增 people 权限时发给后端的差异项。
@@ -60,7 +83,7 @@ export interface IContainerPermissionChangeSet {
 }
 
 /**
- * 计算权限草稿相对初始快照的差异。
+ * 计算权限草稿相对初始快照的差异，以便一次性保存权限的修改。
  */
 export const computeContainerPermissionChanges = (
   originalEntriesByTab: PermissionEntriesByTab,
@@ -94,10 +117,12 @@ export const computeContainerPermissionChanges = (
       // 已存在的权限如果角色变了，就只发更新角色所需的 permissionId。
       if (originalEntry.role !== draftEntry.role) {
         update.push({
-          permissionId: requirePermissionId(
-            originalEntry,
-            "update current permission role",
-          ),
+          permissionId: requireEntryField(originalEntry.permissionId, {
+            code: "missingPermissionId",
+            operation: "update current permission role",
+            fieldName: "permissionId",
+            entryId: originalEntry.id,
+          }),
           role: draftEntry.role,
         });
       }
@@ -107,10 +132,12 @@ export const computeContainerPermissionChanges = (
     for (const originalEntry of originalEntries) {
       if (!draftEntryById.has(originalEntry.id)) {
         remove.push({
-          permissionId: requirePermissionId(
-            originalEntry,
-            "delete a removed permission",
-          ),
+          permissionId: requireEntryField(originalEntry.permissionId, {
+            code: "missingPermissionId",
+            operation: "delete a removed permission",
+            fieldName: "permissionId",
+            entryId: originalEntry.id,
+          }),
         });
       }
     }
@@ -124,24 +151,6 @@ export const computeContainerPermissionChanges = (
 };
 
 /**
- * 读取更新和删除所需的 permissionId。
- *
- * 缺失时直接抛错，避免把不完整的权限快照写回后端。
- */
-const requirePermissionId = (
-  entry: IContainerPermissionEntry,
-  operation: string,
-): string => {
-  if (entry.permissionId) {
-    return entry.permissionId;
-  }
-
-  throw new Error(
-    `Cannot ${operation} because permissionId is missing for ${entry.id}.`,
-  );
-};
-
-/**
  * 把草稿权限转换成 create 差异。
  */
 const createContainerPermissionChangeFromEntry = (
@@ -152,7 +161,12 @@ const createContainerPermissionChangeFromEntry = (
     return {
       principalType: "people",
       principalId: entry.principalId,
-      userPrincipalName: requireUserPrincipalName(entry),
+      userPrincipalName: requireEntryField(entry.principalUserPrincipalName, {
+        code: "missingUserPrincipalName",
+        operation: "create people permission",
+        fieldName: "principalUserPrincipalName",
+        entryId: entry.id,
+      }),
       role: entry.role,
     };
   }
@@ -166,14 +180,21 @@ const createContainerPermissionChangeFromEntry = (
 };
 
 /**
- * 读取 people 创建所需的 userPrincipalName。
+ * 读取权限条目中的必需字段。
+ *
+ * 缺失时统一抛出结构化验证错误，避免各字段各写一套重复逻辑。
  */
-const requireUserPrincipalName = (entry: IContainerPermissionEntry): string => {
-  if (entry.principalUserPrincipalName) {
-    return entry.principalUserPrincipalName;
+const requireEntryField = (
+  value: string | undefined,
+  options: IRequiredEntryFieldOptions,
+): string => {
+  if (typeof value === "string" && value) {
+    return value;
   }
 
-  throw new Error(
-    `Cannot create people permission for ${entry.id} because userPrincipalName is missing.`,
+  throw new ContainerPermissionValidationError(
+    options.code,
+    `Cannot ${options.operation}: missing ${String(options.fieldName)}`,
+    options.entryId,
   );
 };

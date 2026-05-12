@@ -1,3 +1,5 @@
+import { FrontendConfigError } from "./errors.ts";
+
 /**
  * 前端配置管理模块
  *
@@ -25,6 +27,20 @@
  **/
 
 /**
+ * 前端运行时配置错误。
+ *
+ * 这类错误通常意味着部署环境或本地启动参数不完整，
+ * 需要尽早失败，避免后续链路在半初始化状态下继续运行。
+ */
+export class ClientConfigError extends FrontendConfigError {
+  constructor(code: string, message: string) {
+    super(code, message, {
+      name: "ClientConfigError",
+    });
+  }
+}
+
+/**
  * 读取必需的环境变量，缺失时抛出明确错误
  * @param key 环境变量名（VITE_ 前缀，与 src/react-app-env.d.ts 中的 ImportMetaEnv 对应）
  * @returns 环境变量值
@@ -33,7 +49,12 @@
 const required = (key: string): string => {
   // Vite 通过 import.meta.env 注入前端环境变量，替代 CRA 的 process.env
   const value = import.meta.env[key] as string | undefined;
-  if (!value) throw new Error(`[config] Missing required env var: ${key}`);
+  if (!value) {
+    throw new ClientConfigError(
+      "missingEnvVar",
+      `[config] Missing required env var: ${key}`,
+    );
+  }
   return value;
 };
 
@@ -64,7 +85,8 @@ const CLOUD_ENDPOINTS: Record<
 const resolveCloudEnv = (): CloudEnv => {
   const val = (import.meta.env.VITE_CLOUD_ENV ?? "global").toLowerCase();
   if (val !== "global" && val !== "china") {
-    throw new Error(
+    throw new ClientConfigError(
+      "unsupportedCloudEnv",
       `[config] Unsupported VITE_CLOUD_ENV value: "${val}". Supported values: global, china`,
     );
   }

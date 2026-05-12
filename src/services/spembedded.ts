@@ -27,6 +27,7 @@
  **/
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
+import { FrontendApiError, FrontendUserActionError } from "../common/errors.ts";
 import { clientConfig } from "./../common/config";
 import * as Scopes from "./../common/scopes";
 import {
@@ -59,6 +60,43 @@ export interface IJobProgress {
 interface IAbortRequestOptions {
   requestAbortSignal?: AbortSignal;
 }
+
+/**
+ * SharePoint Embedded 服务层的稳定 API 错误。
+ */
+export class SpEmbeddedRequestError extends FrontendApiError {
+  constructor(code: string, message: string, statusCode: number) {
+    super(code, message, {
+      name: "SpEmbeddedRequestError",
+      statusCode,
+    });
+  }
+}
+
+/**
+ * 用户取消归档保存目标选择时抛出的稳定错误。
+ */
+export class ArchiveSaveTargetSelectionCancelledError extends FrontendUserActionError {
+  constructor() {
+    super("downloadCancelled", "Download cancelled by user.", {
+      name: "ArchiveSaveTargetSelectionCancelledError",
+    });
+  }
+}
+
+/**
+ * 根据响应构造稳定的服务层请求错误。
+ */
+const buildSpEmbeddedRequestError = (
+  code: string,
+  operation: string,
+  response: Response,
+): SpEmbeddedRequestError =>
+  new SpEmbeddedRequestError(
+    code,
+    `${operation} failed: ${response.status}`,
+    response.status,
+  );
 
 /**
  * 批量删除操作的返回结果
@@ -240,7 +278,11 @@ export default class SpEmbedded {
     if (response.ok) {
       return (await response.json()) as IDeleteItemsResult;
     }
-    throw new Error(`deleteItems failed: ${response.status}`);
+    throw buildSpEmbeddedRequestError(
+      "deleteItemsFailed",
+      "deleteItems",
+      response,
+    );
   }
 
   /**
@@ -283,7 +325,11 @@ export default class SpEmbedded {
       const data = await response.json();
       return data.jobId as string;
     }
-    throw new Error(`startDownloadArchive failed: ${response.status}`);
+    throw buildSpEmbeddedRequestError(
+      "startArchivePreparationFailed",
+      "startDownloadArchive",
+      response,
+    );
   }
 
   /**
@@ -308,7 +354,11 @@ export default class SpEmbedded {
     if (response.ok) {
       return (await response.json()) as IJobProgress;
     }
-    throw new Error(`getArchivePreparationProgress failed: ${response.status}`);
+    throw buildSpEmbeddedRequestError(
+      "archivePreparationProgressFailed",
+      "getArchivePreparationProgress",
+      response,
+    );
   }
 
   /**
@@ -333,7 +383,11 @@ export default class SpEmbedded {
     if (response.ok) {
       return (await response.json()) as IArchiveManifest;
     }
-    throw new Error(`getDownloadManifest failed: ${response.status}`);
+    throw buildSpEmbeddedRequestError(
+      "downloadManifestFailed",
+      "getDownloadManifest",
+      response,
+    );
   }
 
   /**
@@ -375,7 +429,7 @@ export default class SpEmbedded {
     } catch (error: any) {
       // 用户取消保存对话框时，不应继续后续下载流程。
       if (error?.name === "AbortError") {
-        throw new Error("Download cancelled by user.");
+        throw new ArchiveSaveTargetSelectionCancelledError();
       }
       throw error;
     }
