@@ -1,8 +1,6 @@
 import { getApiAccessToken } from "../../../services/backendApi";
-import {
-  FrontendApiError,
-  FrontendConfigError,
-} from "../../../common/errors.ts";
+import { FrontendApiError } from "../../../common/errors.ts";
+import { clientConfig } from "../../../common/config";
 import {
   IContainerPermissionEntry,
   PermissionEntriesByTab,
@@ -105,7 +103,7 @@ const sendAuthorizedRequest = async (
     );
   }
 
-  const response = await fetch(`${readApiServerUrl()}${path}`, {
+  const response = await fetch(`${clientConfig.apiServerUrl}${path}`, {
     ...init,
     headers: {
       ...(init.headers ?? {}),
@@ -121,33 +119,15 @@ const sendAuthorizedRequest = async (
 };
 
 /**
- * 延迟读取 API 服务地址，避免仅仅 import 权限模块时就要求测试环境注入完整配置。
- */
-const readApiServerUrl = (): string => {
-  const apiServerUrl = import.meta.env.VITE_API_SERVER_URL as
-    | string
-    | undefined;
-
-  if (!apiServerUrl) {
-    throw new FrontendConfigError(
-      "missingEnvVar",
-      "[config] Missing required env var: VITE_API_SERVER_URL",
-      {
-        name: "ContainerPermissionApiConfigError",
-      },
-    );
-  }
-
-  return apiServerUrl;
-};
-
-/**
  * 把后端返回的权限数组重新按 people/groups 分组。
  */
 const mapEntriesToTabs = (
   entries: IContainerPermissionEntry[],
 ): PermissionEntriesByTab => {
-  const nextEntries = createEmptyPermissionEntries();
+  const nextEntries: PermissionEntriesByTab = {
+    people: [],
+    groups: [],
+  };
 
   for (const entry of entries) {
     nextEntries[entry.principalType].push(entry);
@@ -187,14 +167,3 @@ const tryReadErrorPayload = async (
     return null;
   }
 };
-
-/**
- * 创建一份空的权限分组结果。
- *
- * 这里保留在 API 映射层本地，避免仅为了一个很小的通用对象工厂
- * 再额外引入独立文件。
- */
-const createEmptyPermissionEntries = (): PermissionEntriesByTab => ({
-  people: [],
-  groups: [],
-});
