@@ -8,7 +8,7 @@ import {
   ContainerPermissionApiError,
   applyContainerPermissionChanges,
   listContainerPermissions,
-} from "./services/containerPermissionApi";
+} from "../../services/containerPermissionApi";
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
 import type { IDirectoryPrincipalSearchResult } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
 
@@ -26,7 +26,7 @@ vi.mock(
   },
 );
 
-vi.mock("./services/containerPermissionApi", () => ({
+vi.mock("../../services/containerPermissionApi", () => ({
   ContainerPermissionApiError: class ContainerPermissionApiError extends Error {
     readonly code: string;
 

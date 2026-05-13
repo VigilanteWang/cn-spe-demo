@@ -35,6 +35,7 @@ import type {
   SelectionEvents,
 } from "@fluentui/react-combobox";
 import { IContainer } from "../../common/types";
+import { readErrorMessage } from "../../common/errors.ts";
 import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";
@@ -77,14 +78,19 @@ export const Containers = (_props: IContainersProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
 
+  // =============== 错误状态：容器加载失败或创建失败时展示 ===============
+  const [containerError, setContainerError] = useState<string | null>(null);
+
   // =============== 副作用：初始加载容器列表 ===============
   // 组件挂载时立即调用后端 API 获取容器列表
   useEffect(() => {
     (async () => {
-      const nextContainers = await listContainers();
-
-      if (nextContainers) {
+      try {
+        const nextContainers = await listContainers();
         setContainers(nextContainers);
+      } catch (error) {
+        // 加载容器列表失败时，在按鈕旁显示错误提示
+        setContainerError(readErrorMessage(error, "Failed to load containers"));
       }
     })();
   }, []);
@@ -114,6 +120,8 @@ export const Containers = (_props: IContainersProps) => {
   const handleContainerCreated = (container: IContainer) => {
     setContainers((currentContainers) => [...currentContainers, container]);
     setSelectedContainer(container);
+    // 创建成功后清除之前的错误提示
+    setContainerError(null);
   };
 
   return (
@@ -147,6 +155,10 @@ export const Containers = (_props: IContainersProps) => {
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               Create container
             </Button>
+            {/* 创建容器失败或加载错误时，在按鈕右侧显示错误文字 */}
+            {containerError && (
+              <span className={styles.errorLabel}>{containerError}</span>
+            )}
           </div>
         </div>
       </div>
@@ -156,6 +168,11 @@ export const Containers = (_props: IContainersProps) => {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onContainerCreated={handleContainerCreated}
+        onError={(error) =>
+          setContainerError(
+            readErrorMessage(error, "Failed to create container"),
+          )
+        }
       />
 
       {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}

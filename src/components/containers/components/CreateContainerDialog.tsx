@@ -71,6 +71,8 @@ export interface ICreateContainerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onContainerCreated: (container: IContainer) => void;
+  /** 创建失败时的回调，用于向父组件上报错误信息（弹窗保持打开）。 */
+  onError: (error: unknown) => void;
 }
 
 /**
@@ -89,6 +91,7 @@ export const CreateContainerDialog = ({
   open,
   onOpenChange,
   onContainerCreated,
+  onError,
 }: ICreateContainerDialogProps) => {
   const styles = useStyles();
 
@@ -140,13 +143,11 @@ export const CreateContainerDialog = ({
 
     try {
       const nextContainer = await createContainer(name, description);
-
-      if (!nextContainer) {
-        return;
-      }
-
       onContainerCreated(nextContainer);
       closeDialog();
+    } catch (error) {
+      // 创建失败时上报错误给父组件展示，弹窗保持打开以便用户重试
+      onError(error);
     } finally {
       setCreatingContainer(false);
     }

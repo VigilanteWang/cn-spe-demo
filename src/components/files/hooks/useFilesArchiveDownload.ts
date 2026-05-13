@@ -8,7 +8,7 @@ import {
   getArchivePreparationProgress,
   getDownloadManifest,
   selectArchiveSaveTarget,
-} from "../../../services/backendApi";
+} from "../../../services/downloadArchiveApi";
 import { downloadArchiveFromManifest } from "../../../services/archiveDownloader";
 import { IDownloadProgress } from "../filesTypes";
 import {

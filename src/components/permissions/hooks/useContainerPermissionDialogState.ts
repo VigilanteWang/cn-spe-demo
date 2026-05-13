@@ -1,9 +1,9 @@
 /**
- * 这个文件负责封装“容器权限编辑弹窗”的本地交互状态。
+ * 这个文件负责封装“容器权限弹窗”的状态。
  *
  * 主要职责：
  * - 维护当前选中的 tab（people / groups）
- * - 维护每个 tab 各自的输入值，避免切页后互相覆盖
+ * - 维护每个 tab 各自的搜索词，避免切页后互相覆盖
  * - 基于草稿机制管理新增、删除、改角色和放弃修改
  * - 提供适合 UI 直接消费的辅助方法，例如获取可见项、判断是否已添加
  *
@@ -56,7 +56,7 @@ export const useContainerPermissionDialogState = (
     replaceEntries,
   } = usePermissionDraft(initialEntriesByTab, resetKey);
 
-  // 两个 tab 共用一个输入框外壳，但分别保存 people / groups 自己的输入值。
+  // 分别保存 people / groups 自己的输入的搜索词。
   const [filterByTab, setFilterByTab] = useState<
     Record<PermissionTabValue, string>
   >({
@@ -154,8 +154,6 @@ export const useContainerPermissionDialogState = (
 /**
  * 把目录搜索候选项转换成一条新的本地权限草稿记录。
  *
- * 这里把构造逻辑收回到真正消费它的状态 Hook 中，
- * 避免为了一个很小的转换单独保留中间工厂文件。
  */
 const createPermissionEntryFromCandidate = (
   candidate: IPermissionPrincipalCandidate,

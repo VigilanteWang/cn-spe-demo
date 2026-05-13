@@ -14,17 +14,13 @@
  */
 import { AsyncZipDeflate, Zip } from "fflate";
 import { FrontendApiError } from "../common/errors.ts";
+import { IAbortRequestOptions } from "./apiClient";
 import {
   IArchiveClientProgress,
   IArchiveDownloadSession,
   IArchiveManifest,
   IArchiveSaveTarget,
 } from "../common/types";
-
-/** 可选请求参数：用于透传调用方 AbortSignal 到 fetch，支持统一取消链路。 */
-interface IAbortRequestOptions {
-  requestAbortSignal?: AbortSignal;
-}
 
 /**
  * 归档下载过程中单个文件的下载错误。

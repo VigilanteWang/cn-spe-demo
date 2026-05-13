@@ -1,11 +1,10 @@
-import { getApiAccessToken } from "../../../services/backendApi";
-import { FrontendApiError } from "../../../common/errors.ts";
-import { clientConfig } from "../../../common/config";
+import { sendAuthorizedRequest } from "./apiClient";
+import { FrontendApiError } from "../common/errors.ts";
 import {
   IContainerPermissionEntry,
   PermissionEntriesByTab,
-} from "../models/permissionModels";
-import { IContainerPermissionChangeSet } from "./containerPermissionDiff";
+} from "../components/permissions/models/permissionModels";
+import { IContainerPermissionChangeSet } from "../components/permissions/services/containerPermissionDiff";
 
 interface IContainerPermissionsResponse {
   entries: IContainerPermissionEntry[];
@@ -58,6 +57,10 @@ export const listContainerPermissions = async (
     },
   );
 
+  if (!response.ok) {
+    throw await buildPermissionApiError(response);
+  }
+
   const payload = (await response.json()) as IContainerPermissionsResponse;
   return mapEntriesToTabs(payload.entries);
 };
@@ -80,42 +83,12 @@ export const applyContainerPermissionChanges = async (
     },
   );
 
+  if (!response.ok) {
+    throw await buildPermissionApiError(response);
+  }
+
   const payload = (await response.json()) as IContainerPermissionsResponse;
   return mapEntriesToTabs(payload.entries);
-};
-
-/**
- * 发送带后端 API Bearer Token 的请求。
- */
-const sendAuthorizedRequest = async (
-  path: string,
-  init: RequestInit,
-): Promise<Response> => {
-  const token = await getApiAccessToken();
-
-  if (!token) {
-    throw new ContainerPermissionApiError(
-      "unauthorized",
-      "You are not signed in, so container permissions are unavailable.",
-      {
-        statusCode: 401,
-      },
-    );
-  }
-
-  const response = await fetch(`${clientConfig.apiServerUrl}${path}`, {
-    ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (response.ok) {
-    return response;
-  }
-
-  throw await buildPermissionApiError(response);
 };
 
 /**

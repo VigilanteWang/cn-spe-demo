@@ -12,7 +12,7 @@ export type PermissionTabValue = "people" | "groups";
 export type ContainerPermissionRole = "Reader" | "Writer" | "Manager" | "Owner";
 
 /**
- * 下拉搜索候选项。
+ * 搜索下拉菜单中的候选项。
  *
  * 说明：
  * - 真实目录搜索结果会先统一成这份模型。
@@ -33,14 +33,14 @@ export interface IPermissionPrincipalCandidate {
 
    * 当候选项是用户时，对应的 userPrincipalName。
    *
-   * Graph 的容器权限创建接口在新增用户权限时要求提供这个字段，
+   * Graph 的添加容器权限接口在新增用户权限时要求提供这个字段，
    * 因此它需要沿着“搜索结果 -> 草稿条目 -> Apply 差异”这条链路被保留下来。
    */
   userPrincipalName?: string;
 }
 
 /**
- * 容器权限访问项。
+ * 容器权限 Access List 中的条目。
  *
  * 说明：
  * - `principalId`：people tab 存放基于 UPN 的合成 id，groups tab 存放 AAD group object id。

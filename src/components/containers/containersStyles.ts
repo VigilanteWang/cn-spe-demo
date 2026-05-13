@@ -54,4 +54,10 @@ export const useContainersStyles = makeStyles({
     width: "100%",
     marginTop: "24px",
   },
+  /** 加载或创建容器失败时显示在按钮右侧的错误提示文字 */
+  errorLabel: {
+    color: tokens.colorPaletteRedForeground1,
+    alignSelf: "center",
+    fontSize: tokens.fontSizeBase200,
+  },
 });

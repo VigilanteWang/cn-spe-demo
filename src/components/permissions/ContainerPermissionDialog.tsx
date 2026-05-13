@@ -55,7 +55,7 @@ import {
   ContainerPermissionApiError,
   applyContainerPermissionChanges,
   listContainerPermissions,
-} from "./services/containerPermissionApi";
+} from "../../services/containerPermissionApi";
 import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
 import { PermissionEntriesByTab } from "./models/permissionModels";
 
