@@ -100,6 +100,16 @@ const getPermissionRequestErrorMessage = (
 };
 
 /**
+ * 创建一份空的权限分组结果。
+ *
+ * Dialog 打开前先以空列表初始化本地草稿，
+ * 等后端返回真实容器权限后再整体替换进去。
+ */
+const createEmptyPermissionEntries = (): PermissionEntriesByTab => ({
+  people: [],
+  groups: [],
+});
+/**
  * 容器权限管理弹窗。
  *
  * 当前步骤实现：
@@ -152,8 +162,7 @@ export const ContainerPermissionDialog = ({
     query,
     results,
     status,
-    feedbackMessage,
-    errorMessage,
+    searchError,
     isDropdownOpen,
     handleQueryChange,
     handleCandidateSelect,
@@ -169,6 +178,19 @@ export const ContainerPermissionDialog = ({
   const visibleEntries = getVisibleEntries(selectedTab);
   const interactionDisabled =
     isLoadingPermissions || isApplyingPermissions || !containerId;
+
+  // 统一把权限读写错误和搜索错误合并到同一错误区，避免在多个位置重复展示。
+  const permissionStatusMessages = [
+    permissionRequestErrorMessage
+      ? `Api Error: ${permissionRequestErrorMessage}`
+      : null,
+    searchError
+      ? `Search Error: ${readErrorMessage(
+          searchError,
+          "Directory search failed. Please try again later.",
+        )}`
+      : null,
+  ].filter((message): message is string => Boolean(message));
 
   useEffect(() => {
     if (!open) {
@@ -319,15 +341,18 @@ export const ContainerPermissionDialog = ({
               <Text weight="semibold">
                 Container: {containerName ?? "<No container selected>"}
               </Text>
-              {permissionRequestErrorMessage ? (
-                <Text
-                  size={200}
+              {permissionStatusMessages.length > 0 ? (
+                <div
                   role="status"
                   aria-live="polite"
                   className={styles.errorStatusText}
                 >
-                  {permissionRequestErrorMessage}
-                </Text>
+                  {permissionStatusMessages.map((message) => (
+                    <Text key={message} size={200}>
+                      {message}
+                    </Text>
+                  ))}
+                </div>
               ) : null}
             </div>
 
@@ -456,42 +481,18 @@ export const ContainerPermissionDialog = ({
 
                   {status === "error" ? (
                     <Option disabled text="Search failed">
-                      <Text size={200}>{errorMessage}</Text>
+                      <Text size={200}>
+                        Please check the error message above.
+                      </Text>
                     </Option>
                   ) : null}
                 </Combobox>
               </div>
 
-              {/* 搜索框下方的说明 / 反馈区：
-                  - 有重复反馈时优先显示重复反馈
-                  - 有搜索错误时显示搜索错误
-                  - 都没有时显示默认使用说明 */}
-              {feedbackMessage ? (
-                <Text
-                  size={200}
-                  role="status"
-                  aria-live="polite"
-                  className={styles.duplicateStatusText}
-                >
-                  {feedbackMessage}
-                </Text>
-              ) : null}
-              {!feedbackMessage && errorMessage ? (
-                <Text
-                  size={200}
-                  role="status"
-                  aria-live="polite"
-                  className={styles.errorStatusText}
-                >
-                  {errorMessage}
-                </Text>
-              ) : null}
-              {!feedbackMessage && !errorMessage ? (
-                <Text size={200} className={styles.searchStatusText}>
-                  Select someone from the results to add them. Duplicates won't
-                  be added twice.
-                </Text>
-              ) : null}
+              <Text size={200} className={styles.searchStatusText}>
+                Select someone from the results to add them. Duplicates won't be
+                added twice.
+              </Text>
             </div>
 
             {/* access list：
@@ -632,14 +633,3 @@ export const ContainerPermissionDialog = ({
     </Dialog>
   );
 };
-
-/**
- * 创建一份空的权限分组结果。
- *
- * Dialog 打开前先以空列表初始化本地草稿，
- * 等后端返回真实容器权限后再整体替换进去。
- */
-const createEmptyPermissionEntries = (): PermissionEntriesByTab => ({
-  people: [],
-  groups: [],
-});

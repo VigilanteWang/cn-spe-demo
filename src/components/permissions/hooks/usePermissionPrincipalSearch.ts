@@ -1,5 +1,6 @@
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { useEffect, useRef, useState } from "react";
+import { FrontendUserActionError } from "../../../common/errors.ts";
 import {
   IPermissionPrincipalCandidate,
   PermissionTabValue,
@@ -109,11 +110,8 @@ interface IUsePermissionPrincipalSearchResult {
   // 当前搜索流程走到哪一步了，比如空闲、加载中、成功、失败。
   status: PermissionPrincipalSearchStatus;
 
-  // 给用户看的辅助提示，比如“这个人已经加过了”。
-  feedbackMessage: string | null;
-
-  // 给用户看的错误提示，比如未登录或搜索失败。
-  errorMessage: string | null;
+  // 给 UI 的原始错误对象，调用方可以按统一错误体系做文案转换。
+  searchError: unknown | null;
 
   // 是否应该展开下拉面板来显示搜索提示或结果。
   isDropdownOpen: boolean;
@@ -132,7 +130,6 @@ interface IUsePermissionPrincipalSearchResult {
  * - 管理最小输入长度和 debounce
  * - 根据当前 tab 切换 People / Groups 搜索源
  * - 把目录搜索结果统一映射成 UI 候选项
- * - 处理重复添加反馈
  *
  * 角色编辑、删除、Apply / Close 草稿控制仍然由其他 Hook 负责。
  */
@@ -161,14 +158,12 @@ export const usePermissionPrincipalSearch = ({
   });
 
   // 搜索错误按 tab 分别记录，避免一个 tab 的错误提示串到另一个 tab 。
-  const [errorMessageByTab, setErrorMessageByTab] = useState<
-    Record<PermissionTabValue, string | null>
+  const [searchErrorByTab, setSearchErrorByTab] = useState<
+    Record<PermissionTabValue, unknown | null>
   >({
     people: null,
     groups: null,
   });
-  // 这个提示主要用于“重复添加”的场景。
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   /**
    * 每次发起异步搜索时递增一个序号。useRef 除非组件卸载，否则一直保持同一个对象，
    * 所以这个序号在多次搜索中会持续递增。
@@ -192,7 +187,7 @@ export const usePermissionPrincipalSearch = ({
         ...currentResults,
         [selectedTab]: [],
       }));
-      setErrorMessageByTab((currentErrors) => ({
+      setSearchErrorByTab((currentErrors) => ({
         ...currentErrors,
         [selectedTab]: null,
       }));
@@ -210,7 +205,7 @@ export const usePermissionPrincipalSearch = ({
         ...currentResults,
         [selectedTab]: [],
       }));
-      setErrorMessageByTab((currentErrors) => ({
+      setSearchErrorByTab((currentErrors) => ({
         ...currentErrors,
         [selectedTab]: null,
       }));
@@ -236,10 +231,12 @@ export const usePermissionPrincipalSearch = ({
           ...currentStatus,
           [selectedTab]: "error",
         }));
-        setErrorMessageByTab((currentErrors) => ({
+        setSearchErrorByTab((currentErrors) => ({
           ...currentErrors,
-          [selectedTab]:
+          [selectedTab]: new FrontendUserActionError(
+            "directorySearchNotSignedIn",
             "You are not signed in, so directory search is unavailable.",
+          ),
         }));
         return;
       }
@@ -254,7 +251,7 @@ export const usePermissionPrincipalSearch = ({
         ...currentStatus,
         [selectedTab]: "loading",
       }));
-      setErrorMessageByTab((currentErrors) => ({
+      setSearchErrorByTab((currentErrors) => ({
         ...currentErrors,
         [selectedTab]: null,
       }));
@@ -288,7 +285,7 @@ export const usePermissionPrincipalSearch = ({
             [selectedTab]: mappedResults.length > 0 ? "success" : "empty",
           }));
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           // 同样只处理最新请求，避免旧请求失败把新状态覆盖掉。
           if (requestSequence.current !== requestId) {
             return;
@@ -303,9 +300,9 @@ export const usePermissionPrincipalSearch = ({
             ...currentStatus,
             [selectedTab]: "error",
           }));
-          setErrorMessageByTab((currentErrors) => ({
+          setSearchErrorByTab((currentErrors) => ({
             ...currentErrors,
-            [selectedTab]: "Directory search failed. Please try again later.",
+            [selectedTab]: error,
           }));
         });
     }, SEARCH_DEBOUNCE_MS);
@@ -318,20 +315,16 @@ export const usePermissionPrincipalSearch = ({
   }, [searchPrincipals, selectedTab, trimmedQuery]);
 
   /**
-   * 输入 query 变化时的 handler
-   *
-   * 用户继续输入时，先清掉“已添加”的提示，
-   * 避免旧反馈残留在新的搜索过程里。
+   * 输入 query 变化时的 handler。
    */
   const handleQueryChange = (value: string) => {
-    setFeedbackMessage(null);
     setQuery(selectedTab, value);
   };
 
   /**
    * 在搜索结果列表中，选中某个候选对象时的 handler。
    *
-   * - 已存在：不给重复加，只提示一次
+   * - 已存在：不重复添加
    * - 不存在：直接加入 access list，并清空输入
    */
   const handleCandidateSelect = (candidateId: string | undefined) => {
@@ -349,15 +342,11 @@ export const usePermissionPrincipalSearch = ({
     }
 
     if (isCandidateAdded(selectedTab, selectedCandidate)) {
-      setFeedbackMessage(
-        `${selectedCandidate.name} is already in the access list.`,
-      );
       return;
     }
 
     // 成功添加后，主动清空当前搜索上下文，方便用户开始下一次搜索。
     addCandidate(selectedTab, selectedCandidate);
-    setFeedbackMessage(null);
     setQuery(selectedTab, "");
     setResultsByTab((currentResults) => ({
       ...currentResults,
@@ -376,8 +365,7 @@ export const usePermissionPrincipalSearch = ({
     query: currentQuery,
     results: resultsByTab[selectedTab],
     status: statusByTab[selectedTab],
-    feedbackMessage,
-    errorMessage: errorMessageByTab[selectedTab],
+    searchError: searchErrorByTab[selectedTab],
     isDropdownOpen,
     handleQueryChange,
     handleCandidateSelect,
