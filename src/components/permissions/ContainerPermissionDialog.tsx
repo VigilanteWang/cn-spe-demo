@@ -45,6 +45,7 @@ import {
 import { readErrorMessage } from "../../common/errors.ts";
 import {
   ContainerPermissionRole,
+  PermissionEntriesByTab,
   PermissionTabValue,
 } from "./models/permissionModels";
 import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
@@ -57,7 +58,6 @@ import {
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
 import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
-import { PermissionEntriesByTab } from "./models/permissionModels";
 
 const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
   "Reader",

@@ -1,22 +1,12 @@
 import { sendAuthorizedRequest } from "./apiClient";
 import { FrontendApiError } from "../common/errors.ts";
-import {
+import type {
+  IContainerPermissionChangeSet,
   IContainerPermissionEntry,
-  PermissionEntriesByTab,
-} from "../components/permissions/models/permissionModels";
-import { IContainerPermissionChangeSet } from "../components/permissions/services/containerPermissionDiff";
-
-interface IContainerPermissionsResponse {
-  entries: IContainerPermissionEntry[];
-}
-
-interface IContainerPermissionErrorResponse {
-  code?: string;
-  message?: string;
-  retryAfterSeconds?: number;
-  requestId?: string;
-  statusCode?: number;
-}
+  IContainerPermissionsApiErrorBody,
+  IContainerPermissionsResponse,
+} from "../../common/contracts/containerPermissionCommonContracts";
+import type { PermissionEntriesByTab } from "../components/permissions/models/permissionModels";
 
 /**
  * 容器权限后端 API 失败时抛出的稳定错误类型。
@@ -133,9 +123,9 @@ const buildPermissionApiError = async (
  */
 const tryReadErrorPayload = async (
   response: Response,
-): Promise<IContainerPermissionErrorResponse | null> => {
+): Promise<IContainerPermissionsApiErrorBody | null> => {
   try {
-    return (await response.json()) as IContainerPermissionErrorResponse;
+    return (await response.json()) as IContainerPermissionsApiErrorBody;
   } catch {
     return null;
   }

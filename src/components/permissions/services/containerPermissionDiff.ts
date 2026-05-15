@@ -1,9 +1,16 @@
 import { FrontendValidationError } from "../../../common/errors.ts";
-import {
-  ContainerPermissionRole,
+import type {
+  IContainerPermissionChangeSet,
+  ICreateContainerPermissionChange,
+  IDeleteContainerPermissionChange,
+  IUpdateContainerPermissionChange,
+} from "../../../../common/contracts/containerPermissionCommonContracts";
+import type {
   IContainerPermissionEntry,
   PermissionEntriesByTab,
 } from "../models/permissionModels";
+
+export { type IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
 
 /**
  * 容器权限草稿计算阶段的验证错误。
@@ -28,62 +35,7 @@ interface IRequiredEntryFieldOptions {
 }
 
 /**
- * 新增 people 权限时发给后端的差异项。
- *
- * Graph 的容器权限创建接口要求用户分支提供 userPrincipalName，
- * 因此这里在类型层直接收紧，不允许 people 分支遗漏该字段。
- */
-export interface ICreatePeopleContainerPermissionChange {
-  principalType: "people";
-  principalId: string;
-  userPrincipalName: string;
-  role: ContainerPermissionRole;
-}
-
-/**
- * 新增 groups 权限时发给后端的差异项。
- *
- * 组分支继续使用稳定 group id。
- */
-export interface ICreateGroupContainerPermissionChange {
-  principalType: "groups";
-  principalId: string;
-  role: ContainerPermissionRole;
-}
-
-/**
- * 新增权限差异项。
- */
-export type ICreateContainerPermissionChange =
-  | ICreatePeopleContainerPermissionChange
-  | ICreateGroupContainerPermissionChange;
-
-/**
- * 更新权限角色的差异项。
- */
-export interface IUpdateContainerPermissionChange {
-  permissionId: string;
-  role: ContainerPermissionRole;
-}
-
-/**
- * 删除权限的差异项。
- */
-export interface IDeleteContainerPermissionChange {
-  permissionId: string;
-}
-
-/**
- * 容器权限草稿和初始权限之间的完整差异集。
- */
-export interface IContainerPermissionChangeSet {
-  create: ICreateContainerPermissionChange[];
-  update: IUpdateContainerPermissionChange[];
-  remove: IDeleteContainerPermissionChange[];
-}
-
-/**
- * 计算权限草稿相对初始快照的差异，以便一次性保存权限的修改。
+ * 计算权限草稿相对初始快照的差异，以便一次性保存权限修改。
  */
 export const computeContainerPermissionChanges = (
   originalEntriesByTab: PermissionEntriesByTab,
@@ -157,7 +109,7 @@ const createContainerPermissionChangeFromEntry = (
   entry: IContainerPermissionEntry,
 ): ICreateContainerPermissionChange => {
   if (entry.principalType === "people") {
-    // people 分支必须带 userPrincipalName，后端创建接口才够用。
+    // people 分支必须带 userPrincipalName，后端创建接口才能用。
     return {
       principalType: "people",
       principalId: entry.principalId,

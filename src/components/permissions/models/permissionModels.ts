@@ -1,15 +1,13 @@
-/**
- * 容器权限页签值。
- */
-export type PermissionTabValue = "people" | "groups";
+import type {
+  IContainerPermissionEntry,
+  PermissionTabValue,
+} from "../../../../common/contracts/containerPermissionCommonContracts";
 
-/**
- * 容器级权限角色。
- *
- * 当前前端继续使用 UI 友好的首字母大写角色名，
- * 与 Graph 原始角色名之间的映射收敛到单独模块处理。
- */
-export type ContainerPermissionRole = "Reader" | "Writer" | "Manager" | "Owner";
+export type {
+  ContainerPermissionRole,
+  IContainerPermissionEntry,
+  PermissionTabValue,
+} from "../../../../common/contracts/containerPermissionCommonContracts";
 
 /**
  * 搜索下拉菜单中的候选项。
@@ -30,40 +28,12 @@ export interface IPermissionPrincipalCandidate {
   /** 只用于 Avatar 的首字母缩写。 */
   initials: string;
   /**
-
    * 当候选项是用户时，对应的 userPrincipalName。
    *
    * Graph 的添加容器权限接口在新增用户权限时要求提供这个字段，
    * 因此它需要沿着“搜索结果 -> 草稿条目 -> Apply 差异”这条链路被保留下来。
    */
   userPrincipalName?: string;
-}
-
-/**
- * 容器权限 Access List 中的条目。
- *
- * 说明：
- * - `principalId`：people tab 存放基于 UPN 的合成 id，groups tab 存放 AAD group object id。
- * - `permissionId` 对应已有的容器权限记录，用于 update / delete。
- * - `role` 表示当前草稿中的容器级角色。
- */
-export interface IContainerPermissionEntry {
-  /** 当前权限记录在前端列表中的唯一键。 */
-  id: string;
-  /** 对应后端 / Graph 权限记录的稳定标识，用于更新和删除。 */
-  permissionId?: string;
-  /** people tab: 基于 UPN 的合成 id；groups tab: AAD group object id。 */
-  principalId: string;
-  /** 当该条权限对应用户时，保留下来的 userPrincipalName。 */
-  principalUserPrincipalName?: string;
-  /** 表格中显示的 principal 名称。 */
-  principalName: string;
-  /** 当前权限记录属于 people 还是 groups 页签。 */
-  principalType: PermissionTabValue;
-  /** 用于展示的辅助说明文本。 */
-  description: string;
-  /** 当前草稿中的容器权限角色。 */
-  role: ContainerPermissionRole;
 }
 
 /**

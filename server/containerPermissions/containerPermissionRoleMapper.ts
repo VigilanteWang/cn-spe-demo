@@ -1,20 +1,10 @@
-/**
- * 容器权限的 UI 角色名。
- *
- * 前端下拉框使用的是首字母大写文案，
- * 这里集中管理它和 Graph 返回值之间的互相映射。
- */
-export type ContainerPermissionUiRole =
-  | "Reader"
-  | "Writer"
-  | "Manager"
-  | "Owner";
+import type { ContainerPermissionRole } from "../../common/contracts/containerPermissionCommonContracts";
 
 /**
  * Microsoft Graph fileStorageContainer 权限角色名。
  *
- * `principalOwner` 是 Graph 列表示例里出现的特殊角色。
- * UI 目前没有单独暴露它，所以统一收敛到 `Owner` 展示。
+ * `principalOwner` 是 Graph 列表示例里会出现的特殊角色，
+ * 但当前 UI 没有单独暴露它，所以统一折叠成 `Owner` 展示。
  */
 export type GraphContainerPermissionRole =
   | "reader"
@@ -25,7 +15,7 @@ export type GraphContainerPermissionRole =
 
 const graphToUiRoleMap: Record<
   GraphContainerPermissionRole,
-  ContainerPermissionUiRole
+  ContainerPermissionRole
 > = {
   reader: "Reader",
   writer: "Writer",
@@ -35,7 +25,7 @@ const graphToUiRoleMap: Record<
 };
 
 const uiToGraphRoleMap: Record<
-  ContainerPermissionUiRole,
+  ContainerPermissionRole,
   Exclude<GraphContainerPermissionRole, "principalOwner">
 > = {
   Reader: "reader",
@@ -45,11 +35,11 @@ const uiToGraphRoleMap: Record<
 };
 
 /**
- * 把 Graph 角色名映射成 UI 角色名。
+ * 把 Graph 角色名映射成共同契约里的 UI 角色名。
  */
 export const mapGraphContainerPermissionRoleToUi = (
   graphRole: string,
-): ContainerPermissionUiRole => {
+): ContainerPermissionRole => {
   const normalizedRole = graphRole as GraphContainerPermissionRole;
   const mappedRole = graphToUiRoleMap[normalizedRole];
 
@@ -61,10 +51,10 @@ export const mapGraphContainerPermissionRoleToUi = (
 };
 
 /**
- * 把 UI 角色名映射回 Graph PATCH/POST 使用的角色名。
+ * 把共同契约里的角色名映射回 Graph PATCH/POST 使用的角色名。
  */
 export const mapUiContainerPermissionRoleToGraph = (
-  uiRole: ContainerPermissionUiRole,
+  uiRole: ContainerPermissionRole,
 ): Exclude<GraphContainerPermissionRole, "principalOwner"> => {
   return uiToGraphRoleMap[uiRole];
 };

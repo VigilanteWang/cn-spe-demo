@@ -1,22 +1,8 @@
-export type ContainerPermissionsErrorCode =
-  | "invalidRequest"
-  | "unauthorized"
-  | "forbidden"
-  | "notFound"
-  | "throttled"
-  | "serviceUnavailable"
-  | "graphFailure";
-
-/**
- * 容器权限后端对前端暴露的稳定错误对象。
- */
-export interface IContainerPermissionsApiErrorBody {
-  code: ContainerPermissionsErrorCode;
-  message: string;
-  retryAfterSeconds?: number;
-  requestId?: string;
-  statusCode?: number;
-}
+import type {
+  ContainerPermissionsErrorCode,
+  IContainerPermissionsApiErrorBody,
+} from "../../common/contracts/containerPermissionCommonContracts";
+import { readRecord } from "./containerPermissionsReaders";
 
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
@@ -49,11 +35,7 @@ export class ContainerPermissionsGraphError extends Error {
 }
 
 /**
- * 把 Graph SDK 抛出的未知错误映射成面向权限 API 的稳定错误类型。
- *
- * 这里不手写通用 retry loop。
- * SDK 自带 RetryHandler 会先处理基础 429/503/504，
- * 这个函数只负责“SDK 重试之后仍然失败”的最终错误映射。
+ * 把 Graph SDK 抛出的未知错误映射成权限 API 自己的稳定错误类型。
  */
 export const mapContainerPermissionsGraphError = (
   error: unknown,
@@ -187,9 +169,6 @@ export const getContainerPermissionsErrorStatus = (
   }
 };
 
-/**
- * 从 Graph 错误对象中读取 HTTP 状态码。
- */
 const readGraphStatusCode = (error: unknown): number | undefined => {
   const record = readRecord(error);
   const statusCode = record.statusCode ?? record.status;
@@ -197,11 +176,9 @@ const readGraphStatusCode = (error: unknown): number | undefined => {
   return typeof statusCode === "number" ? statusCode : undefined;
 };
 
-/**
- * 尽量从错误对象里提取 Retry-After 秒数。
- */
 const readRetryAfterSeconds = (error: unknown): number | undefined => {
   const headerValue =
+    // 这里兼容大小写不同的 header 名称，避免被 SDK 或运行时的 header 形状细节绊住。
     readHeaderValue(error, "Retry-After") ?? readHeaderValue(error, "retry-after");
 
   if (headerValue) {
@@ -212,6 +189,7 @@ const readRetryAfterSeconds = (error: unknown): number | undefined => {
   }
 
   const innerError = readInnerError(error);
+  // 某些 Graph/SDK 错误会把 retry 信息放在 innerError 里，所以这里继续多形状兼容读取。
   const retryAfter =
     innerError.retryAfter ??
     innerError.retryAfterSeconds ??
@@ -229,9 +207,6 @@ const readRetryAfterSeconds = (error: unknown): number | undefined => {
   return undefined;
 };
 
-/**
- * 提取请求 id，方便前端或日志继续追踪 Graph 侧请求。
- */
 const readRequestId = (error: unknown): string | undefined => {
   const headerRequestId =
     readHeaderValue(error, "request-id") ??
@@ -243,6 +218,7 @@ const readRequestId = (error: unknown): string | undefined => {
   }
 
   const innerError = readInnerError(error);
+  // request id 既可能在 header，也可能被包到 innerError 里，这里统一抽出来方便前端和日志追踪。
   const requestId =
     innerError["request-id"] ??
     innerError.requestId ??
@@ -251,9 +227,6 @@ const readRequestId = (error: unknown): string | undefined => {
   return typeof requestId === "string" && requestId ? requestId : undefined;
 };
 
-/**
- * 尽量保留 Graph/SDK 自带的错误细节，便于排查。
- */
 const readGraphErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -273,9 +246,6 @@ const readGraphErrorMessage = (error: unknown): string => {
     : "The request still failed after the SDK retry policy completed.";
 };
 
-/**
- * 读取错误对象中常见的 response headers 容器。
- */
 const readHeaderValue = (
   error: unknown,
   headerName: string,
@@ -312,21 +282,10 @@ const readHeaderValue = (
   return undefined;
 };
 
-/**
- * Graph 错误常把 request id、retry 等信息放在 innerError 里。
- */
 const readInnerError = (error: unknown): Record<string, unknown> => {
   const record = readRecord(error);
   const bodyRecord = readRecord(record.body);
   const errorRecord = readRecord(record.error);
 
   return readRecord(bodyRecord.innerError ?? errorRecord.innerError);
-};
-
-const readRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
 };

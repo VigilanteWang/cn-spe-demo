@@ -61,8 +61,12 @@ Run the narrowest relevant validation after each substantive change. Prefer targ
 
 - Frontend app entry: `src/index.tsx`
 - Main app shell: `src/App.tsx`
+- Main containers page: `src/components/containers/index.tsx`
 - File management UI: `src/components/files/`
+- Container permission UI: `src/components/permissions/`
+- Shared cross-layer contracts: `common/contracts/`
 - Backend entry: `server/index.ts`
+- Container permission backend: `server/containerPermissions/`
 - Auth logic: `server/auth.ts`
 - SharePoint Embedded docs: `docs/spe/sharepoint-embedded-guide.md`
 
