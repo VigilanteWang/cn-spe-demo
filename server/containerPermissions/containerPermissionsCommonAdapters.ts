@@ -1,9 +1,22 @@
+/**
+ * 这个文件负责容器权限模块里最核心的“对象翻译”工作。
+ *
+ * 它主要处理两类转换：
+ * 1. 把 Microsoft Graph 返回的原始 permission / identity 对象，整理成前后端共用的契约类型
+ * 2. 把前端提交的新增权限差异，翻译成 Graph 创建权限时要求的请求体
+ *
+ * 可以把它理解成“共同契约”和“Graph 协议细节”之间的适配层。
+ * 这样 handler 不需要理解 Graph 字段形状，前端也不需要直接依赖 Graph 返回结构。
+ */
 import type {
   IContainerPermissionEntry,
   ICreateContainerPermissionChange,
   PermissionTabValue,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import { mapGraphContainerPermissionRoleToUi, mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
+import {
+  mapGraphContainerPermissionRoleToUi,
+  mapUiContainerPermissionRoleToGraph,
+} from "./containerPermissionRoleMapper";
 import type { IGraphPermissionIdentity } from "./containerPermissionsInternalContracts";
 import {
   readOptionalString,
@@ -13,17 +26,19 @@ import {
 } from "./containerPermissionsReaders";
 
 /**
- * 把 Graph permission 对象映射成前后端共同使用的 access list 行模型。
+ * 把单条 Graph permission 对象映射成前后端共用的 access list 行模型。
  */
 export const mapGraphPermissionToEntry = (
   permission: unknown,
 ): IContainerPermissionEntry => {
   const permissionRecord = readRecord(permission);
+  // Graph permission 的 id 是后续更新、删除这条权限时最稳定的锚点。
   const permissionId = readRequiredString(permissionRecord.id, "permission id");
   const roles = readStringArray(permissionRecord.roles);
   const grantedToV2 = readRecord(permissionRecord.grantedToV2);
-  // Graph 可能把同一条权限挂在 user、siteUser、group 或 siteGroup 上，
-  // 这里按优先级收口成统一 identity，后面的映射逻辑就不需要知道原始分支细节。
+
+  // Graph 可能把同一条权限挂在 user、siteUser、group 或 siteGroup 上。
+  // 这里先按优先级收口成统一 identity，后面的映射逻辑就不必关心原始分支细节。
   const principal =
     normalizeGraphPermissionIdentity(grantedToV2.user) ??
     normalizeGraphPermissionIdentity(grantedToV2.siteUser) ??
@@ -42,26 +57,28 @@ export const mapGraphPermissionToEntry = (
   const primaryRole = roles[0] ?? "reader";
 
   return {
-    // 这里用 permissionId 生成稳定列表键，而不是直接依赖 principal id，
-    // 因为 people 在 Graph 读回时不一定能拿到稳定 object id。
+    // 列表行 id 使用 permissionId 生成，而不是直接依赖 principalId。
+    // 原因是 people 在 Graph 读回时不一定带稳定 object id，但 permissionId 一定存在。
     id: `permission:${permissionId}`,
     permissionId,
-    // people 缺少 Graph object id 时，回退为本地可识别的合成 id，
-    // 这样前端草稿态和列表渲染仍然有稳定主键可用。
+    // people 缺少 Graph object id 时，退回到本地合成 id。
+    // 这样前端草稿状态、diff 和列表渲染仍然有稳定主键可用。
     principalId:
       principal.graphId ??
       createFallbackPrincipalId(principalType, permissionId),
+    // people 新增时后续写回 Graph 需要 userPrincipalName，所以读取时也尽量保留下来。
     principalUserPrincipalName:
       principalType === "people" ? principal.userPrincipalName : undefined,
     principalName: principal.displayName,
     principalType,
     description: principal.description,
+    // 这里把 Graph 小写角色翻译成 UI / 共同契约里使用的大写角色。
     role: mapGraphContainerPermissionRoleToUi(primaryRole),
   };
 };
 
 /**
- * 从 Graph identity 对象里提取共同契约真正需要的最小字段。
+ * 从 Graph identity 对象里提取共同契约真正需要的最小字段集合。
  */
 export const normalizeGraphPermissionIdentity = (
   identity: unknown,
@@ -73,6 +90,8 @@ export const normalizeGraphPermissionIdentity = (
   const record = readRecord(identity);
   const graphId = readOptionalString(record.id);
   const userPrincipalName = readOptionalString(record.userPrincipalName);
+  // Graph 在不同 identity 形状下，可用的人类可读字段并不完全一致。
+  // 这里按“最适合展示给用户”的优先级依次兜底，尽量稳定产出可显示名称。
   const displayName =
     readOptionalString(record.displayName) ??
     readOptionalString(record.email) ??
@@ -81,6 +100,7 @@ export const normalizeGraphPermissionIdentity = (
     readOptionalString(record.loginName) ??
     graphId ??
     "Unknown principal";
+  // description 更偏向副标题，因此优先选 email / UPN 这类更适合辅助展示的字段。
   const description =
     readOptionalString(record.email) ??
     userPrincipalName ??
@@ -120,9 +140,10 @@ export const createGraphCreatePermissionBody = (
 } => {
   if (createChange.principalType === "people") {
     return {
+      // Graph 创建接口使用小写角色值，所以这里先从 UI 角色映射回 Graph 角色。
       roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
       grantedToV2: {
-        // people 分支必须用 userPrincipalName，Graph 才知道要给哪个用户创建权限。
+        // people 分支必须使用 userPrincipalName，Graph 才知道要把权限授予哪个用户。
         user: {
           userPrincipalName: createChange.userPrincipalName,
         },
@@ -131,6 +152,7 @@ export const createGraphCreatePermissionBody = (
   }
 
   return {
+    // groups 分支同样先把 UI 角色转换成 Graph 角色。
     roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
     grantedToV2: {
       // groups 分支继续使用稳定的 group object id。

@@ -2,569 +2,734 @@
 
 ## 1. 背景
 
-这次重构前，`Container Permission` 后端逻辑主要集中在一个大文件里。  
+这次重构之前，`Container Permission` 后端逻辑主要集中在一个大文件里。  
 当我们沿着“前端弹窗 -> 后端 API -> Microsoft Graph”这条链路读代码时，会看到很多“对象转换”和很多 `read*` 方法，第一眼很容易觉得它们像是在重复包一层。
 
 真正的问题不是“为什么有包装”，而是：
 
 - 必要的包装和可读性包装混在一起了
 - 前后端各自维护了一份很像的类型
-- `read* / map* / parse* / normalize*` 都堆在一个文件里，边界不明显
+- `read* / map* / parse* / normalize*` 都堆在一个地方，边界不明显
 
-所以这次重构的目标不是把所有中间层删掉，而是把它们分层、命名、归档，让初级同学一眼能看出：
+所以这次重构的目标不是把所有中间层删掉，而是把它们分层、命名、归档，让我们一眼能看出：
 
 1. 哪些是前后端共同契约
 2. 哪些是后端为了适配 Graph 必须做的转换
 3. 哪些 `read*` 方法本质上是在做“边界防腐层”
 
+为了让这些概念不悬空，下面全文都用同一份真实的 Graph 返回对象举例。
+
+## 2. 示例：Graph List fileStorageContainer Permission 的原始 JSON
+
+下面这份对象，就是调用 Graph 的 `List permissions` 后，后端可能拿到的原始响应：
+
+```json
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#storage/fileStorage/containers('b%21tS3mD-xg_EqBuMkNIy_Q85wPs41jU5hBsxXZTsn4gN04XpRkGb3mQ66tfaaDuAMZ')/permissions",
+  "value": [
+    {
+      "id": "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+      "roles": [
+        "writer"
+      ],
+      "grantedToV2": {
+        "user": {
+          "displayName": "Alex Wilber",
+          "email": "AlexW@<tenantname>.onmicrosoft.com",
+          "userPrincipalName": "alexw@<tenantname>.onmicrosoft.com"
+        }
+      }
+    },
+    {
+      "id": "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      "roles": [
+        "writer"
+      ],
+      "grantedToV2": {
+        "group": {
+          "displayName": "U.S. Sales Members",
+          "email": "U.S.Sales@<tenantname>.onmicrosoft.com",
+          "id": "7eba5343-2fd9-4885-a294-8af3a59677b5"
+        }
+      }
+    }
+  ]
+}
+```
+
+这份 JSON 很重要，因为它能直接说明：
+
+- Graph 返回的不是我们前端直接想消费的 `IContainerPermissionEntry`
+- `value` 里的每一项 shape 并不完全统一
+- `user` 和 `group` 的字段并不完全一样
+- 有些字段前端必须保留，有些字段只是 Graph 协议细节
+
 ---
 
-## 2. 总体关系图
+## 3. 总体关系图
 
-现在这个模块有 4 层常见对象：
+现在这个模块里常见的对象层次可以理解成：
 
 ```text
 前端本地 UI 模型
-  ↓
-共同契约 common/contracts/containerPermissionCommonContracts.ts
-  ↓
-后端内部模型 server/containerPermissions/*
-  ↓
-Microsoft Graph 原始对象
+  -> 共同契约 common/contracts/containerPermissionCommonContracts.ts
+  -> 后端内部模型 server/containerPermissions/*
+  -> Microsoft Graph 原始对象
 ```
 
-更具体一点：
+结合上面的 JSON，可以把链路想得更具体一些：
 
 ```text
-Directory 搜索结果
-  -> IPermissionPrincipalCandidate
-  -> IContainerPermissionEntry
-  -> IContainerPermissionChangeSet
-  -> 后端 parse 成已校验的 change set
-  -> Graph POST / PATCH / DELETE body
-
-Graph GET /permissions 返回值
+Graph GET /permissions 原始响应
+  -> response.value[0] / response.value[1]
   -> normalizeGraphPermissionIdentity(...)
   -> mapGraphPermissionToEntry(...)
-  -> IContainerPermissionEntry
-  -> 前端 PermissionEntriesByTab 草稿态
+  -> IContainerPermissionEntry[]
+  -> 前端 entries / draft state
 ```
 
-这里最重要的认识是：
+最关键的区分是：
 
-- `IPermissionPrincipalCandidate` 不是共同契约，它只服务前端搜索交互
-- `IContainerPermissionEntry` 是共同契约，因为前后端都要认它
-- `IGraphPermissionIdentity` 不是共同契约，它只服务后端适配 Graph
+- Graph 原始对象：例如 `grantedToV2.user.email`
+- 共同契约对象：例如 `IContainerPermissionEntry.description`
+- 后端内部中间对象：例如 `IGraphPermissionIdentity`
+
+也就是说，Graph 返回对象不是直接穿到前端，而是先被“收口”和“翻译”。
 
 ---
 
-## 3. 一次完整链路
+## 4. 用这份 JSON 走一遍完整链路
 
-下面用一次真实的权限编辑流程，把这些层串起来。
+### 第一步：Graph 返回整个响应对象
 
-### 第一步：Dialog 打开，前端请求当前权限
+在 [`containerPermissionsHandlers.ts`](../../server/containerPermissions/containerPermissionsHandlers.ts) 里，`fetchContainerPermissionEntries(...)` 会先拿到类似上面那份原始响应。
 
-前端调用：
+它真正关心的是：
 
 ```ts
-const response = await sendAuthorizedRequest(
-  `/api/containerPermissions/${encodeURIComponent(containerId)}`,
-  { method: "GET" },
-);
+const responseRecord = readRecord(response);
+const permissionItems = responseRecord.value;
 ```
 
-后端入口在：
+如果把上面的 JSON 代进去：
 
-- `server/index.ts`
-- `server/containerPermissions/containerPermissionsHandlers.ts`
+- `response`：就是整份 Graph JSON 对象
+- `responseRecord.value`：就是长度为 2 的数组
+- `permissionItems[0]`：就是 Alex Wilber 那条权限
+- `permissionItems[1]`：就是 `U.S. Sales Members` 那条权限
 
-后端 handler 只做编排：
+如果 `value` 不是数组，这里会直接按空数组处理，而不是让前端崩掉。
+
+### 第二步：`mapGraphPermissionToEntry(...)` 把单条 Graph 权限翻译成共同契约
+
+在 [`containerPermissionsCommonAdapters.ts`](../../server/containerPermissions/containerPermissionsCommonAdapters.ts) 里，核心函数是：
 
 ```ts
-const entries = await fetchContainerPermissionEntries(graphClient, containerId);
-const responseBody: IContainerPermissionsResponse = { entries };
-res.send(200, responseBody);
+export const mapGraphPermissionToEntry = (
+  permission: unknown,
+): IContainerPermissionEntry => { ... }
 ```
 
-这里的重点是：  
-handler 不直接理解 Graph 原始对象细节，它只负责“拿数据、调映射、发响应”。
+先看第一个 `user` 示例输入：
 
-### 第二步：后端把 Graph 对象翻译成共同契约
+```json
+{
+  "id": "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+  "roles": ["writer"],
+  "grantedToV2": {
+    "user": {
+      "displayName": "Alex Wilber",
+      "email": "AlexW@<tenantname>.onmicrosoft.com",
+      "userPrincipalName": "alexw@<tenantname>.onmicrosoft.com"
+    }
+  }
+}
+```
 
-Graph 返回的权限对象并不适合前端直接消费，因为它有这些现实问题：
-
-- `user` / `siteUser` / `group` / `siteGroup` 结构不同
-- people 有时没有稳定 `id`
-- role 名字和 UI 展示名字不同
-
-所以后端会先走两步：
+经过 `mapGraphPermissionToEntry(...)` 后，输出会接近：
 
 ```ts
-const principal =
-  normalizeGraphPermissionIdentity(grantedToV2.user) ??
-  normalizeGraphPermissionIdentity(grantedToV2.siteUser) ??
-  normalizeGraphPermissionIdentity(grantedToV2.group) ??
-  normalizeGraphPermissionIdentity(grantedToV2.siteGroup);
-
-return {
-  id: `permission:${permissionId}`,
-  permissionId,
+{
+  id: "permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+  permissionId: "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
   principalId:
-    principal.graphId ?? createFallbackPrincipalId(principalType, permissionId),
-  role: mapGraphContainerPermissionRoleToUi(primaryRole),
-};
-```
-
-这里有 3 个重要动作：
-
-1. `normalizeGraphPermissionIdentity(...)`
-   把多种 Graph identity 形状收口成统一中间对象
-2. `createFallbackPrincipalId(...)`
-   people 没有 Graph object id 时，给前端一个稳定可用的本地 id
-3. `mapGraphContainerPermissionRoleToUi(...)`
-   把 Graph 的 `reader/writer/...` 转成共同契约里的 `Reader/Writer/...`
-
-### 第三步：前端维护草稿态
-
-前端不会直接操作 Graph，也不会每改一项就立刻写后端。  
-它先维护两份本地快照：
-
-```ts
-const [originalEntriesByTab, setOriginalEntriesByTab] = useState(...);
-const [draftEntriesByTab, setDraftEntriesByTab] = useState(...);
-```
-
-这样做的原因：
-
-- `Close` 时可以回滚到最近一次确认后的状态
-- `Apply` 成功后可以把服务端最新结果变成新的基线
-- 编辑中不必反复请求后端
-
-### 第四步：点击 Apply，前端算出 change set
-
-前端不会把整张表重新发给后端，而是只发差异：
-
-```ts
-return {
-  create,
-  update,
-  remove,
-};
-```
-
-这里的 `IContainerPermissionChangeSet` 也是共同契约。  
-它的作用是让前端和后端都只关心：
-
-- 新增了谁
-- 哪条权限改了角色
-- 哪条权限被删了
-
-### 第五步：后端 parse 请求体
-
-后端拿到 `req.body` 后，先不急着写 Graph，而是先 parse：
-
-```ts
-const changeSet = parseContainerPermissionChangeSet(req.body);
-```
-
-`parse` 阶段会做这些事：
-
-- 检查 `create/update/remove` 是否存在
-- 兼容历史字段 `delete`
-- 校验 `role`
-- 校验 `principalType`
-- 对 people 分支强制要求 `userPrincipalName`
-
-### 第六步：后端转成 Graph 写入 body
-
-后端内部差异模型和 Graph 请求体也不是一回事。  
-尤其新增时，people 和 groups 的载荷完全不同：
-
-```ts
-if (createChange.principalType === "people") {
-  return {
-    roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
-    grantedToV2: {
-      user: {
-        userPrincipalName: createChange.userPrincipalName,
-      },
-    },
-  };
+    "people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+  principalUserPrincipalName: "alexw@<tenantname>.onmicrosoft.com",
+  principalName: "Alex Wilber",
+  principalType: "people",
+  description: "AlexW@<tenantname>.onmicrosoft.com",
+  role: "Writer"
 }
+```
 
-return {
-  roles: [mapUiContainerPermissionRoleToGraph(createChange.role)],
-  grantedToV2: {
-    group: {
-      id: createChange.principalId,
+这里要注意：
+
+- `permissionId` 来自 Graph 原始 `id`
+- `role` 从 Graph 的 `"writer"` 被映射成 UI 契约里的 `"Writer"`
+- 这个 `user` 示例里没有 `user.id`，所以 `principalId` 会退化成 `createFallbackPrincipalId("people", permissionId)`
+
+再看第二个 `group` 示例输入：
+
+```json
+{
+  "id": "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+  "roles": ["writer"],
+  "grantedToV2": {
+    "group": {
+      "displayName": "U.S. Sales Members",
+      "email": "U.S.Sales@<tenantname>.onmicrosoft.com",
+      "id": "7eba5343-2fd9-4885-a294-8af3a59677b5"
+    }
+  }
+}
+```
+
+输出会接近：
+
+```ts
+{
+  id: "permission:X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+  permissionId: "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+  principalId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
+  principalUserPrincipalName: undefined,
+  principalName: "U.S. Sales Members",
+  principalType: "groups",
+  description: "U.S.Sales@<tenantname>.onmicrosoft.com",
+  role: "Writer"
+}
+```
+
+这里又能看出一个很关键的区别：
+
+- `group` 分支直接有稳定的 `id`
+- 所以 `principalId` 可以直接用真实 group object id
+- `groups` 不需要 `principalUserPrincipalName`
+
+### 第三步：整个 GET 接口最终返回什么
+
+`fetchContainerPermissionEntries(...)` 会把 `value` 数组 `map(mapGraphPermissionToEntry)`，所以后端最终返回给前端的结构是：
+
+```ts
+const responseBody: IContainerPermissionsResponse = {
+  entries: [
+    {
+      id: "permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+      permissionId: "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+      principalId:
+        "people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+      principalUserPrincipalName: "alexw@<tenantname>.onmicrosoft.com",
+      principalName: "Alex Wilber",
+      principalType: "people",
+      description: "AlexW@<tenantname>.onmicrosoft.com",
+      role: "Writer"
     },
-  },
+    {
+      id: "permission:X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      permissionId: "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      principalId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
+      principalName: "U.S. Sales Members",
+      principalType: "groups",
+      description: "U.S.Sales@<tenantname>.onmicrosoft.com",
+      role: "Writer"
+    }
+  ]
 };
 ```
 
-这就是典型的“共同契约 -> 外部协议”转换层。
-
-### 第七步：写回后再次读取，回到共同契约
-
-Apply 完成后，后端不会只返回“成功了”，而是再读一遍服务端当前真实状态，重新映射成：
-
-```ts
-IContainerPermissionsResponse;
-```
-
-前端拿到后调用 `replaceEntries(...)`，把最新结果同时写回：
-
-- `originalEntriesByTab`
-- `draftEntriesByTab`
-
-这样脏状态就被清掉了。
+这就是共同契约真正发挥作用的地方：前端后面只看 `entries`，不再直接理解 Graph 的 `grantedToV2.user/group` 细节。
 
 ---
 
-## 4. 什么是共同契约，为什么放在根目录 `common/contracts`
+## 5. 什么是共同契约，为什么放在 `common/contracts`
 
-这次重构后，共同契约统一放在：
+共同契约文件是 [`containerPermissionCommonContracts.ts`](../../common/contracts/containerPermissionCommonContracts.ts)。
 
-```text
-common/contracts/containerPermissionCommonContracts.ts
-```
+它描述的不是“Graph 长什么样”，而是“前后端通过 HTTP 交互时，彼此承诺的数据长什么样”。
 
-这样放的原因有 3 个：
+还是用上面的 Graph 示例来看，`IContainerPermissionEntry` 里这些字段为什么存在：
 
-1. 它不属于前端，也不属于后端
-2. 它描述的是“HTTP 两端都认的结构”
-3. 用目录位置提醒大家：这是共享协议，不是某一层的私有细节
+- `permissionId`
+  来自 Graph 原始权限项的 `id`
+- `principalName`
+  对应 `displayName`，例如 `"Alex Wilber"` 或 `"U.S. Sales Members"`
+- `description`
+  通常取 `email` 或 `userPrincipalName`
+- `principalType`
+  不直接来自单一字段，而是后端根据 `user/siteUser/group/siteGroup` 分支推导出来
+- `role`
+  是把 Graph 的小写角色转成 UI 用的大写角色
 
-这个文件里只放两类东西：
+也就是说，共同契约不是把 Graph JSON 原样搬运，而是把“前端真正需要稳定消费的信息”整理出来。
 
-- 共同的数据模型
-- 共同的错误响应模型
+不应该放进共同契约的内容包括：
 
-例如：
+- Graph 原始响应 shape，例如 `grantedToV2.user`
+- 后端内部中间对象，例如 `IGraphPermissionIdentity`
+- 只服务某一层的本地状态
 
-```ts
-export interface IContainerPermissionEntry {
-  id: string;
-  permissionId?: string;
-  principalId: string;
-  principalUserPrincipalName?: string;
-  principalName: string;
-  principalType: PermissionTabValue;
-  description: string;
-  role: ContainerPermissionRole;
-}
-```
+一句话记忆：
 
-和：
-
-```ts
-export interface IContainerPermissionChangeSet {
-  create: ICreateContainerPermissionChange[];
-  update: IUpdateContainerPermissionChange[];
-  remove: IDeleteContainerPermissionChange[];
-}
-```
-
-不应该放进共同契约的东西：
-
-- Graph 原始返回结构
-- 后端为了适配 Graph 造的中间对象
-- 前端搜索候选项
-- 前端草稿态 Hook 内部状态
-
-一句话记忆：  
-**共同契约描述“前后端怎么说话”，不是描述“每一层内部怎么工作”。**
+**共同契约描述的是“前后端怎么说话”，不是“Graph 原始对象长什么样”。**
 
 ---
 
-## 5. 为什么不是所有中间对象都该删
+## 6. 为什么不能把中间对象全删掉
 
-很多初级同学会问：  
-“既然有共同契约，能不能直接把 Graph 返回值给前端？”
+很多同学会问：既然有共同契约，能不能直接把 Graph 返回对象传给前端？
 
-这在这个模块里不合适，原因很现实：
+拿这份 JSON 来看，这样做并不合适。
 
-### 1. Graph identity 形状不统一
+### 1. `user` 和 `group` 的 shape 不统一
 
-后端读权限时，可能遇到：
+在示例 JSON 里：
 
-- `grantedToV2.user`
-- `grantedToV2.siteUser`
-- `grantedToV2.group`
-- `grantedToV2.siteGroup`
+- 第一条权限用的是 `grantedToV2.user`
+- 第二条权限用的是 `grantedToV2.group`
 
-如果不先统一，主流程就会塞满条件分支。
+这意味着前端如果直接消费 Graph 数据，就必须到处写这种判断：
 
-### 2. people 不一定有稳定 object id
+```ts
+if (permission.grantedToV2?.user) { ... }
+if (permission.grantedToV2?.group) { ... }
+```
 
-Graph 有时只给：
+而现在后端只做一次统一，前端永远读：
 
-- `displayName`
-- `email`
-- `userPrincipalName`
+```ts
+entry.principalType
+entry.principalName
+entry.description
+```
 
-不给 `user.id`。  
-如果前端直接拿这种原始对象做列表主键，后续编辑和 diff 都会变得不稳定。
+### 2. `people` 不一定有稳定 `id`
 
-### 3. Graph role 和 UI role 不同
+在示例里的 `user` 权限对象中：
 
-Graph 用：
+```json
+"user": {
+  "displayName": "Alex Wilber",
+  "email": "AlexW@<tenantname>.onmicrosoft.com",
+  "userPrincipalName": "alexw@<tenantname>.onmicrosoft.com"
+}
+```
 
-- `reader`
-- `writer`
-- `manager`
-- `owner`
-- `principalOwner`
+这里并没有 `id`。  
+如果前端直接把这个 Graph 对象拿来当列表主键或 diff 锚点，就会不稳定。
 
-UI 和共同契约用：
+所以后端才会生成：
 
-- `Reader`
-- `Writer`
-- `Manager`
-- `Owner`
+```ts
+createFallbackPrincipalId("people", permissionId)
+```
 
-这就是一个典型的“必须有映射层”的场景。
+也就是：
 
-### 4. create/update/delete 的载荷不同
+```ts
+"people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20"
+```
 
-尤其 create：
+### 3. Graph role 和 UI role 不是一套命名
 
-- people 需要 `userPrincipalName`
-- groups 需要 `group id`
+示例 JSON 里角色是：
 
-如果没有中间差异模型，前后端就很容易在“字段是给谁用的”这件事上混乱。
+```json
+"roles": ["writer"]
+```
+
+但前端共同契约里是：
+
+```ts
+role: "Writer"
+```
+
+如果没有映射层，前后端就会在大小写和角色枚举上反复纠缠。
 
 所以正确做法不是“删光中间层”，而是：
 
-- 保留必要边界
-- 给每个边界一个清楚名字
-- 把它们放到对应文件夹里
+- 保留真正必要的边界
+- 让每个边界只做一件事
+- 用文件名把职责说清楚
 
 ---
 
-## 6. `read*` 是什么 pattern
+## 7. `normalizeGraphPermissionIdentity(...)` 到底在做什么
 
-这次重构里，`read*` 方法被集中到了 `server/containerPermissions/containerPermissionsReaders.ts`，以及错误映射附近的读取辅助逻辑里。
+这个函数在 [`containerPermissionsCommonAdapters.ts`](../../server/containerPermissions/containerPermissionsCommonAdapters.ts) 里。
 
-它们背后的模式可以理解为：
+它的职责不是“把整条 permission 转完”，而是先把 Graph 里不同形状的 identity 收口成统一对象。
 
-## Reader / Parser pattern
+### 例子 1：输入是 `user`
 
-更准确地说，它是一种“边界防腐层”的写法。
+输入：
 
-边界防腐层的意思是：
-
-- 外部输入往往是弱类型、松散、甚至不稳定的
-- 业务代码不应该直接信任这些输入
-- 所以先由一层小工具把输入“读干净”“收紧”“统一”
-
-例如：
-
-```ts
-export const readRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
-};
+```json
+{
+  "displayName": "Alex Wilber",
+  "email": "AlexW@<tenantname>.onmicrosoft.com",
+  "userPrincipalName": "alexw@<tenantname>.onmicrosoft.com"
+}
 ```
 
-和：
+输出会接近：
 
 ```ts
-export const readRequiredString = (
-  value: unknown,
-  fieldName: string,
-): string => {
-  if (typeof value === "string" && value) {
-    return value;
-  }
-
-  throw new Error(`Missing required ${fieldName}.`);
-};
+{
+  graphId: undefined,
+  displayName: "Alex Wilber",
+  description: "AlexW@<tenantname>.onmicrosoft.com",
+  userPrincipalName: "alexw@<tenantname>.onmicrosoft.com"
+}
 ```
 
-这些方法本身不是业务规则。  
-它们更像“门口保安”：
+### 例子 2：输入是 `group`
 
-- 先确认输入是不是对象
-- 先确认字段是不是非空字符串
-- 先兼容多种 header/innerError 形状
-- 再把干净的值交给真正的业务逻辑
+输入：
 
-这样好处很大：
+```json
+{
+  "displayName": "U.S. Sales Members",
+  "email": "U.S.Sales@<tenantname>.onmicrosoft.com",
+  "id": "7eba5343-2fd9-4885-a294-8af3a59677b5"
+}
+```
 
-1. 主流程更清楚
-2. 校验逻辑可以复用
-3. 出错点更集中
-4. 更容易单元测试
+输出会接近：
 
----
+```ts
+{
+  graphId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
+  displayName: "U.S. Sales Members",
+  description: "U.S.Sales@<tenantname>.onmicrosoft.com",
+  userPrincipalName: undefined
+}
+```
 
-## 7. 本模块里 `read*` 方法的分类
-
-这次可以把它们分成 4 类。
-
-### A. 请求解析类
-
-典型代表：
-
-- `parseContainerPermissionChangeSet(...)`
-
-它的职责不是“读取单个字段”，而是把原始 `req.body` 解析成后端真正愿意接受的 change set。
-
-它会：
-
-- 校验字段结构
-- 兼容 `delete -> remove`
-- 调用更细的字段读取逻辑
-
-所以它更接近 `Parser`。
-
-### B. 基础弱类型读取类
-
-典型代表：
-
-- `readRecord(...)`
-- `readOptionalString(...)`
-- `readRequiredString(...)`
-- `readStringArray(...)`
-
-这类方法解决的是：
-
-- 这个值能不能当对象看
-- 这个字段是不是字符串
-- 这个字段是不是必填
-- 这个字段是不是字符串数组
-
-它们是最底层的“安全读取工具”。
-
-### C. Graph identity 读取类
-
-典型代表：
-
-- `normalizeGraphPermissionIdentity(...)`
-
-它不是单纯 `read` 一个值，而是在做：
-
-- 从多种 Graph identity 形状里提字段
-- 统一 `displayName`
-- 统一 `description`
-- 保留 `userPrincipalName`
-
-所以它更像“结构归一化器”。
-
-### D. 错误对象读取类
-
-典型代表：
-
-- `readRetryAfterSeconds(...)`
-- `readRequestId(...)`
-- `readHeaderValue(...)`
-- `readInnerError(...)`
-
-这类方法的场景是：
-
-- SDK 错误对象形状不稳定
-- header 可能在不同位置
-- `request-id` 和 `retry-after` 可能在 header，也可能在 `innerError`
-
-它们的职责是把“调试和恢复所需信息”尽量提取出来，供：
-
-- 前端提示
-- 日志追踪
-- 节流等待建议
+这样后面的 `mapGraphPermissionToEntry(...)` 就不用再关心它最初是 `user` 还是 `group` 的字段形状了。
 
 ---
 
-## 8. 重构后的文件地图与阅读顺序
+## 8. `read*` 模式到底在保护什么
 
-现在建议按下面顺序读：
+`read*` 方法主要在 [`containerPermissionsReaders.ts`](../../server/containerPermissions/containerPermissionsReaders.ts)。
+
+它们的本质不是业务逻辑，而是“边界读取工具”。
+
+### `readRecord(...)`
+
+函数签名：
+
+```ts
+readRecord(value: unknown): Record<string, unknown>
+```
+
+把 Graph 整个响应对象传进去：
+
+```ts
+const responseRecord = readRecord(graphResponse);
+```
+
+如果 `graphResponse` 真的是对象，就返回这个对象的可读形式；如果不是对象，就返回 `{}`。
+
+结合上面的 JSON：
+
+- 输入：整份 Graph 返回对象
+- 输出：可以安全做 `responseRecord.value` 的对象
+
+### `readStringArray(...)`
+
+在示例里：
+
+```ts
+const roles = readStringArray(permissionRecord.roles);
+```
+
+如果输入是：
+
+```json
+["writer"]
+```
+
+输出就是：
+
+```ts
+["writer"]
+```
+
+如果 Graph 以后异常返回了别的形状，例如 `null` 或混杂数组，这里至少不会让主流程直接炸掉。
+
+### `readRequiredString(...)`
+
+在 `mapGraphPermissionToEntry(...)` 里有：
+
+```ts
+const permissionId = readRequiredString(permissionRecord.id, "permission id");
+```
+
+代入第一条示例数据：
+
+- 输入值：`"X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20"`
+- 输出值：同一个字符串
+
+如果 Graph 某次返回里缺了 `id`，这里会立即抛错，而不是让后面带着脏数据继续跑。
+
+### `readOptionalString(...)`
+
+在 `normalizeGraphPermissionIdentity(...)` 里有：
+
+```ts
+const userPrincipalName = readOptionalString(record.userPrincipalName);
+```
+
+代入两个示例：
+
+- 对 `user` 输入，输出是 `"alexw@<tenantname>.onmicrosoft.com"`
+- 对 `group` 输入，输出是 `undefined`
+
+这就很符合“可选字段”的语义。
+
+一句话概括：
+
+**`read*` 不是在决定业务，而是在保证主流程读到的是干净、可预测的数据。**
+
+---
+
+## 9. `parse*` 模式和这份 Graph JSON的关系
+
+`parseContainerPermissionChangeSet(...)` 在 [`containerPermissionsRequestParser.ts`](../../server/containerPermissions/containerPermissionsRequestParser.ts) 里。
+
+它处理的不是 Graph GET 响应，而是前端提交的 Apply 请求体。  
+但它和上面的 Graph 示例依然是连着的，因为前端的更新和删除，通常都是基于刚才那批 `entries` 算出来的。
+
+例如，上面 `group` 那条 Graph 权限被映射成：
+
+```ts
+{
+  permissionId: "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+  principalId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
+  principalType: "groups",
+  role: "Writer"
+}
+```
+
+如果前端把它改成 `Reader`，可能发给后端的 `update` 就是：
+
+```json
+{
+  "create": [],
+  "update": [
+    {
+      "permissionId": "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      "role": "Reader"
+    }
+  ],
+  "remove": []
+}
+```
+
+这时 `parseContainerPermissionChangeSet(req.body)` 的输入就是上面这个请求体，输出是：
+
+```ts
+{
+  create: [],
+  update: [
+    {
+      permissionId:
+        "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      role: "Reader"
+    }
+  ],
+  remove: []
+}
+```
+
+再比如，如果前端要删除 Alex 那条权限，请求体可能是：
+
+```json
+{
+  "create": [],
+  "update": [],
+  "remove": [
+    {
+      "permissionId": "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20"
+    }
+  ]
+}
+```
+
+也就是说：
+
+- `parse*` 负责把前端请求体读干净
+- `map* / normalize*` 负责把 Graph 响应体读干净
+- 它们都属于边界防腐层，只是面向的边界不同
+
+---
+
+## 10. `createGraphCreatePermissionBody(...)` 的输入输出例子
+
+这个函数同样在 [`containerPermissionsCommonAdapters.ts`](../../server/containerPermissions/containerPermissionsCommonAdapters.ts) 里。
+
+它负责把共同契约里的新增差异，翻译成 Graph 创建权限时要的请求体。
+
+### 例子 1：新增一个 people 权限
+
+输入：
+
+```ts
+{
+  principalType: "people",
+  principalId: "some-local-id",
+  userPrincipalName: "alexw@<tenantname>.onmicrosoft.com",
+  role: "Writer"
+}
+```
+
+输出：
+
+```ts
+{
+  roles: ["writer"],
+  grantedToV2: {
+    user: {
+      userPrincipalName: "alexw@<tenantname>.onmicrosoft.com"
+    }
+  }
+}
+```
+
+这里可以和上面的 Graph 读取示例互相对照：
+
+- 读取回来时，people 记录里常见的是 `displayName/email/userPrincipalName`
+- 写回去时，Graph 真正要求的是 `grantedToV2.user.userPrincipalName`
+
+### 例子 2：新增一个 groups 权限
+
+输入：
+
+```ts
+{
+  principalType: "groups",
+  principalId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
+  role: "Writer"
+}
+```
+
+输出：
+
+```ts
+{
+  roles: ["writer"],
+  grantedToV2: {
+    group: {
+      id: "7eba5343-2fd9-4885-a294-8af3a59677b5"
+    }
+  }
+}
+```
+
+这和上面的 `group` 示例也能对上：
+
+- 读取时，后端从 Graph `group.id` 里拿到真实 group id
+- 新增时，后端再把这个 id 按 Graph 规定写回 `grantedToV2.group.id`
+
+---
+
+## 11. 重构后的文件地图与阅读顺序
+
+建议按下面顺序读：
 
 ```text
 common/contracts/containerPermissionCommonContracts.ts
-  -> 先看共同契约，理解前后端说话的语言
+  -> 先看共同契约，理解前后端对外约定的数据结构
 
 src/components/permissions/models/permissionModels.ts
-  -> 再看前端本地补充模型，理解 UI 还额外需要什么
+  -> 再看前端本地模型，理解 UI 额外维护了什么
 
 src/components/permissions/services/containerPermissionDiff.ts
-  -> 看草稿如何变成 change set
+  -> 看前端如何从 entries 算出 change set
 
 src/services/containerPermissionApi.ts
-  -> 看前端如何请求后端、如何拿共同契约
+  -> 看前端如何请求后端
 
 server/containerPermissions/containerPermissionsHandlers.ts
-  -> 看后端主流程编排
+  -> 看后端主流程如何串联读取、apply、回读
 
 server/containerPermissions/containerPermissionsRequestParser.ts
-  -> 看请求体如何被 parse 和校验
+  -> 看前端请求体如何被 parse 和校验
 
 server/containerPermissions/containerPermissionsCommonAdapters.ts
   -> 看共同契约和 Graph 之间如何互转
+
+server/containerPermissions/containerPermissionsReaders.ts
+  -> 看 `read*` 如何做边界防腐
 
 server/containerPermissions/containerPermissionsError.ts
   -> 看错误如何被标准化
 ```
 
-如果你是第一次接触这个模块，最重要的两个入口是：
+如果你是第一次接触这个模块，最值得先抓住的两个入口是：
 
 1. `common/contracts/containerPermissionCommonContracts.ts`
 2. `server/containerPermissions/containerPermissionsHandlers.ts`
 
-因为一个告诉你“双方约定了什么”，另一个告诉你“这条链路怎么跑”。
+因为一个告诉你“双方约定了什么”，另一个告诉你“整条链路怎么跑”。
 
 ---
 
-## 9. 给初级同学的阅读建议
+## 12. 给初级同学的阅读建议
 
-### 建议 1：先分清“共同契约”和“内部模型”
+### 建议 1：看到类型先问“它属于哪一层”
 
-如果一个类型会穿过 HTTP 边界，它大概率属于共同契约。  
-如果一个类型只是为了让某一层内部更好写代码，它就不该进共同契约。
+拿这次例子来说：
 
-### 建议 2：不要把 `read*` 当成业务逻辑
+- Graph 原始 `grantedToV2.user.email` 属于 Graph 协议层
+- `IGraphPermissionIdentity` 属于后端内部适配层
+- `IContainerPermissionEntry.description` 属于共同契约层
 
-`read*` 更多是在做：
+只要先分清层次，很多“为什么又包了一层”的困惑会立刻变少。
 
-- 安全读取
-- 兜底
-- 兼容不同输入形状
-
-真正的业务决策通常在：
-
-- “people 为什么要用 userPrincipalName”
-- “为什么 entry.id 用 permissionId”
-- “为什么先删再改再建”
-
-这些地方。
-
-### 建议 3：看到 `map* / parse* / normalize*` 时先问自己“边界是哪一层”
-
-一个很实用的问题是：
-
-> 这个函数是在把哪一层，转换成哪一层？
+### 建议 2：看到 `map* / parse* / normalize*` 时，先问“它在把谁翻译成谁”
 
 例如：
 
 - `mapGraphPermissionToEntry`
-  是 `Graph -> 共同契约`
-- `parseContainerPermissionChangeSet`
-  是 `原始请求体 -> 后端已校验差异模型`
+  是 `Graph permission -> IContainerPermissionEntry`
 - `normalizeGraphPermissionIdentity`
-  是 `多种 Graph identity 形状 -> 统一中间结构`
+  是 `Graph user/group shape -> 统一 identity`
+- `parseContainerPermissionChangeSet`
+  是 `前端原始请求体 -> 已校验 change set`
 
-一旦你能回答这个问题，代码就会清楚很多。
+### 建议 3：不要把 `read*` 当业务逻辑
 
-### 建议 4：先理解“为什么需要这一层”，再看字段细节
+`readRecord(...)`、`readRequiredString(...)` 这些函数，并没有在决定“权限应该怎么改”。  
+它们只是在做更基础的事：
 
-如果你先盯着每个字段名，容易陷进细节。  
-更好的顺序是：
+- 安全读取
+- 容错
+- 提前失败
 
-1. 这层存在是为了解决什么问题
-2. 这层的输入是什么
-3. 这层的输出是什么
-4. 哪些字段是为了兼容外部系统不得不保留的
+真正的业务决策仍然在更高层，比如：
 
-这样读起来会更像在理解系统设计。
+- 为什么 people 创建要用 `userPrincipalName`
+- 为什么 `entry.id` 不直接等于 `principalId`
+- 为什么 Apply 时要先删、再改、后建
+
+### 建议 4：读代码时，尽量把真实例子代进去
+
+比如读到：
+
+```ts
+normalizeGraphPermissionIdentity(grantedToV2.user)
+```
+
+脑子里就直接代入：
+
+```json
+{
+  "displayName": "Alex Wilber",
+  "email": "AlexW@<tenantname>.onmicrosoft.com",
+  "userPrincipalName": "alexw@<tenantname>.onmicrosoft.com"
+}
+```
+
+再问自己：“这个函数最后会产出什么统一字段？”  
+这样会比只盯着类型签名更容易真正理解系统设计。

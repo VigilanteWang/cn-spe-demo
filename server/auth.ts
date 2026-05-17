@@ -569,20 +569,6 @@ export const getGraphToken = async (token: string): Promise<string> => {
 };
 
 /**
- * 创建 Microsoft Graph API 客户端
- *
- * Graph API 客户端用来与微软 Graph API 通信，相当于一个 API 驱动程序
- * 它简化了 API 调用，提供了对象化的接口，而不需要手动构造 HTTP 请求
- *
- * 配置说明：
- * - authProvider: 提供 token 的函数，每次 API 调用时会被调用以获取最新 token
- * - defaultVersion: 使用 v1.0 API（稳定版），不用 beta（实验版）
- * - baseUrl: Graph API 的基础地址（全球或中国）
- * - customHosts: 限制只能访问该主机，防止被 SSRF 攻击
- *
- * @param accessToken Graph API 的有效 access token
- * @returns Microsoft Graph Client 实例，可以用来调用 API
- *
  * 使用示例：
  * ```ts
  * const graphClient = createGraphClient(graphToken);
@@ -603,6 +589,21 @@ export const getGraphToken = async (token: string): Promise<string> => {
  *     containerTypeId: typeId,
  *   });
  * ```
+ */
+/**
+ * 创建 Microsoft Graph API 客户端
+ *
+ * Graph API 客户端用来与微软 Graph API 通信，相当于一个 API 驱动程序
+ * 它简化了 API 调用，提供了对象化的接口，而不需要手动构造 HTTP 请求
+ *
+ * 配置说明：
+ * - authProvider: 提供 token 的函数，每次 API 调用时会被调用以获取最新 token
+ * - defaultVersion: 使用 v1.0 API（稳定版），不用 beta（实验版）
+ * - baseUrl: Graph API 的基础地址（全球或中国）
+ * - customHosts: 限制只能访问该主机，防止被 SSRF 攻击
+ *
+ * @param accessToken Graph API 的有效 access token
+ * @returns Microsoft Graph Client 实例，可以用来调用 API
  */
 export const createGraphClient = (accessToken: string): Client => {
   return Client.init({
