@@ -8,7 +8,7 @@
  *
  * 把映射规则集中在这里，可以避免角色转换逻辑散落到 handler、adapter 或 parser 中。
  */
-import type { ContainerPermissionRole } from "../../common/contracts/containerPermissionCommonContracts";
+import type { ContainerPermissionRoleForUI } from "../../common/contracts/containerPermissionCommonContracts";
 
 /**
  * Microsoft Graph fileStorageContainer 权限角色名。
@@ -26,7 +26,7 @@ export type GraphContainerPermissionRole =
 // Graph -> UI 的读取方向映射。
 const graphToUiRoleMap: Record<
   GraphContainerPermissionRole,
-  ContainerPermissionRole
+  ContainerPermissionRoleForUI
 > = {
   reader: "Reader",
   writer: "Writer",
@@ -38,7 +38,7 @@ const graphToUiRoleMap: Record<
 // UI -> Graph 的写回方向映射。
 // 这里不会产生 principalOwner，因为当前产品层没有单独编辑这个角色的入口。
 const uiToGraphRoleMap: Record<
-  ContainerPermissionRole,
+  ContainerPermissionRoleForUI,
   Exclude<GraphContainerPermissionRole, "principalOwner">
 > = {
   Reader: "reader",
@@ -52,13 +52,15 @@ const uiToGraphRoleMap: Record<
  */
 export const mapGraphContainerPermissionRoleToUi = (
   graphRole: string,
-): ContainerPermissionRole => {
+): ContainerPermissionRoleForUI => {
   // Graph SDK 在这里给到的仍然是动态字符串，所以先按 Graph 角色集合尝试收口。
   const normalizedRole = graphRole as GraphContainerPermissionRole;
   const mappedRole = graphToUiRoleMap[normalizedRole];
 
   if (!mappedRole) {
-    throw new Error(`Unsupported Graph container permission role: ${graphRole}`);
+    throw new Error(
+      `Unsupported Graph container permission role: ${graphRole}`,
+    );
   }
 
   return mappedRole;
@@ -68,7 +70,7 @@ export const mapGraphContainerPermissionRoleToUi = (
  * 把共同契约里的角色名映射回 Graph PATCH/POST 使用的角色名。
  */
 export const mapUiContainerPermissionRoleToGraph = (
-  uiRole: ContainerPermissionRole,
+  uiRole: ContainerPermissionRoleForUI,
 ): Exclude<GraphContainerPermissionRole, "principalOwner"> => {
   return uiToGraphRoleMap[uiRole];
 };

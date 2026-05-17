@@ -1,10 +1,10 @@
 import { sendAuthorizedRequest } from "./apiClient";
 import { FrontendApiError } from "../common/errors.ts";
 import type {
-  IContainerPermissionChangeSet,
-  IContainerPermissionEntry,
+  IContainerPermissionChangeSetFromUI,
+  IContainerPermissionEntryForUI,
   IContainerPermissionsApiErrorBody,
-  IContainerPermissionsResponse,
+  IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionModels";
 
@@ -51,7 +51,8 @@ export const listContainerPermissions = async (
     throw await buildPermissionApiError(response);
   }
 
-  const payload = (await response.json()) as IContainerPermissionsResponse;
+  const payload =
+    (await response.json()) as IContainerPermissionsResponseFromApi;
   return mapEntriesToTabs(payload.entries);
 };
 
@@ -60,7 +61,7 @@ export const listContainerPermissions = async (
  */
 export const applyContainerPermissionChanges = async (
   containerId: string,
-  changes: IContainerPermissionChangeSet,
+  changes: IContainerPermissionChangeSetFromUI,
 ): Promise<PermissionEntriesByTab> => {
   const response = await sendAuthorizedRequest(
     `/api/containerPermissions/${encodeURIComponent(containerId)}/apply`,
@@ -77,7 +78,8 @@ export const applyContainerPermissionChanges = async (
     throw await buildPermissionApiError(response);
   }
 
-  const payload = (await response.json()) as IContainerPermissionsResponse;
+  const payload =
+    (await response.json()) as IContainerPermissionsResponseFromApi;
   return mapEntriesToTabs(payload.entries);
 };
 
@@ -85,7 +87,7 @@ export const applyContainerPermissionChanges = async (
  * 把后端返回的权限数组重新按 people/groups 分组。
  */
 const mapEntriesToTabs = (
-  entries: IContainerPermissionEntry[],
+  entries: IContainerPermissionEntryForUI[],
 ): PermissionEntriesByTab => {
   const nextEntries: PermissionEntriesByTab = {
     people: [],

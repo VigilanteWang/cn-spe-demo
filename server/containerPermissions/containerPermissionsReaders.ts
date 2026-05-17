@@ -25,7 +25,7 @@ export const readStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
   }
-
+  // item is string 是 TypeScript 的 type predicate，告诉编译器 "如果函数返回 true，那么这个 item 就是 string 类型"。
   return value.filter((item): item is string => typeof item === "string");
 };
 

@@ -13,7 +13,7 @@ export type PermissionTabValue = "people" | "groups";
  * 这里保留前端界面直接展示的首字母大写形式，
  * 后端与 Graph 之间的小写角色映射由专门的 role mapper 负责。
  */
-export type ContainerPermissionRole =
+export type ContainerPermissionRoleForUI =
   | "Reader"
   | "Writer"
   | "Manager"
@@ -25,7 +25,7 @@ export type ContainerPermissionRole =
  * 这份结构会被后端返回给前端，也会被前端草稿态和 diff 逻辑直接复用，
  * 因此它属于真正的“共同契约”。
  */
-export interface IContainerPermissionEntry {
+export interface IContainerPermissionEntryForUI {
   /**
    * 前端列表渲染和本地草稿更新使用的稳定键。
    * 它不等同于 Graph principal id，而是当前模块约定好的“列表行标识”。
@@ -61,14 +61,14 @@ export interface IContainerPermissionEntry {
   /**
    * 当前容器权限角色。
    */
-  role: ContainerPermissionRole;
+  role: ContainerPermissionRoleForUI;
 }
 
 /**
  * 后端读取或 apply 完成后返回给前端的响应体。
  */
-export interface IContainerPermissionsResponse {
-  entries: IContainerPermissionEntry[];
+export interface IContainerPermissionsResponseFromApi {
+  entries: IContainerPermissionEntryForUI[];
 }
 
 /**
@@ -77,11 +77,11 @@ export interface IContainerPermissionsResponse {
  * Graph 创建用户权限时要求传 userPrincipalName，
  * 所以共同契约里也必须把这个字段显式收紧。
  */
-export interface ICreatePeopleContainerPermissionChange {
+export interface IPeopleContainerPermissionCreateChange {
   principalType: "people";
   principalId: string;
   userPrincipalName: string;
-  role: ContainerPermissionRole;
+  role: ContainerPermissionRoleForUI;
 }
 
 /**
@@ -89,41 +89,41 @@ export interface ICreatePeopleContainerPermissionChange {
  *
  * Graph 创建组权限时继续使用稳定的 group id。
  */
-export interface ICreateGroupContainerPermissionChange {
+export interface IGroupContainerPermissionCreateChange {
   principalType: "groups";
   principalId: string;
-  role: ContainerPermissionRole;
+  role: ContainerPermissionRoleForUI;
 }
 
-export type ICreateContainerPermissionChange =
-  | ICreatePeopleContainerPermissionChange
-  | ICreateGroupContainerPermissionChange;
+export type IContainerPermissionCreateChange =
+  | IPeopleContainerPermissionCreateChange
+  | IGroupContainerPermissionCreateChange;
 
 /**
  * 已有权限记录改角色时提交给后端的差异项。
  */
-export interface IUpdateContainerPermissionChange {
+export interface IContainerPermissionUpdateChange {
   permissionId: string;
-  role: ContainerPermissionRole;
+  role: ContainerPermissionRoleForUI;
 }
 
 /**
  * 删除已有权限记录时提交给后端的差异项。
  */
-export interface IDeleteContainerPermissionChange {
+export interface IContainerPermissionRemoveChange {
   permissionId: string;
 }
 
 /**
  * 前端草稿相对原始快照计算出来的完整差异集。
  */
-export interface IContainerPermissionChangeSet {
-  create: ICreateContainerPermissionChange[];
-  update: IUpdateContainerPermissionChange[];
-  remove: IDeleteContainerPermissionChange[];
+export interface IContainerPermissionChangeSetFromUI {
+  create: IContainerPermissionCreateChange[];
+  update: IContainerPermissionUpdateChange[];
+  remove: IContainerPermissionRemoveChange[];
 }
 
-export type ContainerPermissionsErrorCode =
+export type ContainerPermissionsApiErrorCode =
   | "invalidRequest"
   | "unauthorized"
   | "forbidden"
@@ -136,7 +136,7 @@ export type ContainerPermissionsErrorCode =
  * 后端暴露给前端的稳定错误响应体。
  */
 export interface IContainerPermissionsApiErrorBody {
-  code: ContainerPermissionsErrorCode;
+  code: ContainerPermissionsApiErrorCode;
   message: string;
   retryAfterSeconds?: number;
   requestId?: string;

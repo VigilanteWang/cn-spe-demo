@@ -18,12 +18,12 @@ import {
   getGraphToken,
 } from "../auth";
 import type {
-  IContainerPermissionChangeSet,
-  IContainerPermissionsResponse,
+  IContainerPermissionChangeSetFromUI,
+  IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import {
   createGraphCreatePermissionBody,
-  mapGraphPermissionToEntry,
+  mapGraphPermissionToEntryOnUI,
 } from "./containerPermissionsCommonAdapters";
 import {
   getContainerPermissionsErrorStatus,
@@ -74,7 +74,7 @@ export const listContainerPermissions = async (req: Request, res: Response) => {
     );
 
     // 使用对象响应结构，便于后续无破坏性扩展更多字段。
-    const responseBody: IContainerPermissionsResponse = { entries };
+    const responseBody: IContainerPermissionsResponseFromApi = { entries };
     res.send(200, responseBody);
   } catch (error: unknown) {
     // 统一走错误映射，保证前端拿到稳定的错误码与消息结构。
@@ -141,7 +141,7 @@ export const applyContainerPermissions = async (
       graphClient,
       containerId,
     );
-    const responseBody: IContainerPermissionsResponse = { entries };
+    const responseBody: IContainerPermissionsResponseFromApi = { entries };
     res.send(200, responseBody);
   } catch (error: unknown) {
     // 所有异常统一转换为稳定 API 错误格式。
@@ -177,7 +177,7 @@ export const fetchContainerPermissionEntries = async (
     }
 
     // 每一项原始 Graph permission 都交给适配层翻译成共同契约 entry。
-    return permissionItems.map(mapGraphPermissionToEntry);
+    return permissionItems.map(mapGraphPermissionToEntryOnUI);
   } catch (error: unknown) {
     // 将原始 Graph/SDK 错误映射成项目内稳定错误类型。
     throw mapContainerPermissionsGraphError(error);
@@ -195,7 +195,7 @@ export const fetchContainerPermissionEntries = async (
 export const applyContainerPermissionChangeSet = async (
   graphClient: IGraphClient,
   containerId: string,
-  changeSet: IContainerPermissionChangeSet,
+  changeSet: IContainerPermissionChangeSetFromUI,
 ): Promise<void> => {
   try {
     // 先删再改再建，可减少同一 principal 残留权限导致的冲突与排查复杂度。

@@ -8,24 +8,21 @@
  * 这样 handler 后续就可以基于“已经过基本校验”的数据继续执行，而不用到处写字段判断。
  */
 import type {
-  ContainerPermissionRole,
-  IContainerPermissionChangeSet,
-  ICreateContainerPermissionChange,
-  IDeleteContainerPermissionChange,
-  IUpdateContainerPermissionChange,
+  ContainerPermissionRoleForUI,
+  IContainerPermissionChangeSetFromUI,
+  IContainerPermissionCreateChange,
+  IContainerPermissionRemoveChange,
+  IContainerPermissionUpdateChange,
   PermissionTabValue,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import {
-  readRecord,
-  readRequiredString,
-} from "./containerPermissionsReaders";
+import { readRecord, readRequiredString } from "./containerPermissionsReaders";
 
 /**
  * 读取并校验 Apply 请求体。
  */
 export const parseContainerPermissionChangeSet = (
   body: unknown,
-): IContainerPermissionChangeSet | null => {
+): IContainerPermissionChangeSetFromUI | null => {
   const bodyRecord = readRecord(body);
   const create = bodyRecord.create;
   const update = bodyRecord.update;
@@ -49,7 +46,7 @@ export const parseContainerPermissionChangeSet = (
   };
 };
 
-const mapCreateChange = (change: unknown): ICreateContainerPermissionChange => {
+const mapCreateChange = (change: unknown): IContainerPermissionCreateChange => {
   const record = readRecord(change);
   const principalType = readPrincipalType(record.principalType);
 
@@ -74,7 +71,7 @@ const mapCreateChange = (change: unknown): ICreateContainerPermissionChange => {
   };
 };
 
-const mapUpdateChange = (change: unknown): IUpdateContainerPermissionChange => {
+const mapUpdateChange = (change: unknown): IContainerPermissionUpdateChange => {
   const record = readRecord(change);
 
   return {
@@ -87,7 +84,7 @@ const mapUpdateChange = (change: unknown): IUpdateContainerPermissionChange => {
   };
 };
 
-const mapDeleteChange = (change: unknown): IDeleteContainerPermissionChange => {
+const mapDeleteChange = (change: unknown): IContainerPermissionRemoveChange => {
   const record = readRecord(change);
 
   return {
@@ -99,7 +96,7 @@ const mapDeleteChange = (change: unknown): IDeleteContainerPermissionChange => {
   };
 };
 
-const readUiRole = (value: unknown): ContainerPermissionRole => {
+const readUiRole = (value: unknown): ContainerPermissionRoleForUI => {
   if (
     value === "Reader" ||
     value === "Writer" ||

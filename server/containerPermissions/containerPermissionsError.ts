@@ -1,5 +1,5 @@
 import type {
-  ContainerPermissionsErrorCode,
+  ContainerPermissionsApiErrorCode,
   IContainerPermissionsApiErrorBody,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import { readRecord } from "./containerPermissionsReaders";
@@ -8,7 +8,7 @@ import { readRecord } from "./containerPermissionsReaders";
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
  */
 export class ContainerPermissionsGraphError extends Error {
-  readonly code: ContainerPermissionsErrorCode;
+  readonly code: ContainerPermissionsApiErrorCode;
 
   readonly retryAfterSeconds?: number;
 
@@ -17,7 +17,7 @@ export class ContainerPermissionsGraphError extends Error {
   readonly statusCode?: number;
 
   constructor(
-    code: ContainerPermissionsErrorCode,
+    code: ContainerPermissionsApiErrorCode,
     message: string,
     options?: {
       retryAfterSeconds?: number;
@@ -179,7 +179,8 @@ const readGraphStatusCode = (error: unknown): number | undefined => {
 const readRetryAfterSeconds = (error: unknown): number | undefined => {
   const headerValue =
     // 这里兼容大小写不同的 header 名称，避免被 SDK 或运行时的 header 形状细节绊住。
-    readHeaderValue(error, "Retry-After") ?? readHeaderValue(error, "retry-after");
+    readHeaderValue(error, "Retry-After") ??
+    readHeaderValue(error, "retry-after");
 
   if (headerValue) {
     const retryAfterSeconds = Number(headerValue);

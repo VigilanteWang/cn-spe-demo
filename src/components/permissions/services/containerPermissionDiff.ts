@@ -1,16 +1,16 @@
 import { FrontendValidationError } from "../../../common/errors.ts";
 import type {
-  IContainerPermissionChangeSet,
-  ICreateContainerPermissionChange,
-  IDeleteContainerPermissionChange,
-  IUpdateContainerPermissionChange,
+  IContainerPermissionChangeSetFromUI,
+  IContainerPermissionCreateChange,
+  IContainerPermissionRemoveChange,
+  IContainerPermissionUpdateChange,
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 import type {
   IContainerPermissionEntry,
   PermissionEntriesByTab,
 } from "../models/permissionModels";
 
-export { type IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
+export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
 
 /**
  * 容器权限草稿计算阶段的验证错误。
@@ -40,10 +40,10 @@ interface IRequiredEntryFieldOptions {
 export const computeContainerPermissionChanges = (
   originalEntriesByTab: PermissionEntriesByTab,
   draftEntriesByTab: PermissionEntriesByTab,
-): IContainerPermissionChangeSet => {
-  const create: ICreateContainerPermissionChange[] = [];
-  const update: IUpdateContainerPermissionChange[] = [];
-  const remove: IDeleteContainerPermissionChange[] = [];
+): IContainerPermissionChangeSetFromUI => {
+  const create: IContainerPermissionCreateChange[] = [];
+  const update: IContainerPermissionUpdateChange[] = [];
+  const remove: IContainerPermissionRemoveChange[] = [];
 
   for (const tab of ["people", "groups"] as const) {
     const originalEntries = originalEntriesByTab[tab];
@@ -107,7 +107,7 @@ export const computeContainerPermissionChanges = (
  */
 const createContainerPermissionChangeFromEntry = (
   entry: IContainerPermissionEntry,
-): ICreateContainerPermissionChange => {
+): IContainerPermissionCreateChange => {
   if (entry.principalType === "people") {
     // people 分支必须带 userPrincipalName，后端创建接口才能用。
     return {

@@ -9,8 +9,8 @@
  * 这样 handler 不需要理解 Graph 字段形状，前端也不需要直接依赖 Graph 返回结构。
  */
 import type {
-  IContainerPermissionEntry,
-  ICreateContainerPermissionChange,
+  IContainerPermissionEntryForUI,
+  IContainerPermissionCreateChange,
   PermissionTabValue,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import {
@@ -26,11 +26,11 @@ import {
 } from "./containerPermissionsReaders";
 
 /**
- * 把单条 Graph permission 对象映射成前后端共用的 access list 行模型。
+ * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntry。
  */
-export const mapGraphPermissionToEntry = (
+export const mapGraphPermissionToEntryOnUI = (
   permission: unknown,
-): IContainerPermissionEntry => {
+): IContainerPermissionEntryForUI => {
   const permissionRecord = readRecord(permission);
   // Graph permission 的 id 是后续更新、删除这条权限时最稳定的锚点。
   const permissionId = readRequiredString(permissionRecord.id, "permission id");
@@ -130,7 +130,7 @@ export const createFallbackPrincipalId = (
  * 把新增权限差异转换成 Graph create permission 请求体。
  */
 export const createGraphCreatePermissionBody = (
-  createChange: ICreateContainerPermissionChange,
+  createChange: IContainerPermissionCreateChange,
 ): {
   roles: string[];
   grantedToV2: {

@@ -29,9 +29,7 @@
   "value": [
     {
       "id": "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
-      "roles": [
-        "writer"
-      ],
+      "roles": ["writer"],
       "grantedToV2": {
         "user": {
           "displayName": "Alex Wilber",
@@ -42,9 +40,7 @@
     },
     {
       "id": "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
-      "roles": [
-        "writer"
-      ],
+      "roles": ["writer"],
       "grantedToV2": {
         "group": {
           "displayName": "U.S. Sales Members",
@@ -72,9 +68,12 @@
 
 ```text
 前端本地 UI 模型
-  -> 共同契约 common/contracts/containerPermissionCommonContracts.ts
-  -> 后端内部模型 server/containerPermissions/*
-  -> Microsoft Graph 原始对象
+  ↓
+共同契约 common/contracts/containerPermissionCommonContracts.ts
+  ↓
+后端内部模型 server/containerPermissions/*
+  ↓
+Microsoft Graph 原始对象
 ```
 
 结合上面的 JSON，可以把链路想得更具体一些：
@@ -214,25 +213,27 @@ const responseBody: IContainerPermissionsResponse = {
   entries: [
     {
       id: "permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
-      permissionId: "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
+      permissionId:
+        "X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
       principalId:
         "people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20",
       principalUserPrincipalName: "alexw@<tenantname>.onmicrosoft.com",
       principalName: "Alex Wilber",
       principalType: "people",
       description: "AlexW@<tenantname>.onmicrosoft.com",
-      role: "Writer"
+      role: "Writer",
     },
     {
       id: "permission:X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
-      permissionId: "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
+      permissionId:
+        "X2M6MG8uY3xmZWRlcmF0ZWRkaXJlY3RvcnljbGFpbXByb3ZpZGVyfDdlYmE1MzQzLTJmZDktNDg4NS1hMjk0LThhZjNhNTk2NzdiNQ",
       principalId: "7eba5343-2fd9-4885-a294-8af3a59677b5",
       principalName: "U.S. Sales Members",
       principalType: "groups",
       description: "U.S.Sales@<tenantname>.onmicrosoft.com",
-      role: "Writer"
-    }
-  ]
+      role: "Writer",
+    },
+  ],
 };
 ```
 
@@ -296,9 +297,9 @@ if (permission.grantedToV2?.group) { ... }
 而现在后端只做一次统一，前端永远读：
 
 ```ts
-entry.principalType
-entry.principalName
-entry.description
+entry.principalType;
+entry.principalName;
+entry.description;
 ```
 
 ### 2. `people` 不一定有稳定 `id`
@@ -319,13 +320,13 @@ entry.description
 所以后端才会生成：
 
 ```ts
-createFallbackPrincipalId("people", permissionId)
+createFallbackPrincipalId("people", permissionId);
 ```
 
 也就是：
 
 ```ts
-"people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20"
+"people:permission:X2k6MCMuZnxtZW1iZXJzaGlwfGFsZXh3QDNjdHNyMi5vbm1pY3Jvc29mdC5jb20";
 ```
 
 ### 3. Graph role 和 UI role 不是一套命名
@@ -339,7 +340,7 @@ createFallbackPrincipalId("people", permissionId)
 但前端共同契约里是：
 
 ```ts
-role: "Writer"
+role: "Writer";
 ```
 
 如果没有映射层，前后端就会在大小写和角色枚举上反复纠缠。
@@ -433,7 +434,7 @@ const responseRecord = readRecord(graphResponse);
 结合上面的 JSON：
 
 - 输入：整份 Graph 返回对象
-- 输出：可以安全做 `responseRecord.value` 的对象
+- 输出：可以安全执行 `responseRecord.<key>` 的对象
 
 ### `readStringArray(...)`
 
@@ -452,7 +453,7 @@ const roles = readStringArray(permissionRecord.roles);
 输出就是：
 
 ```ts
-["writer"]
+["writer"];
 ```
 
 如果 Graph 以后异常返回了别的形状，例如 `null` 或混杂数组，这里至少不会让主流程直接炸掉。
@@ -493,12 +494,11 @@ const userPrincipalName = readOptionalString(record.userPrincipalName);
 
 ---
 
-## 9. `parse*` 模式和这份 Graph JSON的关系
+## 9. `parse*` 函数的作用
 
 `parseContainerPermissionChangeSet(...)` 在 [`containerPermissionsRequestParser.ts`](../../server/containerPermissions/containerPermissionsRequestParser.ts) 里。
 
-它处理的不是 Graph GET 响应，而是前端提交的 Apply 请求体。  
-但它和上面的 Graph 示例依然是连着的，因为前端的更新和删除，通常都是基于刚才那批 `entries` 算出来的。
+它处理的不是 Graph GET 响应，而是前端提交的 Apply 请求体。
 
 例如，上面 `group` 那条 Graph 权限被映射成：
 
@@ -718,7 +718,7 @@ server/containerPermissions/containerPermissionsError.ts
 比如读到：
 
 ```ts
-normalizeGraphPermissionIdentity(grantedToV2.user)
+normalizeGraphPermissionIdentity(grantedToV2.user);
 ```
 
 脑子里就直接代入：

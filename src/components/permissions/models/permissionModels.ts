@@ -1,11 +1,11 @@
 import type {
-  IContainerPermissionEntry,
+  IContainerPermissionEntryForUI,
   PermissionTabValue,
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 
 export type {
-  ContainerPermissionRole,
-  IContainerPermissionEntry,
+  ContainerPermissionRoleForUI as ContainerPermissionRole,
+  IContainerPermissionEntryForUI as IContainerPermissionEntry,
   PermissionTabValue,
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 
@@ -41,5 +41,5 @@ export interface IPermissionPrincipalCandidate {
  */
 export type PermissionEntriesByTab = Record<
   PermissionTabValue,
-  IContainerPermissionEntry[]
+  IContainerPermissionEntryForUI[]
 >;
