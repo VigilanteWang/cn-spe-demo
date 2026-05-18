@@ -40,7 +40,7 @@
 │  createContainer.ts         │    │  /drives/{id}/items/...      │
 │  listContainers.ts          │    │                              │
 │  deleteItems (index.ts)     │    └──────────────────────────────┘
-│  downloadArchive.ts         │                ↑
+│  download/                  │                ↑
 │                             │                │
 │  config.ts → 环境变量管理    │    ┌──────────────────────────────┐
 └─────────────────────────────┘    │    Microsoft Entra ID        │
@@ -59,7 +59,8 @@ spe-demo/
 │   ├── config.ts              #   环境变量配置管理
 │   ├── createContainer.ts     #   创建容器 API
 │   ├── listContainers.ts      #   列出容器 API
-│   ├── downloadArchive.ts     #   ZIP 归档下载任务
+│   ├── download/              #   ZIP 下载准备任务模块
+│   ├── downloadHandlers.ts    #   下载任务 HTTP handler
 │   ├── common/scopes.ts       #   SPE 权限常量
 │   ├── tsconfig.json          #   后端 TypeScript 配置
 │   └── README.md              #   后端详细文档（含概念教程）

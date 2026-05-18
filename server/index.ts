@@ -8,19 +8,20 @@
  * 1. 启动 Restify HTTP 服务器，让浏览器或其他客户端可以通过 HTTP 调用后端能力
  * 2. 注册 API 路由，把具体 URL 映射到对应的业务处理函数
  * 3. 配置 CORS (跨域资源共享)，允许前端开发服务器从不同端口访问本地后端
- * 4. 在路由这一层做统一的异常兜底，避免未捕获错误直接导致请求挂起
+ * 4. 在路由这一层通过 `withErrorHandling()` 做统一异常响应，避免未捕获错误直接导致请求挂起
  * 5. 串联认证、Microsoft Graph 调用、归档下载等多个模块
  *
  * 服务器运行在 http://localhost:3001
- * 这个文件暴露的 API 主要分为三类：
+ * 这个文件暴露的 API 主要分为四类：
  * - 容器管理：列出容器、创建容器
+ * - 容器权限：读取和应用容器级权限
  * - 文件项管理：批量删除指定项目
- * - 归档下载：启动归档准备任务、查询进度、返回下载清单（manifest）
+ * - 下载准备：启动后台任务、查询准备进度、返回下载清单（manifest）
  *
  * 对初级开发者来说，阅读顺序建议是：
  * 1. 先看中间件配置，理解每个请求进入服务器后的公共处理
  * 2. 再看各个路由注释，理解请求参数、调用链和响应结果
- * 3. 最后跳转到 listContainers / createContainer / downloadArchive / auth 等模块看具体业务实现
+ * 3. 最后跳转到 listContainers / createContainer / download / auth 等模块看具体业务实现
  */
 
 import * as restify from "restify"; // HTTP 服务框架
@@ -34,10 +35,10 @@ import {
 } from "./containerPermissions";
 import { deleteItems } from "./deleteItems";
 import {
-  getDownloadArchiveManifestRequest,
-  getDownloadArchiveProgressRequest,
-  startDownloadArchiveRequest,
-} from "./downloadArchiveHandlers";
+  getDownloadManifestRequest,
+  getDownloadProgressRequest,
+  startDownloadRequest,
+} from "./downloadHandlers";
 
 /**
  * Handler 风格说明（重要）
@@ -114,7 +115,7 @@ server.pre((req, res, next) => {
  * 而是把真正的工作委托给 listContainers 模块，当前文件只负责：
  * 1. 接收 HTTP 请求
  * 2. 调用业务函数
- * 3. 如果业务函数抛错，则统一转换成 500 响应
+ * 3. 如果业务函数抛错，则交给统一错误层转换成稳定的 API 错误响应
  * 4. 在 async 处理器中不要调用 `next()`；请使用 `async (req, res)` 或非 async 的 `function(req, res, next)` 两类风格之一
  *
  * 这种分层方式的好处是：
@@ -132,7 +133,7 @@ server.get("/api/listContainers", withErrorHandling(listContainers));
  * 和 listContainers 一样，当前路由只负责 HTTP 层面的编排：
  * 1. 从客户端接收创建请求
  * 2. 调用 createContainer 模块执行业务逻辑
- * 3. 如果底层实现抛错，则返回 500，避免请求无响应
+ * 3. 如果底层实现抛错，则交给统一错误层输出稳定响应，避免请求无响应
  * 4. 在 async 处理器中不要调用 `next()`；请使用 `async (req, res)` 或非 async 的 `function(req, res, next)` 两类风格之一
  *
  * 对初级开发者来说，可以把这里理解为 controller，
@@ -161,6 +162,10 @@ server.get(
  *
  * 这个接口接收前端已经拆好的新增 / 更新 / 删除差异，
  * 再由服务端顺序写入 Graph，并在成功后返回最新权限列表。
+ *
+ * 这里继续把权限写入编排留在服务端，原因是：
+ * 1. 前端只负责表达“想改成什么”
+ * 2. 服务端统一负责 OBO、Graph 写入顺序、错误映射和最终结果收敛
  */
 server.post(
   "/api/containerPermissions/:containerId/apply",
@@ -192,9 +197,9 @@ server.post("/api/deleteItems", withErrorHandling(deleteItems));
 
 // ── 归档下载：启动任务 ──────────────────────────────────────────────────────
 /**
- * POST /api/downloadArchive/start
+ * POST /api/download/start
  *
- * 这个接口用于“发起一个后台归档准备任务”，而不是直接把 ZIP 文件同步返回给浏览器。
+ * 这个接口用于“发起一个后台下载准备任务”，而不是直接把 ZIP 文件同步返回给浏览器。
  * 之所以分成异步任务，是因为当用户选择的文件较多时，目录展开与链接解析可能持续数秒甚至更久，
  * 如果在一个 HTTP 请求里同步完成，体验会差，也更容易超时。
  *
@@ -204,39 +209,52 @@ server.post("/api/deleteItems", withErrorHandling(deleteItems));
  * 返回的 jobId 是后续整个下载流程的关键：
  * - 前端用它轮询准备进度
  * - 准备完成后通过 manifest 接口获取下载清单
+ *
+ * 当前实现里真正的 ZIP 压缩不在后端完成：
+ * 1. 后端只负责展开目录、校验限制、解析下载地址、维护任务状态
+ * 2. 前端拿到 manifest 后再逐项下载并流式压缩成 ZIP
  */
 server.post(
-  "/api/downloadArchive/start",
-  withErrorHandling(startDownloadArchiveRequest),
+  "/api/download/start",
+  withErrorHandling(startDownloadRequest),
 );
 
 // ── 归档下载：查询进度 ─────────────────────────────────────────────────────
 /**
- * GET /api/downloadArchive/progress/:jobId
+ * GET /api/download/progress/:jobId
  *
- * 这个接口用于查询某个归档任务当前进展。
+ * 这个接口用于查询某个下载准备任务当前进展。
  * 前端通常会在用户点击“下载选中项”后，周期性轮询这个接口，
  * 从而更新页面上的进度条、状态文案或 loading 提示。
  *
- * 响应: JobProgress | 404
+ * 响应: JobProgress
  *
- * 如果 jobId 找不到，通常说明：
+ * 如果请求失败，常见原因包括：
  * - jobId 本身无效
  * - 任务已经过期并从内存中清理掉
+ * - 当前用户不是任务创建者
  */
 server.get(
-  "/api/downloadArchive/progress/:jobId",
-  withErrorHandling(getDownloadArchiveProgressRequest),
+  "/api/download/progress/:jobId",
+  withErrorHandling(getDownloadProgressRequest),
 );
 
 // ── 归档下载：获取文件清单 ──────────────────────────────────────────────────
 /**
- * GET /api/downloadArchive/manifest/:jobId
+ * GET /api/download/manifest/:jobId
  *
  * 这个接口用于在任务准备完成后返回清单（manifest）。
  * 后端会继续校验任务所有权，确保只有创建任务的用户能读取清单。
+ *
+ * 这里不会返回 ZIP 二进制，而是返回一个最小清单：
+ * - 每个文件在 ZIP 内的相对路径
+ * - 文件大小和 MIME 类型
+ * - 前端可直接下载的 URL
+ *
+ * 如果任务还没到 `ready`，download 模块会抛出 `409 conflict`，
+ * 提示前端继续轮询而不是提前开始下载。
  */
 server.get(
-  "/api/downloadArchive/manifest/:jobId",
-  withErrorHandling(getDownloadArchiveManifestRequest),
+  "/api/download/manifest/:jobId",
+  withErrorHandling(getDownloadManifestRequest),
 );

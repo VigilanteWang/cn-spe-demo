@@ -63,8 +63,8 @@ import { Providers } from "@microsoft/mgt-element";
  *
  * 后端 API 调用（通过 backendApi 模块）：
  * - deleteItems()            → 批量删除文件
- * - startDownloadArchive()   → 启动 ZIP 归档任务
- * - getArchivePreparationProgress() → 轮询归档准备进度
+ * - startDownload()          → 启动 ZIP 下载准备任务
+ * - getDownloadProgress()    → 轮询归档准备进度
  * - getDownloadManifest()    → 获取归档清单
  *
  * 前端归档模块调用（通过 archiveDownloader 模块）：

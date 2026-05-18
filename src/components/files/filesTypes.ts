@@ -1,6 +1,6 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IArchiveClientProgress, IContainer } from "../../common/types";
-import type { IJobProgress } from "../../services/downloadArchiveApi";
+import type { IJobProgress } from "../../services/downloadApi";
 
 /**
  * Files 入口组件属性。

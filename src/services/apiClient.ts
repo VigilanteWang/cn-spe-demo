@@ -5,7 +5,7 @@
  * 1. 获取后端 API 专用 Access Token（通过 MGT globalProvider）
  * 2. 封装带 Bearer Token 的授权请求，统一注入 Authorization header
  *
- * 所有后端服务模块（backendApi、containerPermissionApi、downloadArchiveApi）
+ * 所有后端服务模块（backendApi、containerPermissionApi、downloadApi）
  * 都应从此处 import，不要各自重复实现 token 获取逻辑。
  */
 

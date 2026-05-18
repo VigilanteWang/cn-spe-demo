@@ -3,12 +3,12 @@ import { SelectionItemId } from "@fluentui/react-components";
 import { readErrorMessage } from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
-  ArchiveSaveTargetSelectionCancelledError,
-  startDownloadArchive,
-  getArchivePreparationProgress,
+  DownloadSaveTargetSelectionCancelledError,
   getDownloadManifest,
-  selectArchiveSaveTarget,
-} from "../../../services/downloadArchiveApi";
+  getDownloadProgress,
+  selectDownloadSaveTarget,
+  startDownload,
+} from "../../../services/downloadApi";
 import { downloadArchiveFromManifest } from "../../../services/archiveDownloader";
 import { IDownloadProgress } from "../filesTypes";
 import {
@@ -31,6 +31,7 @@ interface IUseFilesArchiveDownloadOptions {
 
 /**
  * 管理 ZIP 归档下载逻辑。
+ *
  * @param options Hook 初始化参数。
  * @returns 下载状态、处理函数和文案计算结果。
  */
@@ -83,17 +84,19 @@ export const useFilesArchiveDownload = ({
    * 关闭下载状态条。
    */
   const onDismissClick = useCallback(() => {
+    // 关闭状态条只影响 UI 展示，不应额外触发一次下载中止。
     downloadAbortControllerRef.current = null;
     setDownloadProgress(createDownloadProgressState());
   }, []);
 
   /**
    * 启动 ZIP 下载任务。
+   *
    * @param itemIds 选中的文件 ID 列表。
    * @param saveTarget 保存目标。
    *
    * 完整流程：
-   * 1. 调用 spEmbedded.startDownloadArchive() 启动后端准备任务
+   * 1. 调用 downloadApi.startDownload() 启动后端准备任务
    * 2. 轮询后端进度直到状态 ready
    * 3. 获取 manifest 后在前端边下载边压缩
    * 4. 压缩完成后自动触发浏览器下载
@@ -132,11 +135,11 @@ export const useFilesArchiveDownload = ({
       );
 
       // ── 第四步：调用后端接口，启动归档任务，获取任务 ID ─────────────────────
-      // 后端会异步地将所选文件打包成 ZIP manifest（文件清单），这里只是“提交任务”，
+      // 后端会异步地将所选文件准备成 manifest（文件清单），这里只是“提交任务”，
       // 并不等待打包完成，打包结果需要后续轮询获取。
       let jobId: string;
       try {
-        jobId = await startDownloadArchive(containerId, itemIds, {
+        jobId = await startDownload(containerId, itemIds, {
           requestAbortSignal: downloadAbortSignal,
         });
       } catch (error: unknown) {
@@ -160,8 +163,8 @@ export const useFilesArchiveDownload = ({
       }
 
       // ── 第五步：启动轮询，每 800ms 查询一次后端任务进度 ─────────────────────
-      // 因为后端打包是异步的，无法立刻拿到结果，所以用 setInterval 定期询问：
-      // “你打包好了吗？当前打包了多少个文件？”
+      // 因为后端下载准备是异步的，无法立刻拿到结果，所以用 setInterval 定期询问：
+      // “你准备好 manifest 了吗？当前已经处理到哪个文件？”
       // isPolling 是一个本地互斥锁，防止上一次请求还未返回时，新的轮询又开始请求，
       // 造成多个并发请求同时修改 UI 状态。
       let isPolling = false;
@@ -174,8 +177,8 @@ export const useFilesArchiveDownload = ({
 
         try {
           isPolling = true;
-          // 查询后端当前的打包进度（已处理文件数、总文件数、状态等）。
-          const progress = await getArchivePreparationProgress(jobId, {
+          // 查询后端当前的准备进度（已处理文件数、总文件数、状态等）。
+          const progress = await getDownloadProgress(jobId, {
             requestAbortSignal: downloadAbortSignal,
           });
 
@@ -192,9 +195,9 @@ export const useFilesArchiveDownload = ({
             backendProgress: progress,
           }));
 
-          // ── 分支 A：后端打包完成（status === "ready"）──────────────────────
+          // ── 分支 A：后端准备完成（status === "ready"）──────────────────────
           if (progress.status === "ready") {
-            // 打包已完成，不再需要轮询，立刻清除定时器。
+            // manifest 已准备完成，不再需要轮询，立刻清除定时器。
             clearInterval(downloadPollRef.current!);
             downloadPollRef.current = null;
 
@@ -276,9 +279,9 @@ export const useFilesArchiveDownload = ({
               downloadAbortControllerRef.current = null;
             }
 
-            // ── 分支 B：后端打包失败（status === "failed"）─────────────────────
+            // ── 分支 B：后端准备失败（status === "failed"）─────────────────────
           } else if (progress.status === "failed") {
-            // 后端打包出错，停止轮询并将错误信息展示给用户。
+            // 后端准备出错，停止轮询并将错误信息展示给用户。
             clearInterval(downloadPollRef.current!);
             downloadPollRef.current = null;
             setDownloadProgress(
@@ -334,6 +337,7 @@ export const useFilesArchiveDownload = ({
 
   /**
    * 工具栏下载按钮处理。
+   *
    * - 单个非文件夹文件：使用直链下载（@microsoft.graph.downloadUrl）。
    * - 多个文件或包含文件夹：通过后端 ZIP 归档任务下载。
    */
@@ -362,14 +366,15 @@ export const useFilesArchiveDownload = ({
        * 它规定某些敏感操作（如弹出窗口、自动播放音频、启动下载等）必须由用户的直接交互触发。
        * 在用户点击手势上下文中先申请保存目标，避免后续异步流程触发手势限制。
        */
-      const saveTarget = await selectArchiveSaveTarget(defaultFilename);
+      const saveTarget = await selectDownloadSaveTarget(defaultFilename);
       await startZipDownload(selectedIds, saveTarget);
     } catch (error: unknown) {
+      // 保存对话框失败和用户主动取消都在这里统一收口成界面可展示的错误文案。
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
           errorMessage:
-            error instanceof ArchiveSaveTargetSelectionCancelledError
+            error instanceof DownloadSaveTargetSelectionCancelledError
               ? "Download cancelled."
               : `Failed to open save dialog: ${readErrorMessage(
                   error,
@@ -386,6 +391,7 @@ export const useFilesArchiveDownload = ({
         clearInterval(downloadPollRef.current);
       }
 
+      // 组件卸载时主动清理下载资源，避免后台轮询或流式写入继续运行。
       downloadSessionAbortRef.current?.();
       downloadAbortControllerRef.current?.abort();
     };

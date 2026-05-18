@@ -1,29 +1,22 @@
 import { Request, Response } from "restify";
 import { requireContainerManageRequest } from "./auth";
-import {
-  getJobManifest,
-  getJobProgress,
-  startDownloadJob,
-} from "./downloadArchive";
-import {
-  BackendBusinessError,
-  BackendValidationError,
-} from "./common/errors";
+import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
+import { BackendValidationError } from "./common/errors";
 
-interface IStartDownloadArchiveRequestBody {
+interface IStartDownloadRequestBody {
   containerId?: unknown;
   itemIds?: unknown;
 }
 
 /**
  * 启动归档准备任务。
+ *
+ * @param req Restify 请求对象。
+ * @param res Restify 响应对象。
  */
-export const startDownloadArchiveRequest = async (
-  req: Request,
-  res: Response,
-) => {
+export const startDownloadRequest = async (req: Request, res: Response) => {
   const authResult = await requireContainerManageRequest(req);
-  const body = (req.body ?? {}) as IStartDownloadArchiveRequestBody;
+  const body = (req.body ?? {}) as IStartDownloadRequestBody;
   const containerId = readNonEmptyString(body.containerId);
   const itemIds = readStringArray(body.itemIds);
 
@@ -33,6 +26,7 @@ export const startDownloadArchiveRequest = async (
     );
   }
 
+  // 任务创建后只返回 jobId，前端通过轮询继续读取准备进度和最终 manifest。
   const jobId = await startDownloadJob(
     containerId,
     itemIds,
@@ -44,8 +38,11 @@ export const startDownloadArchiveRequest = async (
 
 /**
  * 读取归档任务进度。
+ *
+ * @param req Restify 请求对象。
+ * @param res Restify 响应对象。
  */
-export const getDownloadArchiveProgressRequest = async (
+export const getDownloadProgressRequest = async (
   req: Request,
   res: Response,
 ) => {
@@ -57,25 +54,17 @@ export const getDownloadArchiveProgressRequest = async (
   }
 
   const requesterOid = authResult.claims.oid ?? "";
-  const progress = getJobProgress(jobId, requesterOid);
-
-  if (!progress) {
-    throw new BackendBusinessError({
-      name: "ArchiveJobNotFoundError",
-      code: "notFound",
-      category: "business",
-      message: "Job not found, expired, or access denied.",
-      statusCode: 404,
-    });
-  }
-
-  res.send(200, progress);
+  // 所有权校验已经下沉到 download 模块，这里只负责把结果直接返回给 HTTP 层。
+  res.send(200, getJobProgress(jobId, requesterOid));
 };
 
 /**
  * 读取归档任务清单。
+ *
+ * @param req Restify 请求对象。
+ * @param res Restify 响应对象。
  */
-export const getDownloadArchiveManifestRequest = async (
+export const getDownloadManifestRequest = async (
   req: Request,
   res: Response,
 ) => {
@@ -87,46 +76,24 @@ export const getDownloadArchiveManifestRequest = async (
   }
 
   const requesterOid = authResult.claims.oid ?? "";
-  const progress = getJobProgress(jobId, requesterOid);
-
-  if (!progress) {
-    throw new BackendBusinessError({
-      name: "ArchiveJobNotFoundError",
-      code: "notFound",
-      category: "business",
-      message: "Job not found, expired, or access denied.",
-      statusCode: 404,
-    });
-  }
-
-  if (progress.status !== "ready") {
-    throw new BackendBusinessError({
-      name: "ArchiveManifestNotReadyError",
-      code: "conflict",
-      category: "business",
-      message: `Archive manifest not ready yet. Status: ${progress.status}`,
-      statusCode: 409,
-    });
-  }
-
-  const manifest = getJobManifest(jobId, requesterOid);
-
-  if (!manifest) {
-    throw new BackendBusinessError({
-      name: "ArchiveManifestNotFoundError",
-      code: "notFound",
-      category: "business",
-      message: "Archive manifest not found.",
-      statusCode: 404,
-    });
-  }
-
-  res.send(200, manifest);
+  res.send(200, getJobManifest(jobId, requesterOid));
 };
 
+/**
+ * 把未知值读取成去首尾空白后的非空字符串。
+ *
+ * @param value 待解析的未知输入。
+ * @returns 合法字符串；否则返回 undefined。
+ */
 const readNonEmptyString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+/**
+ * 从未知值中筛出非空字符串数组。
+ *
+ * @param value 待解析的未知输入。
+ * @returns 过滤后的字符串数组。
+ */
 const readStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
