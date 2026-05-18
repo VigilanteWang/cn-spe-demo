@@ -27,7 +27,7 @@ export class ContainerPermissionValidationError extends FrontendValidationError 
   }
 }
 
-interface IRequiredEntryFieldOptions {
+interface IRequiredFieldErrorOptions {
   code: string;
   operation: string;
   fieldName: keyof IContainerPermissionEntry;
@@ -138,15 +138,15 @@ const createContainerPermissionChangeFromEntry = (
  */
 const requireEntryField = (
   value: string | undefined,
-  options: IRequiredEntryFieldOptions,
+  requiredFieldErrorOptions: IRequiredFieldErrorOptions,
 ): string => {
   if (typeof value === "string" && value) {
     return value;
   }
 
   throw new ContainerPermissionValidationError(
-    options.code,
-    `Cannot ${options.operation}: missing ${String(options.fieldName)}`,
-    options.entryId,
+    requiredFieldErrorOptions.code,
+    `Cannot ${requiredFieldErrorOptions.operation}: missing ${String(requiredFieldErrorOptions.fieldName)}`,
+    requiredFieldErrorOptions.entryId,
   );
 };
