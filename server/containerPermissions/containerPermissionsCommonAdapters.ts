@@ -17,10 +17,10 @@ import {
   mapGraphContainerPermissionRoleToUi,
   mapUiContainerPermissionRoleToGraph,
 } from "./containerPermissionRoleMapper";
-import type { IGraphPermissionIdentity } from "./containerPermissionsInternalContracts";
+import type { IGraphIdentityInPermission } from "./containerPermissionsInternalContracts";
 import {
   readOptionalString,
-  readRecord,
+  readGraphToRecord,
   readRequiredString,
   readStringArray,
 } from "./containerPermissionsReaders";
@@ -31,11 +31,11 @@ import {
 export const mapGraphPermissionToEntryOnUI = (
   permission: unknown,
 ): IContainerPermissionEntryForUI => {
-  const permissionRecord = readRecord(permission);
+  const permissionRecord = readGraphToRecord(permission);
   // Graph permission 的 id 是后续更新、删除这条权限时最稳定的锚点。
   const permissionId = readRequiredString(permissionRecord.id, "permission id");
   const roles = readStringArray(permissionRecord.roles);
-  const grantedToV2 = readRecord(permissionRecord.grantedToV2);
+  const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
 
   // Graph 可能把同一条权限挂在 user、siteUser、group 或 siteGroup 上。
   // 这里先按优先级收口成统一 identity，后面的映射逻辑就不必关心原始分支细节。
@@ -82,12 +82,12 @@ export const mapGraphPermissionToEntryOnUI = (
  */
 export const normalizeGraphPermissionIdentity = (
   identity: unknown,
-): IGraphPermissionIdentity | null => {
+): IGraphIdentityInPermission | null => {
   if (!identity) {
     return null;
   }
 
-  const record = readRecord(identity);
+  const record = readGraphToRecord(identity);
   const graphId = readOptionalString(record.id);
   const userPrincipalName = readOptionalString(record.userPrincipalName);
   // Graph 在不同 identity 形状下，可用的人类可读字段并不完全一致。
@@ -129,7 +129,7 @@ export const createFallbackPrincipalId = (
 /**
  * 把新增权限差异转换成 Graph create permission 请求体。
  */
-export const createGraphCreatePermissionBody = (
+export const newGraphCreatePermissionBody = (
   createChange: IContainerPermissionCreateChange,
 ): {
   roles: string[];

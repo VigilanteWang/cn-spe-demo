@@ -1,10 +1,10 @@
 /**
- * 把 unknown 推断成“可安全按 key 读取的对象Record”。
+ * 读取 Graph 对象为 Record。
  *
  * 这是边界读取层最基础的一步：先保证“能不能当对象看”，
  * 再决定后面是否去取字符串、数组或嵌套字段。
  */
-export const readRecord = (value: unknown): Record<string, unknown> => {
+export const readGraphToRecord = (value: unknown): Record<string, unknown> => {
   if (typeof value === "object" && value !== null) {
     return value as Record<string, unknown>;
   }

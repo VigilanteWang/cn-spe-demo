@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { mapGraphPermissionToEntry } from "./containerPermissionsCommonAdapters";
+import { mapGraphPermissionToEntryOnUI } from "./containerPermissionsCommonAdapters";
 
-describe("mapGraphPermissionToEntry", () => {
+describe("mapGraphPermissionToEntryOnUI", () => {
   it.each([
     [
       "user",
@@ -62,7 +62,7 @@ describe("mapGraphPermissionToEntry", () => {
       "groups",
     ],
   ])("should map %s identities into common entries", (_kind, permission, expectedTab) => {
-    const entry = mapGraphPermissionToEntry(permission);
+    const entry = mapGraphPermissionToEntryOnUI(permission);
 
     expect(entry.principalType).toBe(expectedTab);
     expect(entry.permissionId).toBe(permission.id);
@@ -70,7 +70,7 @@ describe("mapGraphPermissionToEntry", () => {
   });
 
   it("should generate fallback principal ids when people identities lack graph id", () => {
-    const entry = mapGraphPermissionToEntry({
+    const entry = mapGraphPermissionToEntryOnUI({
       id: "perm-no-user-id",
       roles: ["reader"],
       grantedToV2: {
@@ -86,7 +86,7 @@ describe("mapGraphPermissionToEntry", () => {
   });
 
   it("should fold principalOwner into Owner", () => {
-    const entry = mapGraphPermissionToEntry({
+    const entry = mapGraphPermissionToEntryOnUI({
       id: "perm-principal-owner",
       roles: ["principalOwner"],
       grantedToV2: {
@@ -102,11 +102,11 @@ describe("mapGraphPermissionToEntry", () => {
 
   it("should throw when grantedToV2 identity is missing", () => {
     expect(() =>
-      mapGraphPermissionToEntry({
+      mapGraphPermissionToEntryOnUI({
         id: "perm-missing-identity",
         roles: ["reader"],
         grantedToV2: {},
       }),
-    ).toThrow("missing grantedToV2 identity");
+    ).toThrow("is missing grantedToV2 identity");
   });
 });

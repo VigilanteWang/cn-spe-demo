@@ -2,12 +2,12 @@ import type {
   ContainerPermissionsApiErrorCode,
   IContainerPermissionsApiErrorBody,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import { readRecord } from "./containerPermissionsReaders";
+import { readGraphToRecord } from "./containerPermissionsReaders";
 
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
  */
-export class ContainerPermissionsGraphError extends Error {
+export class ContainerPermissionsApiError extends Error {
   readonly code: ContainerPermissionsApiErrorCode;
 
   readonly retryAfterSeconds?: number;
@@ -26,7 +26,7 @@ export class ContainerPermissionsGraphError extends Error {
     },
   ) {
     super(message);
-    this.name = "ContainerPermissionsGraphError";
+    this.name = "ContainerPermissionsApiError";
     this.code = code;
     this.retryAfterSeconds = options?.retryAfterSeconds;
     this.requestId = options?.requestId;
@@ -39,8 +39,8 @@ export class ContainerPermissionsGraphError extends Error {
  */
 export const mapContainerPermissionsGraphError = (
   error: unknown,
-): ContainerPermissionsGraphError => {
-  if (error instanceof ContainerPermissionsGraphError) {
+): ContainerPermissionsApiError => {
+  if (error instanceof ContainerPermissionsApiError) {
     return error;
   }
 
@@ -50,7 +50,7 @@ export const mapContainerPermissionsGraphError = (
   const message = readGraphErrorMessage(error);
 
   if (statusCode === 400) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "invalidRequest",
       `Container permission request is invalid: ${message}`,
       {
@@ -61,7 +61,7 @@ export const mapContainerPermissionsGraphError = (
   }
 
   if (statusCode === 401) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "unauthorized",
       "Container permission authentication expired. Please sign in again.",
       {
@@ -72,7 +72,7 @@ export const mapContainerPermissionsGraphError = (
   }
 
   if (statusCode === 403) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "forbidden",
       "The current account does not have permission to manage this container.",
       {
@@ -83,7 +83,7 @@ export const mapContainerPermissionsGraphError = (
   }
 
   if (statusCode === 404) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "notFound",
       "The target container or permission record was not found.",
       {
@@ -94,7 +94,7 @@ export const mapContainerPermissionsGraphError = (
   }
 
   if (statusCode === 429) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "throttled",
       "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
       {
@@ -106,7 +106,7 @@ export const mapContainerPermissionsGraphError = (
   }
 
   if (statusCode === 503 || statusCode === 504) {
-    return new ContainerPermissionsGraphError(
+    return new ContainerPermissionsApiError(
       "serviceUnavailable",
       `Container permission request still failed after SDK retries: ${message}`,
       {
@@ -117,7 +117,7 @@ export const mapContainerPermissionsGraphError = (
     );
   }
 
-  return new ContainerPermissionsGraphError(
+  return new ContainerPermissionsApiError(
     "graphFailure",
     `Microsoft Graph container permission request failed: ${message}`,
     {
@@ -131,8 +131,8 @@ export const mapContainerPermissionsGraphError = (
 /**
  * 把服务端内部错误对象转换成稳定的 API 响应体。
  */
-export const toContainerPermissionsApiErrorBody = (
-  error: ContainerPermissionsGraphError,
+export const toContainerPermissionsApiErrorResponseBody = (
+  error: ContainerPermissionsApiError,
 ): IContainerPermissionsApiErrorBody => ({
   code: error.code,
   message: error.message,
@@ -144,8 +144,8 @@ export const toContainerPermissionsApiErrorBody = (
 /**
  * 根据业务错误类型选择合适的 HTTP 状态码。
  */
-export const getContainerPermissionsErrorStatus = (
-  error: ContainerPermissionsGraphError,
+export const getContainerPermissionsApiErrorResponseStatus = (
+  error: ContainerPermissionsApiError,
 ): number => {
   if (error.statusCode) {
     return error.statusCode;
@@ -170,7 +170,7 @@ export const getContainerPermissionsErrorStatus = (
 };
 
 const readGraphStatusCode = (error: unknown): number | undefined => {
-  const record = readRecord(error);
+  const record = readGraphToRecord(error);
   const statusCode = record.statusCode ?? record.status;
 
   return typeof statusCode === "number" ? statusCode : undefined;
@@ -233,8 +233,8 @@ const readGraphErrorMessage = (error: unknown): string => {
     return error.message;
   }
 
-  const record = readRecord(error);
-  const nestedError = readRecord(record.error);
+  const record = readGraphToRecord(error);
+  const nestedError = readGraphToRecord(record.error);
   const nestedMessage = nestedError.message;
 
   if (typeof nestedMessage === "string" && nestedMessage) {
@@ -251,12 +251,12 @@ const readHeaderValue = (
   error: unknown,
   headerName: string,
 ): string | undefined => {
-  const record = readRecord(error);
+  const record = readGraphToRecord(error);
   const headersCandidate =
     record.headers ??
     record.responseHeaders ??
-    readRecord(record.response).headers ??
-    readRecord(record.body).headers;
+    readGraphToRecord(record.response).headers ??
+    readGraphToRecord(record.body).headers;
 
   if (!headersCandidate) {
     return undefined;
@@ -272,7 +272,7 @@ const readHeaderValue = (
     return typeof value === "string" && value ? value : undefined;
   }
 
-  const headersRecord = readRecord(headersCandidate);
+  const headersRecord = readGraphToRecord(headersCandidate);
 
   for (const [key, value] of Object.entries(headersRecord)) {
     if (key.toLowerCase() === headerName.toLowerCase()) {
@@ -284,9 +284,9 @@ const readHeaderValue = (
 };
 
 const readInnerError = (error: unknown): Record<string, unknown> => {
-  const record = readRecord(error);
-  const bodyRecord = readRecord(record.body);
-  const errorRecord = readRecord(record.error);
+  const record = readGraphToRecord(error);
+  const bodyRecord = readGraphToRecord(record.body);
+  const errorRecord = readGraphToRecord(record.error);
 
-  return readRecord(bodyRecord.innerError ?? errorRecord.innerError);
+  return readGraphToRecord(bodyRecord.innerError ?? errorRecord.innerError);
 };

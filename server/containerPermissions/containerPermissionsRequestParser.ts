@@ -15,15 +15,18 @@ import type {
   IContainerPermissionUpdateChange,
   PermissionTabValue,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import { readRecord, readRequiredString } from "./containerPermissionsReaders";
+import {
+  readGraphToRecord,
+  readRequiredString,
+} from "./containerPermissionsReaders";
 
 /**
- * 读取并校验 Apply 请求体。
+ * 读取并校验前端请求，转成变更集。
  */
 export const parseContainerPermissionChangeSet = (
   body: unknown,
 ): IContainerPermissionChangeSetFromUI | null => {
-  const bodyRecord = readRecord(body);
+  const bodyRecord = readGraphToRecord(body);
   const create = bodyRecord.create;
   const update = bodyRecord.update;
   // 这里继续兼容历史 delete 字段，避免前后端版本短暂错位时直接写回失败。
@@ -40,14 +43,16 @@ export const parseContainerPermissionChangeSet = (
 
   return {
     // 这里把“原始数组项”逐条收口成已经校验过的差异对象。
-    create: create.map(mapCreateChange),
-    update: update.map(mapUpdateChange),
-    remove: remove.map(mapDeleteChange),
+    create: create.map(mapCreateChangeFromUI),
+    update: update.map(mapUpdateChangeFromUI),
+    remove: remove.map(mapRemoveChangeFromUI),
   };
 };
 
-const mapCreateChange = (change: unknown): IContainerPermissionCreateChange => {
-  const record = readRecord(change);
+const mapCreateChangeFromUI = (
+  change: unknown,
+): IContainerPermissionCreateChange => {
+  const record = readGraphToRecord(change);
   const principalType = readPrincipalType(record.principalType);
 
   if (principalType === "people") {
@@ -71,8 +76,10 @@ const mapCreateChange = (change: unknown): IContainerPermissionCreateChange => {
   };
 };
 
-const mapUpdateChange = (change: unknown): IContainerPermissionUpdateChange => {
-  const record = readRecord(change);
+const mapUpdateChangeFromUI = (
+  change: unknown,
+): IContainerPermissionUpdateChange => {
+  const record = readGraphToRecord(change);
 
   return {
     // 已存在权限的更新只允许改角色，因此这里只读取 permissionId 和 role。
@@ -84,14 +91,16 @@ const mapUpdateChange = (change: unknown): IContainerPermissionUpdateChange => {
   };
 };
 
-const mapDeleteChange = (change: unknown): IContainerPermissionRemoveChange => {
-  const record = readRecord(change);
+const mapRemoveChangeFromUI = (
+  change: unknown,
+): IContainerPermissionRemoveChange => {
+  const record = readGraphToRecord(change);
 
   return {
     // 删除阶段只需要知道要删哪一条权限记录。
     permissionId: readRequiredString(
       record.permissionId,
-      "delete permissionId",
+      "remove permissionId",
     ),
   };
 };

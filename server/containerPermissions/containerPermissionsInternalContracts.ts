@@ -33,7 +33,7 @@ export interface IGraphClient {
  * 这样后续的 `Graph -> common contract` 映射层只需要面对统一结构，
  * 不必在主流程里反复分支处理 `user`、`siteUser`、`group`、`siteGroup`。
  */
-export interface IGraphPermissionIdentity {
+export interface IGraphIdentityInPermission {
   // Graph 原始对象上的稳定 id；people 分支可能缺失。
   graphId?: string;
   // 前端主标题展示文本。

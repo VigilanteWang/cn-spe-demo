@@ -1,6 +1,6 @@
 export {
   applyContainerPermissionChangeSet,
-  applyContainerPermissions,
-  fetchContainerPermissionEntries,
-  listContainerPermissions,
+  applyContainerPermissionsToGraph as applyContainerPermissions,
+  fetchMapContainerPermissionFromGraphToEntries as fetchContainerPermissionEntries,
+  listContainerPermissionsFromGraph as listContainerPermissions,
 } from "./containerPermissionsHandlers";

@@ -22,18 +22,21 @@ import type {
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import {
-  createGraphCreatePermissionBody,
+  newGraphCreatePermissionBody,
   mapGraphPermissionToEntryOnUI,
 } from "./containerPermissionsCommonAdapters";
 import {
-  getContainerPermissionsErrorStatus,
+  getContainerPermissionsApiErrorResponseStatus,
   mapContainerPermissionsGraphError,
-  toContainerPermissionsApiErrorBody,
+  toContainerPermissionsApiErrorResponseBody,
 } from "./containerPermissionsError";
 import type { IGraphClient } from "./containerPermissionsInternalContracts";
 import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
 import { parseContainerPermissionChangeSet } from "./containerPermissionsRequestParser";
-import { readOptionalString, readRecord } from "./containerPermissionsReaders";
+import {
+  readOptionalString,
+  readGraphToRecord,
+} from "./containerPermissionsReaders";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。
@@ -42,7 +45,10 @@ import { readOptionalString, readRecord } from "./containerPermissionsReaders";
  * @param res Restify 响应对象，用于返回标准化结果。
  * @returns Promise<void>
  */
-export const listContainerPermissions = async (req: Request, res: Response) => {
+export const listContainerPermissionsFromGraph = async (
+  req: Request,
+  res: Response,
+) => {
   // 先做鉴权与 scope 校验，避免无权限请求继续访问 Graph。
   const authorizationResult = await authorizeContainerManageRequest(req);
 
@@ -68,7 +74,7 @@ export const listContainerPermissions = async (req: Request, res: Response) => {
     const graphToken = await getGraphToken(authorizationResult.token);
     // 基于本次请求 token 创建 Graph 客户端，避免跨请求串用身份。
     const graphClient = createGraphClient(graphToken) as IGraphClient;
-    const entries = await fetchContainerPermissionEntries(
+    const entries = await fetchMapContainerPermissionFromGraphToEntries(
       graphClient,
       containerId,
     );
@@ -78,7 +84,7 @@ export const listContainerPermissions = async (req: Request, res: Response) => {
     res.send(200, responseBody);
   } catch (error: unknown) {
     // 统一走错误映射，保证前端拿到稳定的错误码与消息结构。
-    sendMappedContainerPermissionError(res, error);
+    sendContainerPermissionMappedGraphError(res, error);
   }
 };
 
@@ -89,7 +95,7 @@ export const listContainerPermissions = async (req: Request, res: Response) => {
  * @param res Restify 响应对象，用于返回更新后的 entries。
  * @returns Promise<void>
  */
-export const applyContainerPermissions = async (
+export const applyContainerPermissionsToGraph = async (
   req: Request,
   res: Response,
 ) => {
@@ -137,7 +143,7 @@ export const applyContainerPermissions = async (
     );
 
     // 变更完成后重新拉取一次，确保返回的是服务端真实状态，而不是本地猜测状态。
-    const entries = await fetchContainerPermissionEntries(
+    const entries = await fetchMapContainerPermissionFromGraphToEntries(
       graphClient,
       containerId,
     );
@@ -145,7 +151,7 @@ export const applyContainerPermissions = async (
     res.send(200, responseBody);
   } catch (error: unknown) {
     // 所有异常统一转换为稳定 API 错误格式。
-    sendMappedContainerPermissionError(res, error);
+    sendContainerPermissionMappedGraphError(res, error);
   }
 };
 
@@ -156,19 +162,19 @@ export const applyContainerPermissions = async (
  * @param containerId 容器 ID。
  * @returns 映射后的权限条目数组。
  */
-export const fetchContainerPermissionEntries = async (
+export const fetchMapContainerPermissionFromGraphToEntries = async (
   graphClient: IGraphClient,
   containerId: string,
 ) => {
   try {
     // 使用 v1.0 权限接口读取容器权限集合。
     const response = await graphClient
-      .api(getContainerPermissionsPath(containerId))
+      .api(getContainerPermissionsGraphPath(containerId))
       .version("v1.0")
       .get();
 
     // Graph 返回值是动态结构，这里先转成可安全读取的 record。
-    const responseRecord = readRecord(response);
+    const responseRecord = readGraphToRecord(response);
     const permissionItems = responseRecord.value;
 
     // 容错处理：若返回值不符合预期，按空列表处理，避免前端崩溃。
@@ -202,7 +208,7 @@ export const applyContainerPermissionChangeSet = async (
     for (const deleteChange of changeSet.remove) {
       await graphClient
         .api(
-          getSingleContainerPermissionPath(
+          getSingleContainerPermissionGraphPath(
             containerId,
             deleteChange.permissionId,
           ),
@@ -217,7 +223,7 @@ export const applyContainerPermissionChangeSet = async (
     for (const updateChange of changeSet.update) {
       await graphClient
         .api(
-          getSingleContainerPermissionPath(
+          getSingleContainerPermissionGraphPath(
             containerId,
             updateChange.permissionId,
           ),
@@ -232,9 +238,9 @@ export const applyContainerPermissionChangeSet = async (
     // 创建阶段使用 Graph 要求的 grantedToV2 载荷结构。
     for (const createChange of changeSet.create) {
       await graphClient
-        .api(getContainerPermissionsPath(containerId))
+        .api(getContainerPermissionsGraphPath(containerId))
         .version("v1.0")
-        .post(createGraphCreatePermissionBody(createChange));
+        .post(newGraphCreatePermissionBody(createChange));
     }
   } catch (error: unknown) {
     throw mapContainerPermissionsGraphError(error);
@@ -247,11 +253,14 @@ export const applyContainerPermissionChangeSet = async (
  * @param res Restify 响应对象。
  * @param error 捕获到的未知异常。
  */
-const sendMappedContainerPermissionError = (res: Response, error: unknown) => {
+const sendContainerPermissionMappedGraphError = (
+  res: Response,
+  error: unknown,
+) => {
   const mappedError = mapContainerPermissionsGraphError(error);
   res.send(
-    getContainerPermissionsErrorStatus(mappedError),
-    toContainerPermissionsApiErrorBody(mappedError),
+    getContainerPermissionsApiErrorResponseStatus(mappedError),
+    toContainerPermissionsApiErrorResponseBody(mappedError),
   );
 };
 
@@ -262,7 +271,7 @@ const sendMappedContainerPermissionError = (res: Response, error: unknown) => {
  * @returns 容器 ID；若不存在则返回 undefined。
  */
 const readContainerId = (req: Request): string | undefined => {
-  const paramsRecord = readRecord(req.params);
+  const paramsRecord = readGraphToRecord(req.params);
   return readOptionalString(paramsRecord.containerId);
 };
 
@@ -272,7 +281,7 @@ const readContainerId = (req: Request): string | undefined => {
  * @param containerId 容器 ID。
  * @returns 容器权限集合 API 路径。
  */
-const getContainerPermissionsPath = (containerId: string): string =>
+const getContainerPermissionsGraphPath = (containerId: string): string =>
   `/storage/fileStorage/containers/${encodeURIComponent(containerId)}/permissions`;
 
 /**
@@ -282,8 +291,8 @@ const getContainerPermissionsPath = (containerId: string): string =>
  * @param permissionId 权限记录 ID。
  * @returns 单条权限 API 路径。
  */
-const getSingleContainerPermissionPath = (
+const getSingleContainerPermissionGraphPath = (
   containerId: string,
   permissionId: string,
 ): string =>
-  `${getContainerPermissionsPath(containerId)}/${encodeURIComponent(permissionId)}`;
+  `${getContainerPermissionsGraphPath(containerId)}/${encodeURIComponent(permissionId)}`;
