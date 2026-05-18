@@ -13,9 +13,9 @@
  */
 import { Request, Response } from "restify";
 import {
-  authorizeContainerManageRequest,
   createGraphClient,
   getGraphToken,
+  requireContainerManageRequest,
 } from "../auth";
 import type {
   IContainerPermissionChangeSetFromUI,
@@ -37,6 +37,7 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
+import { BackendValidationError } from "../common/errors";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。
@@ -50,23 +51,13 @@ export const listContainerPermissionsFromGraph = async (
   res: Response,
 ) => {
   // 先做鉴权与 scope 校验，避免无权限请求继续访问 Graph。
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   // 从路由参数读取容器 ID，作为后续 Graph 路径的关键输入。
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    res.send(400, {
-      code: "invalidRequest",
-      message: "containerId route parameter is required.",
-      statusCode: 400,
-    });
-    return;
+    throw new BackendValidationError("containerId route parameter is required.");
   }
 
   try {
@@ -100,35 +91,22 @@ export const applyContainerPermissionsToGraph = async (
   res: Response,
 ) => {
   // 与读取接口保持一致，先进行统一鉴权。
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   // 先读取容器 ID，缺失时直接返回 400，避免无效 Graph 请求。
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    res.send(400, {
-      code: "invalidRequest",
-      message: "containerId route parameter is required.",
-      statusCode: 400,
-    });
-    return;
+    throw new BackendValidationError("containerId route parameter is required.");
   }
 
   // 解析并校验 create/update/remove 三段变更数据。
   const changeSet = parseContainerPermissionChangeSet(req.body);
 
   if (!changeSet) {
-    res.send(400, {
-      code: "invalidRequest",
-      message: "create, update and remove arrays are required.",
-      statusCode: 400,
-    });
-    return;
+    throw new BackendValidationError(
+      "create, update and remove arrays are required.",
+    );
   }
 
   try {

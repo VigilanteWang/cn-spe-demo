@@ -43,10 +43,16 @@ import {
 import jwksClient from "jwks-rsa";
 import { Request } from "restify";
 // Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
+import type { IApiErrorResponseBody } from "../common/contracts/apiErrorContracts";
 import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
+import { toApiErrorResponseBody } from "./common/errorResponse";
+import {
+  BackendAuthError,
+  BackendUpstreamError,
+} from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -92,9 +98,7 @@ type AuthorizationSuccess = {
 type AuthorizationFailure = {
   ok: false;
   status: number;
-  body: {
-    message: string;
-  };
+  body: IApiErrorResponseBody;
 };
 
 /**
@@ -465,7 +469,11 @@ export const authorizeContainerManageRequest = async (
     return {
       ok: false,
       status: 401,
-      body: { message: "No access token provided." },
+      body: toApiErrorResponseBody(
+        new BackendAuthError("unauthorized", "No access token provided.", {
+          statusCode: 401,
+        }),
+      ),
     };
   }
 
@@ -478,7 +486,15 @@ export const authorizeContainerManageRequest = async (
     return {
       ok: false,
       status: 401,
-      body: { message: "Authorization header must use Bearer token format." },
+      body: toApiErrorResponseBody(
+        new BackendAuthError(
+          "unauthorized",
+          "Authorization header must use Bearer token format.",
+          {
+            statusCode: 401,
+          },
+        ),
+      ),
     };
   }
 
@@ -491,9 +507,15 @@ export const authorizeContainerManageRequest = async (
       return {
         ok: false,
         status: 403,
-        body: {
-          message: `Access token is missing required scope ${SPEMBEDDED_CONTAINER_MANAGE}.`,
-        },
+        body: toApiErrorResponseBody(
+          new BackendAuthError(
+            "forbidden",
+            `Access token is missing required scope ${SPEMBEDDED_CONTAINER_MANAGE}.`,
+            {
+              statusCode: 403,
+            },
+          ),
+        ),
       };
     }
 
@@ -509,9 +531,41 @@ export const authorizeContainerManageRequest = async (
     return {
       ok: false,
       status: 401,
-      body: { message: `Invalid access token: ${message}` },
+      body: toApiErrorResponseBody(
+        new BackendAuthError("unauthorized", `Invalid access token: ${message}`, {
+          statusCode: 401,
+          cause: error,
+        }),
+      ),
     };
   }
+};
+
+/**
+ * 直接返回鉴权成功结果；若失败则抛出统一鉴权错误。
+ *
+ * 这个入口适合新的 throw 风格 handler，
+ * 让路由层可以统一交给 withErrorHandling 处理。
+ */
+export const requireContainerManageRequest = async (
+  req: Request,
+): Promise<AuthorizationSuccess> => {
+  const authorizationResult = await authorizeContainerManageRequest(req);
+
+  if (authorizationResult.ok) {
+    return authorizationResult;
+  }
+
+  throw new BackendAuthError(
+    authorizationResult.body.code === "forbidden" ? "forbidden" : "unauthorized",
+    authorizationResult.body.message,
+    {
+      statusCode: authorizationResult.status,
+      details: authorizationResult.body.details,
+      requestId: authorizationResult.body.requestId,
+      retryAfterSeconds: authorizationResult.body.retryAfterSeconds,
+    },
+  );
 };
 
 /**
@@ -564,7 +618,15 @@ export const getGraphToken = async (token: string): Promise<string> => {
     return oboGraphToken;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Unable to generate Microsoft Graph OBO token: ${message}`);
+    throw new BackendUpstreamError(
+      "upstreamFailure",
+      "Unable to generate Microsoft Graph OBO token.",
+      {
+        statusCode: 502,
+        details: { upstreamMessage: message },
+        cause: error,
+      },
+    );
   }
 };
 

@@ -3,19 +3,18 @@ import type {
   IContainerPermissionsApiErrorBody,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import { readGraphToRecord } from "./containerPermissionsReaders";
+import {
+  BackendBusinessError,
+  BackendValidationError,
+  readErrorRequestId,
+  readErrorRetryAfterSeconds,
+  readErrorStatusCode,
+} from "../common/errors";
 
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
  */
-export class ContainerPermissionsApiError extends Error {
-  readonly code: ContainerPermissionsApiErrorCode;
-
-  readonly retryAfterSeconds?: number;
-
-  readonly requestId?: string;
-
-  readonly statusCode?: number;
-
+export class ContainerPermissionsApiError extends BackendBusinessError<ContainerPermissionsApiErrorCode> {
   constructor(
     code: ContainerPermissionsApiErrorCode,
     message: string,
@@ -23,14 +22,30 @@ export class ContainerPermissionsApiError extends Error {
       retryAfterSeconds?: number;
       requestId?: string;
       statusCode?: number;
+      details?: Record<string, unknown>;
+      cause?: unknown;
     },
   ) {
-    super(message);
-    this.name = "ContainerPermissionsApiError";
-    this.code = code;
-    this.retryAfterSeconds = options?.retryAfterSeconds;
-    this.requestId = options?.requestId;
-    this.statusCode = options?.statusCode;
+    super({
+      name: "ContainerPermissionsApiError",
+      code,
+      category:
+        code === "invalidRequest"
+          ? "validation"
+          : code === "unauthorized" || code === "forbidden"
+            ? "auth"
+            : code === "throttled" ||
+                code === "serviceUnavailable" ||
+                code === "graphFailure"
+              ? "upstream"
+              : "business",
+      message,
+      statusCode: options?.statusCode,
+      requestId: options?.requestId,
+      retryAfterSeconds: options?.retryAfterSeconds,
+      details: options?.details,
+      cause: options?.cause,
+    });
   }
 }
 
@@ -44,9 +59,17 @@ export const mapContainerPermissionsGraphError = (
     return error;
   }
 
-  const statusCode = readGraphStatusCode(error);
-  const retryAfterSeconds = readRetryAfterSeconds(error);
-  const requestId = readRequestId(error);
+  if (error instanceof BackendValidationError) {
+    return new ContainerPermissionsApiError("invalidRequest", error.message, {
+      statusCode: error.statusCode ?? 400,
+      details: error.details,
+      cause: error.cause ?? error,
+    });
+  }
+
+  const statusCode = readErrorStatusCode(error);
+  const retryAfterSeconds = readErrorRetryAfterSeconds(error);
+  const requestId = readErrorRequestId(error);
   const message = readGraphErrorMessage(error);
 
   if (statusCode === 400) {
@@ -56,6 +79,7 @@ export const mapContainerPermissionsGraphError = (
       {
         statusCode,
         requestId,
+        cause: error,
       },
     );
   }
@@ -67,6 +91,7 @@ export const mapContainerPermissionsGraphError = (
       {
         statusCode,
         requestId,
+        cause: error,
       },
     );
   }
@@ -78,6 +103,7 @@ export const mapContainerPermissionsGraphError = (
       {
         statusCode,
         requestId,
+        cause: error,
       },
     );
   }
@@ -89,6 +115,7 @@ export const mapContainerPermissionsGraphError = (
       {
         statusCode,
         requestId,
+        cause: error,
       },
     );
   }
@@ -101,6 +128,7 @@ export const mapContainerPermissionsGraphError = (
         statusCode,
         retryAfterSeconds,
         requestId,
+        cause: error,
       },
     );
   }
@@ -113,6 +141,7 @@ export const mapContainerPermissionsGraphError = (
         statusCode,
         retryAfterSeconds,
         requestId,
+        cause: error,
       },
     );
   }
@@ -124,6 +153,7 @@ export const mapContainerPermissionsGraphError = (
       statusCode,
       retryAfterSeconds,
       requestId,
+      cause: error,
     },
   );
 };
@@ -138,7 +168,8 @@ export const toContainerPermissionsApiErrorResponseBody = (
   message: error.message,
   retryAfterSeconds: error.retryAfterSeconds,
   requestId: error.requestId,
-  statusCode: error.statusCode,
+  statusCode: error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
+  details: error.details,
 });
 
 /**
@@ -169,65 +200,6 @@ export const getContainerPermissionsApiErrorResponseStatus = (
   }
 };
 
-const readGraphStatusCode = (error: unknown): number | undefined => {
-  const record = readGraphToRecord(error);
-  const statusCode = record.statusCode ?? record.status;
-
-  return typeof statusCode === "number" ? statusCode : undefined;
-};
-
-const readRetryAfterSeconds = (error: unknown): number | undefined => {
-  const headerValue =
-    // 这里兼容大小写不同的 header 名称，避免被 SDK 或运行时的 header 形状细节绊住。
-    readHeaderValue(error, "Retry-After") ??
-    readHeaderValue(error, "retry-after");
-
-  if (headerValue) {
-    const retryAfterSeconds = Number(headerValue);
-    if (!Number.isNaN(retryAfterSeconds)) {
-      return retryAfterSeconds;
-    }
-  }
-
-  const innerError = readInnerError(error);
-  // 某些 Graph/SDK 错误会把 retry 信息放在 innerError 里，所以这里继续多形状兼容读取。
-  const retryAfter =
-    innerError.retryAfter ??
-    innerError.retryAfterSeconds ??
-    innerError["retry-after"];
-
-  if (typeof retryAfter === "number") {
-    return retryAfter;
-  }
-
-  if (typeof retryAfter === "string" && retryAfter) {
-    const retryAfterSeconds = Number.parseInt(retryAfter, 10);
-    return Number.isNaN(retryAfterSeconds) ? undefined : retryAfterSeconds;
-  }
-
-  return undefined;
-};
-
-const readRequestId = (error: unknown): string | undefined => {
-  const headerRequestId =
-    readHeaderValue(error, "request-id") ??
-    readHeaderValue(error, "Request-Id") ??
-    readHeaderValue(error, "client-request-id");
-
-  if (headerRequestId) {
-    return headerRequestId;
-  }
-
-  const innerError = readInnerError(error);
-  // request id 既可能在 header，也可能被包到 innerError 里，这里统一抽出来方便前端和日志追踪。
-  const requestId =
-    innerError["request-id"] ??
-    innerError.requestId ??
-    innerError["client-request-id"];
-
-  return typeof requestId === "string" && requestId ? requestId : undefined;
-};
-
 const readGraphErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -245,48 +217,4 @@ const readGraphErrorMessage = (error: unknown): string => {
   return typeof message === "string" && message
     ? message
     : "The request still failed after the SDK retry policy completed.";
-};
-
-const readHeaderValue = (
-  error: unknown,
-  headerName: string,
-): string | undefined => {
-  const record = readGraphToRecord(error);
-  const headersCandidate =
-    record.headers ??
-    record.responseHeaders ??
-    readGraphToRecord(record.response).headers ??
-    readGraphToRecord(record.body).headers;
-
-  if (!headersCandidate) {
-    return undefined;
-  }
-
-  if (
-    typeof headersCandidate === "object" &&
-    headersCandidate !== null &&
-    "get" in headersCandidate &&
-    typeof headersCandidate.get === "function"
-  ) {
-    const value = headersCandidate.get(headerName);
-    return typeof value === "string" && value ? value : undefined;
-  }
-
-  const headersRecord = readGraphToRecord(headersCandidate);
-
-  for (const [key, value] of Object.entries(headersRecord)) {
-    if (key.toLowerCase() === headerName.toLowerCase()) {
-      return typeof value === "string" && value ? value : undefined;
-    }
-  }
-
-  return undefined;
-};
-
-const readInnerError = (error: unknown): Record<string, unknown> => {
-  const record = readGraphToRecord(error);
-  const bodyRecord = readGraphToRecord(record.body);
-  const errorRecord = readGraphToRecord(record.error);
-
-  return readGraphToRecord(bodyRecord.innerError ?? errorRecord.innerError);
 };

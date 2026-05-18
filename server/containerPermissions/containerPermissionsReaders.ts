@@ -1,3 +1,5 @@
+import { BackendValidationError } from "../common/errors";
+
 /**
  * 读取 Graph 对象为 Record。
  *
@@ -43,5 +45,5 @@ export const readRequiredString = (
     return value;
   }
 
-  throw new Error(`Missing required ${fieldName}.`);
+  throw new BackendValidationError(`Missing required ${fieldName}.`);
 };

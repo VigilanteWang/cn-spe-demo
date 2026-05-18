@@ -25,22 +25,19 @@
 
 import * as restify from "restify"; // HTTP 服务框架
 import "./config"; // 加载环境变量配置 (副作用导入)
+import { withErrorHandling } from "./common/errorResponse";
 import { listContainers } from "./listContainers";
 import { createContainer } from "./createContainer";
-import {
-  startDownloadJob,
-  getJobProgress,
-  getJobManifest,
-} from "./downloadArchive";
-import {
-  authorizeContainerManageRequest,
-  createGraphClient,
-  getGraphToken,
-} from "./auth";
 import {
   applyContainerPermissions,
   listContainerPermissions,
 } from "./containerPermissions";
+import { deleteItems } from "./deleteItems";
+import {
+  getDownloadArchiveManifestRequest,
+  getDownloadArchiveProgressRequest,
+  startDownloadArchiveRequest,
+} from "./downloadArchiveHandlers";
 
 /**
  * Handler 风格说明（重要）
@@ -124,14 +121,7 @@ server.pre((req, res, next) => {
  * - 路由文件保持薄，容易快速浏览所有接口
  * - 业务逻辑集中在单独模块里，更容易测试和复用
  */
-server.get("/api/listContainers", async (req, res) => {
-  try {
-    await listContainers(req, res);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error in API server: ${msg}` });
-  }
-});
+server.get("/api/listContainers", withErrorHandling(listContainers));
 
 /**
  * POST /api/createContainer 路由
@@ -148,14 +138,7 @@ server.get("/api/listContainers", async (req, res) => {
  * 对初级开发者来说，可以把这里理解为 controller，
  * createContainer 则更接近 service 层或 use-case 层。
  */
-server.post("/api/createContainer", async (req, res) => {
-  try {
-    await createContainer(req, res);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error in API server: ${msg}` });
-  }
-});
+server.post("/api/createContainer", withErrorHandling(createContainer));
 
 /**
  * GET /api/containerPermissions/:containerId
@@ -168,14 +151,10 @@ server.post("/api/createContainer", async (req, res) => {
  * 2. 集中处理 Graph 节流、错误映射和最小字段收敛
  * 3. 避免把容器权限写回细节散落到前端
  */
-server.get("/api/containerPermissions/:containerId", async (req, res) => {
-  try {
-    await listContainerPermissions(req, res);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error in listContainerPermissions: ${msg}` });
-  }
-});
+server.get(
+  "/api/containerPermissions/:containerId",
+  withErrorHandling(listContainerPermissions),
+);
 
 /**
  * POST /api/containerPermissions/:containerId/apply
@@ -185,14 +164,7 @@ server.get("/api/containerPermissions/:containerId", async (req, res) => {
  */
 server.post(
   "/api/containerPermissions/:containerId/apply",
-  async (req, res) => {
-    try {
-      await applyContainerPermissions(req, res);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      res.send(500, { message: `Error in applyContainerPermissions: ${msg}` });
-    }
-  },
+  withErrorHandling(applyContainerPermissions),
 );
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────
@@ -216,53 +188,7 @@ server.post(
  * 而是返回 successful/failed 两个集合。这样前端可以更友好地提示用户：
  * 哪些项已删除，哪些项失败，以及失败原因是什么。
  */
-server.post("/api/deleteItems", async (req, res) => {
-  try {
-    const authResult = await authorizeContainerManageRequest(req);
-    if (!authResult.ok) {
-      res.send(authResult.status, authResult.body);
-      return;
-    }
-
-    const { containerId, itemIds } = req.body as {
-      containerId: string;
-      itemIds: string[];
-    };
-
-    if (!containerId || !Array.isArray(itemIds) || itemIds.length === 0) {
-      res.send(400, {
-        message: "containerId and a non-empty itemIds array are required.",
-      });
-      return;
-    }
-
-    const graphToken = await getGraphToken(authResult.token);
-    const graphClient = createGraphClient(graphToken);
-
-    const successful: string[] = [];
-    const failed: Array<{ id: string; reason: string }> = [];
-
-    /** 顺序删除以降低 Microsoft Graph 节流风险。 */
-    for (const itemId of itemIds) {
-      try {
-        await graphClient
-          .api(`/drives/${containerId}/items/${itemId}`)
-          .delete();
-        successful.push(itemId);
-      } catch (err: unknown) {
-        failed.push({
-          id: itemId,
-          reason: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    res.send(200, { successful, failed });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error in deleteItems: ${msg}` });
-  }
-});
+server.post("/api/deleteItems", withErrorHandling(deleteItems));
 
 // ── 归档下载：启动任务 ──────────────────────────────────────────────────────
 /**
@@ -279,38 +205,10 @@ server.post("/api/deleteItems", async (req, res) => {
  * - 前端用它轮询准备进度
  * - 准备完成后通过 manifest 接口获取下载清单
  */
-server.post("/api/downloadArchive/start", async (req, res) => {
-  try {
-    const authResult = await authorizeContainerManageRequest(req);
-    if (!authResult.ok) {
-      res.send(authResult.status, authResult.body);
-      return;
-    }
-
-    const { containerId, itemIds } = req.body as {
-      containerId: string;
-      itemIds: string[];
-    };
-
-    if (!containerId || !Array.isArray(itemIds) || itemIds.length === 0) {
-      res.send(400, {
-        message: "containerId and a non-empty itemIds array are required.",
-      });
-      return;
-    }
-
-    const jobId = await startDownloadJob(
-      containerId,
-      itemIds,
-      authResult.token,
-      authResult.claims.oid ?? "",
-    );
-    res.send(200, { jobId });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error starting archive job: ${msg}` });
-  }
-});
+server.post(
+  "/api/downloadArchive/start",
+  withErrorHandling(startDownloadArchiveRequest),
+);
 
 // ── 归档下载：查询进度 ─────────────────────────────────────────────────────
 /**
@@ -326,27 +224,10 @@ server.post("/api/downloadArchive/start", async (req, res) => {
  * - jobId 本身无效
  * - 任务已经过期并从内存中清理掉
  */
-server.get("/api/downloadArchive/progress/:jobId", async (req, res) => {
-  try {
-    const authResult = await authorizeContainerManageRequest(req);
-    if (!authResult.ok) {
-      res.send(authResult.status, authResult.body);
-      return;
-    }
-
-    const { jobId } = req.params as { jobId: string };
-    const requesterOid = authResult.claims.oid ?? "";
-    const progress = getJobProgress(jobId, requesterOid);
-    if (!progress) {
-      res.send(404, { message: "Job not found, expired, or access denied." });
-      return;
-    }
-    res.send(200, progress);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Error fetching progress: ${msg}` });
-  }
-});
+server.get(
+  "/api/downloadArchive/progress/:jobId",
+  withErrorHandling(getDownloadArchiveProgressRequest),
+);
 
 // ── 归档下载：获取文件清单 ──────────────────────────────────────────────────
 /**
@@ -355,39 +236,7 @@ server.get("/api/downloadArchive/progress/:jobId", async (req, res) => {
  * 这个接口用于在任务准备完成后返回清单（manifest）。
  * 后端会继续校验任务所有权，确保只有创建任务的用户能读取清单。
  */
-server.get("/api/downloadArchive/manifest/:jobId", async (req, res) => {
-  try {
-    const authResult = await authorizeContainerManageRequest(req);
-    if (!authResult.ok) {
-      res.send(authResult.status, authResult.body);
-      return;
-    }
-
-    const { jobId } = req.params as { jobId: string };
-    const requesterOid = authResult.claims.oid ?? "";
-    const progress = getJobProgress(jobId, requesterOid);
-    if (!progress) {
-      res.send(404, { message: "Job not found, expired, or access denied." });
-      return;
-    }
-
-    if (progress.status !== "ready") {
-      res.send(409, {
-        message: `Archive manifest not ready yet. Status: ${progress.status}`,
-      });
-      return;
-    }
-
-    const manifest = getJobManifest(jobId, requesterOid);
-    if (!manifest) {
-      res.send(404, { message: "Archive manifest not found." });
-      return;
-    }
-    res.send(200, manifest);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, {
-      message: `Error fetching archive manifest: ${msg}`,
-    });
-  }
-});
+server.get(
+  "/api/downloadArchive/manifest/:jobId",
+  withErrorHandling(getDownloadArchiveManifestRequest),
+);

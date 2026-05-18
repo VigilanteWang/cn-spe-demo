@@ -1,3 +1,8 @@
+import type {
+  ApiErrorCode,
+  IApiErrorResponseBody,
+} from "./apiErrorContracts";
+
 /**
  * 容器权限模块在前后端之间共享的主体类型。
  *
@@ -123,22 +128,21 @@ export interface IContainerPermissionChangeSetFromUI {
   remove: IContainerPermissionRemoveChange[];
 }
 
-export type ContainerPermissionsApiErrorCode =
+export type ContainerPermissionsApiErrorCode = Extract<
+  ApiErrorCode,
   | "invalidRequest"
   | "unauthorized"
   | "forbidden"
   | "notFound"
   | "throttled"
   | "serviceUnavailable"
-  | "graphFailure";
+  | "graphFailure"
+>;
 
 /**
  * 后端暴露给前端的稳定错误响应体。
  */
-export interface IContainerPermissionsApiErrorBody {
+export interface IContainerPermissionsApiErrorBody
+  extends Omit<IApiErrorResponseBody, "code"> {
   code: ContainerPermissionsApiErrorCode;
-  message: string;
-  retryAfterSeconds?: number;
-  requestId?: string;
-  statusCode?: number;
 }

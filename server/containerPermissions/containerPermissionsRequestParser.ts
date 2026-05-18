@@ -21,6 +21,7 @@ import {
   readGraphToRecord,
   readRequiredString,
 } from "./containerPermissionsReaders";
+import { BackendValidationError } from "../common/errors";
 
 /**
  * 读取并校验前端请求，转成变更集。
@@ -117,7 +118,9 @@ const readUiRole = (value: unknown): ContainerPermissionRoleForUI => {
     return value;
   }
 
-  throw new Error(`Unsupported container permission UI role: ${String(value)}`);
+  throw new BackendValidationError(
+    `Unsupported container permission UI role: ${String(value)}`,
+  );
 };
 
 const readPrincipalType = (value: unknown): PermissionTabValue => {
@@ -125,5 +128,7 @@ const readPrincipalType = (value: unknown): PermissionTabValue => {
     return value;
   }
 
-  throw new Error(`Unsupported permission principal type: ${String(value)}`);
+  throw new BackendValidationError(
+    `Unsupported permission principal type: ${String(value)}`,
+  );
 };

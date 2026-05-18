@@ -14,10 +14,11 @@
 
 import { Request, Response } from "restify";
 import {
-  authorizeContainerManageRequest,
   createGraphClient,
   getGraphToken,
+  requireContainerManageRequest,
 } from "./auth";
+import { toBackendUpstreamError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -31,12 +32,7 @@ import { serverConfig } from "./config";
  */
 export const listContainers = async (req: Request, res: Response) => {
   /** 先做权限校验，避免未授权请求访问下游服务。 */
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   try {
     /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
@@ -58,8 +54,13 @@ export const listContainers = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Unable to list containers: ${msg}` });
-    return;
+    throw toBackendUpstreamError(error, {
+      defaultMessage: "Unable to list containers.",
+      throttledMessage:
+        "Microsoft Graph throttled the container list request after retries were exhausted.",
+      serviceUnavailableMessage:
+        "Microsoft Graph is temporarily unavailable for the container list request.",
+      graphFailureMessage: "Unable to list containers.",
+    });
   }
 };

@@ -14,10 +14,14 @@
 
 import { Request, Response } from "restify";
 import {
-  authorizeContainerManageRequest,
   createGraphClient,
   getGraphToken,
+  requireContainerManageRequest,
 } from "./auth";
+import {
+  BackendValidationError,
+  toBackendUpstreamError,
+} from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -32,12 +36,7 @@ import { serverConfig } from "./config";
  */
 export const createContainer = async (req: Request, res: Response) => {
   /** 所有创建操作都先经过统一权限校验。 */
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   try {
     /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
@@ -50,8 +49,12 @@ export const createContainer = async (req: Request, res: Response) => {
      * 请求体只允许前端控制名称和描述。
      * 容器类型由服务端配置决定，避免客户端绕过约束。
      */
+    if (typeof req.body?.displayName !== "string" || !req.body.displayName.trim()) {
+      throw new BackendValidationError("displayName is required.");
+    }
+
     const containerRequestData = {
-      displayName: req.body!.displayName,
+      displayName: req.body.displayName.trim(),
       description: req.body?.description ? req.body.description : "",
       containerTypeId: serverConfig.containerTypeId,
     };
@@ -64,8 +67,17 @@ export const createContainer = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Failed to create container: ${msg}` });
-    return;
+    if (error instanceof BackendValidationError) {
+      throw error;
+    }
+
+    throw toBackendUpstreamError(error, {
+      defaultMessage: "Failed to create container.",
+      throttledMessage:
+        "Microsoft Graph throttled the create-container request after retries were exhausted.",
+      serviceUnavailableMessage:
+        "Microsoft Graph is temporarily unavailable for the create-container request.",
+      graphFailureMessage: "Failed to create container.",
+    });
   }
 };
