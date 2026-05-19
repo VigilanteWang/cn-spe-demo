@@ -12,7 +12,6 @@ export type ApiErrorCode =
   | "conflict"
   | "throttled"
   | "serviceUnavailable"
-  | "upstreamFailure"
   | "graphFailure"
   | "internalError";
 

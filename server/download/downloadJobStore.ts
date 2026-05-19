@@ -7,16 +7,22 @@ const jobs = new Map<string, Job>();
 /**
  * 定时清理过期任务，避免内存中的状态无限增长。
  */
-const cleanupTimer = setInterval(() => {
-  const now = Date.now();
+const cleanupTimer = setInterval(
+  () => {
+    const now = Date.now();
 
-  for (const [id, job] of jobs) {
-    if (now - (job.completedAt ?? job.createdAt) > JOB_TTL_MS) {
-      jobs.delete(id);
+    for (const [id, job] of jobs) {
+      if (now - (job.completedAt ?? job.createdAt) > JOB_TTL_MS) {
+        jobs.delete(id);
+      }
     }
-  }
-}, 2 * 60 * 1000);
+  },
+  2 * 60 * 1000,
+);
 
+// 这个定时器只负责后台清理内存缓存，不是业务主流程；调用 unref 后，
+// 即使它还在等待下一次执行，也不会因为它而把整个 Node 进程留住。
+// 这样服务在没有其他活动句柄时可以正常退出，不会被这个辅助任务拖住。
 cleanupTimer.unref?.();
 
 /**

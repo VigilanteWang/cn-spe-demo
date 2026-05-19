@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { createGraphClient, getGraphToken } from "../auth";
+import { createGraphClient, getGraphOBOToken } from "../auth";
 import {
   createArchiveEmptyError,
   createArchiveJobNotFoundError,
@@ -8,7 +8,7 @@ import {
   createArchiveTooLargeError,
   createArchiveTooManyFilesError,
   getDownloadJobFailureMessage,
-  toDownloadUpstreamError,
+  toDownloadGraphError,
   validateDownloadJobInput,
 } from "./downloadErrors";
 import {
@@ -19,7 +19,11 @@ import {
   toJobProgress,
 } from "./downloadJobStore";
 import { flattenDriveItems, resolveDownloadUrl } from "./downloadGraph";
-import type { ArchiveManifest, ArchiveManifestItem, JobProgress } from "./downloadTypes";
+import type {
+  ArchiveManifest,
+  ArchiveManifestItem,
+  JobProgress,
+} from "./downloadTypes";
 
 const MAX_FILES = 500;
 const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
@@ -135,9 +139,9 @@ async function processJob(
 
   let graphToken: string;
   try {
-    graphToken = await getGraphToken(userToken);
+    graphToken = await getGraphOBOToken(userToken);
   } catch (error: unknown) {
-    throw toDownloadUpstreamError(error, "Unable to prepare the archive.");
+    throw toDownloadGraphError(error, "Unable to prepare the archive.");
   }
 
   const graphClient = createGraphClient(graphToken);

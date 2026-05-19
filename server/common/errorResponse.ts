@@ -5,7 +5,7 @@ import type {
 } from "../../common/contracts/apiErrorContracts";
 import {
   BackendAuthError,
-  BackendBusinessError,
+  BackendError,
   BackendInternalError,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
@@ -56,7 +56,7 @@ const readFallbackMessage = (
  * 把服务端内部错误对象转换成稳定的 API 响应体。
  */
 export const toApiErrorResponseBody = (
-  error: BackendBusinessError,
+  error: BackendError,
 ): IApiErrorResponseBody => ({
   code: error.code,
   message: error.message,
@@ -69,8 +69,8 @@ export const toApiErrorResponseBody = (
 /**
  * 把任意未知异常收口为统一的服务端业务错误。
  */
-export const normalizeError = (error: unknown): BackendBusinessError => {
-  if (error instanceof BackendBusinessError) {
+export const normalizeError = (error: unknown): BackendError => {
+  if (error instanceof BackendError) {
     return error;
   }
 
@@ -94,8 +94,8 @@ export const normalizeError = (error: unknown): BackendBusinessError => {
       });
     }
 
-    return new BackendBusinessError({
-      name: "NormalizedBackendBusinessError",
+    return new BackendError({
+      name: "NormalizedBackendError",
       code: normalizedCode,
       category:
         normalizedCode === "invalidRequest"

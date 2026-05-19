@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  BackendBusinessError,
-  toBackendUpstreamError,
+  BackendError,
+  toBackendGraphError,
 } from "./errors";
 
-describe("toBackendUpstreamError", () => {
+describe("toBackendGraphError", () => {
   it("should map 429 errors with Retry-After and request id", () => {
-    const mappedError = toBackendUpstreamError(
+    const mappedError = toBackendGraphError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
         headers: {
@@ -22,16 +22,16 @@ describe("toBackendUpstreamError", () => {
     expect(mappedError.requestId).toBe("req-429");
   });
 
-  it("should keep an existing upstream error instance", () => {
-    const existingError = new BackendBusinessError({
+  it("should keep an existing graph error instance", () => {
+    const existingError = new BackendError({
       name: "ExistingError",
-      code: "upstreamFailure",
-      category: "upstream",
+      code: "graphFailure",
+      category: "graph",
       message: "Already normalised",
       statusCode: 502,
     });
 
-    const mappedError = toBackendUpstreamError(existingError);
+    const mappedError = toBackendGraphError(existingError);
 
     expect(mappedError).toBe(existingError);
   });

@@ -14,7 +14,7 @@
 import { Request, Response } from "restify";
 import {
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
   requireContainerManageRequest,
 } from "../auth";
 import type {
@@ -57,12 +57,14 @@ export const listContainerPermissionsFromGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError("containerId route parameter is required.");
+    throw new BackendValidationError(
+      "containerId route parameter is required.",
+    );
   }
 
   try {
     // 通过 OBO 流程获取当前用户上下文下的 Graph token。
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
     // 基于本次请求 token 创建 Graph 客户端，避免跨请求串用身份。
     const graphClient = createGraphClient(graphToken) as IGraphClient;
     const entries = await fetchMapContainerPermissionFromGraphToEntries(
@@ -97,7 +99,9 @@ export const applyContainerPermissionsToGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError("containerId route parameter is required.");
+    throw new BackendValidationError(
+      "containerId route parameter is required.",
+    );
   }
 
   // 解析并校验 create/update/remove 三段变更数据。
@@ -111,7 +115,7 @@ export const applyContainerPermissionsToGraph = async (
 
   try {
     // 使用请求级 token 构造 Graph 客户端，保证权限边界正确。
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
     const graphClient = createGraphClient(graphToken) as IGraphClient;
 
     await applyContainerPermissionChangeSet(

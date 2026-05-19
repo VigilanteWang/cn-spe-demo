@@ -4,7 +4,7 @@ import type {
 } from "../../common/contracts/containerPermissionCommonContracts";
 import { readGraphToRecord } from "./containerPermissionsReaders";
 import {
-  BackendBusinessError,
+  BackendError,
   BackendValidationError,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
@@ -14,7 +14,7 @@ import {
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
  */
-export class ContainerPermissionsApiError extends BackendBusinessError<ContainerPermissionsApiErrorCode> {
+export class ContainerPermissionsApiError extends BackendError<ContainerPermissionsApiErrorCode> {
   constructor(
     code: ContainerPermissionsApiErrorCode,
     message: string,
@@ -37,7 +37,7 @@ export class ContainerPermissionsApiError extends BackendBusinessError<Container
             : code === "throttled" ||
                 code === "serviceUnavailable" ||
                 code === "graphFailure"
-              ? "upstream"
+              ? "graph"
               : "business",
       message,
       statusCode: options?.statusCode,

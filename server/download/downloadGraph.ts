@@ -1,11 +1,11 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
-import { BackendUpstreamError } from "../common/errors";
+import { BackendGraphError } from "../common/errors";
 import { createGraphClient } from "../auth";
 import {
   FlatFile,
   GraphDriveItemWithDownloadUrl,
 } from "./downloadTypes";
-import { toDownloadUpstreamError } from "./downloadErrors";
+import { toDownloadGraphError } from "./downloadErrors";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;
 
@@ -28,7 +28,7 @@ const readDownloadLocationOrThrow = (
     return location;
   }
 
-  throw new BackendUpstreamError(
+  throw new BackendGraphError(
     "graphFailure",
     `Unable to resolve the download url for item ${itemId}.`,
     {
@@ -87,7 +87,7 @@ export const resolveDownloadUrl = async (
       return item["@microsoft.graph.downloadUrl"];
     }
   } catch (error: unknown) {
-    throw toDownloadUpstreamError(
+    throw toDownloadGraphError(
       error,
       `Unable to resolve the download url for item ${itemId}.`,
     );
@@ -109,11 +109,11 @@ export const resolveDownloadUrl = async (
       response.status,
     );
   } catch (error: unknown) {
-    if (error instanceof BackendUpstreamError) {
+    if (error instanceof BackendGraphError) {
       throw error;
     }
 
-    throw toDownloadUpstreamError(
+    throw toDownloadGraphError(
       error,
       `Unable to resolve the download url for item ${itemId}.`,
     );
@@ -144,7 +144,7 @@ async function expandItem(
       .select("id,name,folder,file,size")
       .get()) as DriveItem;
   } catch (error: unknown) {
-    throw toDownloadUpstreamError(
+    throw toDownloadGraphError(
       error,
       "Unable to expand the selected items.",
     );
@@ -200,7 +200,7 @@ async function expandFolder(
         .select("id,name,folder,file,size")
         .get();
     } catch (error: unknown) {
-      throw toDownloadUpstreamError(
+      throw toDownloadGraphError(
         error,
         "Unable to expand the selected items.",
       );

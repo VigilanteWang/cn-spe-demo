@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BackendBusinessError } from "./common/errors";
+import { BackendError } from "./common/errors";
 import { withErrorHandling } from "./common/errorResponse";
 import { getDownloadManifestRequest, getDownloadProgressRequest } from "./downloadHandlers";
 
@@ -27,7 +27,7 @@ describe("downloadHandlers error handling", () => {
 
   it("should return notFound when archive progress does not exist", async () => {
     downloadMocks.getJobProgress.mockImplementation(() => {
-      throw new BackendBusinessError({
+      throw new BackendError({
         name: "ArchiveJobNotFoundError",
         code: "notFound",
         category: "business",
@@ -53,7 +53,7 @@ describe("downloadHandlers error handling", () => {
 
   it("should return conflict when archive manifest is not ready", async () => {
     downloadMocks.getJobManifest.mockImplementation(() => {
-      throw new BackendBusinessError({
+      throw new BackendError({
         name: "ArchiveManifestNotReadyError",
         code: "conflict",
         category: "business",

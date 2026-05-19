@@ -1,12 +1,12 @@
 import { Request, Response } from "restify";
 import {
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
 import {
   BackendValidationError,
-  toBackendUpstreamError,
+  toBackendGraphError,
 } from "./common/errors";
 
 interface IDeleteItemsRequestBody {
@@ -33,7 +33,7 @@ export const deleteItems = async (req: Request, res: Response) => {
   }
 
   try {
-    const graphToken = await getGraphToken(authResult.token);
+    const graphToken = await getGraphOBOToken(authResult.token);
     const graphClient = createGraphClient(graphToken);
 
     const successful: string[] = [];
@@ -42,7 +42,9 @@ export const deleteItems = async (req: Request, res: Response) => {
     // 顺序删除能减少瞬时并发，降低 Graph 节流概率。
     for (const itemId of itemIds) {
       try {
-        await graphClient.api(`/drives/${containerId}/items/${itemId}`).delete();
+        await graphClient
+          .api(`/drives/${containerId}/items/${itemId}`)
+          .delete();
         successful.push(itemId);
       } catch (error: unknown) {
         failed.push({
@@ -54,7 +56,7 @@ export const deleteItems = async (req: Request, res: Response) => {
 
     res.send(200, { successful, failed });
   } catch (error: unknown) {
-    throw toBackendUpstreamError(error, {
+    throw toBackendGraphError(error, {
       defaultMessage: "Unable to delete the selected items.",
       throttledMessage:
         "Microsoft Graph throttled the delete-items request after retries were exhausted.",
@@ -74,7 +76,8 @@ const readStringArray = (value: unknown): string[] => {
   }
 
   return value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0,
   );
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BackendAuthError, BackendBusinessError } from "./errors";
+import { BackendAuthError, BackendError } from "./errors";
 import {
   normalizeError,
   toApiErrorResponseBody,
@@ -30,7 +30,7 @@ describe("normalizeError", () => {
 describe("toApiErrorResponseBody", () => {
   it("should serialise stable metadata", () => {
     const responseBody = toApiErrorResponseBody(
-      new BackendBusinessError({
+      new BackendError({
         name: "SerializableError",
         code: "serviceUnavailable",
         category: "upstream",

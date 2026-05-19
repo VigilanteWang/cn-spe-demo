@@ -15,12 +15,12 @@
 import { Request, Response } from "restify";
 import {
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
 import {
   BackendValidationError,
-  toBackendUpstreamError,
+  toBackendGraphError,
 } from "./common/errors";
 import { serverConfig } from "./config";
 
@@ -40,7 +40,7 @@ export const createContainer = async (req: Request, res: Response) => {
 
   try {
     /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
 
     /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
     const graphClient = createGraphClient(graphToken);
@@ -49,7 +49,10 @@ export const createContainer = async (req: Request, res: Response) => {
      * 请求体只允许前端控制名称和描述。
      * 容器类型由服务端配置决定，避免客户端绕过约束。
      */
-    if (typeof req.body?.displayName !== "string" || !req.body.displayName.trim()) {
+    if (
+      typeof req.body?.displayName !== "string" ||
+      !req.body.displayName.trim()
+    ) {
       throw new BackendValidationError("displayName is required.");
     }
 
@@ -71,7 +74,7 @@ export const createContainer = async (req: Request, res: Response) => {
       throw error;
     }
 
-    throw toBackendUpstreamError(error, {
+    throw toBackendGraphError(error, {
       defaultMessage: "Failed to create container.",
       throttledMessage:
         "Microsoft Graph throttled the create-container request after retries were exhausted.",

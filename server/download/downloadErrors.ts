@@ -1,9 +1,9 @@
 import {
-  BackendBusinessError,
+  BackendError,
   BackendInternalError,
-  BackendUpstreamError,
+  BackendGraphError,
   BackendValidationError,
-  toBackendUpstreamError,
+  toBackendGraphError,
 } from "../common/errors";
 
 /**
@@ -17,7 +17,7 @@ export const getDownloadJobFailureMessage = (
   error: unknown,
   fallbackMessage: string,
 ): string => {
-  if (error instanceof BackendBusinessError || error instanceof Error) {
+  if (error instanceof BackendError || error instanceof Error) {
     return error.message;
   }
 
@@ -25,17 +25,17 @@ export const getDownloadJobFailureMessage = (
 };
 
 /**
- * 统一构造下载模块的下游错误。
+ * 统一构造下载模块的 Graph 错误。
  *
- * @param error 原始下游异常。
+ * @param error 原始 Graph 异常。
  * @param defaultMessage 面向调用方的默认错误文案。
- * @returns 统一的下游错误对象。
+ * @returns 统一的 Graph 错误对象。
  */
-export const toDownloadUpstreamError = (
+export const toDownloadGraphError = (
   error: unknown,
   defaultMessage: string,
-): BackendUpstreamError =>
-  toBackendUpstreamError(error, {
+): BackendGraphError =>
+  toBackendGraphError(error, {
     defaultMessage,
     throttledMessage:
       "Microsoft Graph throttled the download preparation request after retries were exhausted.",
@@ -49,8 +49,8 @@ export const toDownloadUpstreamError = (
  *
  * @returns 对应 404 的业务错误。
  */
-export const createArchiveJobNotFoundError = (): BackendBusinessError =>
-  new BackendBusinessError({
+export const createArchiveJobNotFoundError = (): BackendError =>
+  new BackendError({
     name: "ArchiveJobNotFoundError",
     code: "notFound",
     category: "business",
@@ -66,8 +66,8 @@ export const createArchiveJobNotFoundError = (): BackendBusinessError =>
  */
 export const createArchiveManifestNotReadyError = (
   status: string,
-): BackendBusinessError =>
-  new BackendBusinessError({
+): BackendError =>
+  new BackendError({
     name: "ArchiveManifestNotReadyError",
     code: "conflict",
     category: "business",
@@ -80,8 +80,8 @@ export const createArchiveManifestNotReadyError = (
  *
  * @returns 对应 404 的业务错误。
  */
-export const createArchiveManifestNotFoundError = (): BackendBusinessError =>
-  new BackendBusinessError({
+export const createArchiveManifestNotFoundError = (): BackendError =>
+  new BackendError({
     name: "ArchiveManifestNotFoundError",
     code: "notFound",
     category: "business",
@@ -119,8 +119,8 @@ export const validateDownloadJobInput = (
  *
  * @returns 对应 409 的业务错误。
  */
-export const createArchiveEmptyError = (): BackendBusinessError =>
-  new BackendBusinessError({
+export const createArchiveEmptyError = (): BackendError =>
+  new BackendError({
     name: "ArchiveEmptyError",
     code: "conflict",
     category: "business",
@@ -138,8 +138,8 @@ export const createArchiveEmptyError = (): BackendBusinessError =>
 export const createArchiveTooManyFilesError = (
   totalFiles: number,
   maxFiles: number,
-): BackendBusinessError =>
-  new BackendBusinessError({
+): BackendError =>
+  new BackendError({
     name: "ArchiveTooManyFilesError",
     code: "conflict",
     category: "business",
@@ -156,8 +156,8 @@ export const createArchiveTooManyFilesError = (
  */
 export const createArchiveTooLargeError = (
   maxBytes: number,
-): BackendBusinessError =>
-  new BackendBusinessError({
+): BackendError =>
+  new BackendError({
     name: "ArchiveTooLargeError",
     code: "conflict",
     category: "business",

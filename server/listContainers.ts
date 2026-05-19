@@ -15,10 +15,10 @@
 import { Request, Response } from "restify";
 import {
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { toBackendUpstreamError } from "./common/errors";
+import { toBackendGraphError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -36,7 +36,7 @@ export const listContainers = async (req: Request, res: Response) => {
 
   try {
     /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
 
     /** Graph 客户端负责封装认证和请求链式调用。 */
     const graphClient = createGraphClient(graphToken);
@@ -54,7 +54,7 @@ export const listContainers = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    throw toBackendUpstreamError(error, {
+    throw toBackendGraphError(error, {
       defaultMessage: "Unable to list containers.",
       throttledMessage:
         "Microsoft Graph throttled the container list request after retries were exhausted.",

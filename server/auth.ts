@@ -49,10 +49,7 @@ import {
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
 import { toApiErrorResponseBody } from "./common/errorResponse";
-import {
-  BackendAuthError,
-  BackendUpstreamError,
-} from "./common/errors";
+import { BackendAuthError, BackendGraphError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -532,10 +529,14 @@ export const authorizeContainerManageRequest = async (
       ok: false,
       status: 401,
       body: toApiErrorResponseBody(
-        new BackendAuthError("unauthorized", `Invalid access token: ${message}`, {
-          statusCode: 401,
-          cause: error,
-        }),
+        new BackendAuthError(
+          "unauthorized",
+          `Invalid access token: ${message}`,
+          {
+            statusCode: 401,
+            cause: error,
+          },
+        ),
       ),
     };
   }
@@ -557,7 +558,9 @@ export const requireContainerManageRequest = async (
   }
 
   throw new BackendAuthError(
-    authorizationResult.body.code === "forbidden" ? "forbidden" : "unauthorized",
+    authorizationResult.body.code === "forbidden"
+      ? "forbidden"
+      : "unauthorized",
     authorizationResult.body.message,
     {
       statusCode: authorizationResult.status,
@@ -595,12 +598,12 @@ export const requireContainerManageRequest = async (
  *
  * 使用示例：
  * ```ts
- * const graphToken = await getGraphToken(userToken);
+ * const graphToken = await getGraphOBOToken(userToken);
  * const graphClient = createGraphClient(graphToken);
  * // 现在可以用 graphClient 代表用户调用 Graph API
  * ```
  */
-export const getGraphToken = async (token: string): Promise<string> => {
+export const getGraphOBOToken = async (token: string): Promise<string> => {
   try {
     /** 构建 OBO 请求体，声明代理用户访问 Graph 所需的权限范围。 */
     const graphTokenRequest = {
@@ -618,8 +621,8 @@ export const getGraphToken = async (token: string): Promise<string> => {
     return oboGraphToken;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new BackendUpstreamError(
-      "upstreamFailure",
+    throw new BackendGraphError(
+      "graphFailure",
       "Unable to generate Microsoft Graph OBO token.",
       {
         statusCode: 502,

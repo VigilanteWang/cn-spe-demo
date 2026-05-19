@@ -4,11 +4,11 @@ export type BackendErrorCategory =
   | "auth"
   | "validation"
   | "config"
-  | "upstream"
+  | "graph"
   | "business"
   | "internal";
 
-export interface IBackendBusinessErrorOptions {
+export interface IBackendErrorOptions {
   statusCode?: number;
   details?: Record<string, unknown>;
   cause?: unknown;
@@ -16,8 +16,8 @@ export interface IBackendBusinessErrorOptions {
   retryAfterSeconds?: number;
 }
 
-interface IBackendBusinessErrorInit<TCode extends string>
-  extends IBackendBusinessErrorOptions {
+interface IBackendErrorInit<TCode extends string>
+  extends IBackendErrorOptions {
   name: string;
   code: TCode;
   category: BackendErrorCategory;
@@ -30,7 +30,7 @@ interface IBackendBusinessErrorInit<TCode extends string>
  * 各模块可以继续派生自己的稳定错误类型，
  * 让 HTTP 层根据 code/category/statusCode 统一构造响应。
  */
-export class BackendBusinessError<TCode extends string = ApiErrorCode> extends Error {
+export class BackendError<TCode extends string = ApiErrorCode> extends Error {
   readonly code: TCode;
 
   readonly category: BackendErrorCategory;
@@ -45,7 +45,7 @@ export class BackendBusinessError<TCode extends string = ApiErrorCode> extends E
 
   readonly retryAfterSeconds?: number;
 
-  constructor(init: IBackendBusinessErrorInit<TCode>) {
+  constructor(init: IBackendErrorInit<TCode>) {
     super(init.message);
     this.name = init.name;
     this.code = init.code;
@@ -61,13 +61,13 @@ export class BackendBusinessError<TCode extends string = ApiErrorCode> extends E
 /**
  * 统一的鉴权失败错误。
  */
-export class BackendAuthError extends BackendBusinessError<
+export class BackendAuthError extends BackendError<
   "unauthorized" | "forbidden"
 > {
   constructor(
     code: "unauthorized" | "forbidden",
     message: string,
-    options?: IBackendBusinessErrorOptions & { name?: string },
+    options?: IBackendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "BackendAuthError",
@@ -86,10 +86,10 @@ export class BackendAuthError extends BackendBusinessError<
 /**
  * 统一的输入校验失败错误。
  */
-export class BackendValidationError extends BackendBusinessError<"invalidRequest"> {
+export class BackendValidationError extends BackendError<"invalidRequest"> {
   constructor(
     message: string,
-    options?: IBackendBusinessErrorOptions & { name?: string },
+    options?: IBackendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "BackendValidationError",
@@ -108,10 +108,10 @@ export class BackendValidationError extends BackendBusinessError<"invalidRequest
 /**
  * 统一的配置错误。
  */
-export class BackendConfigError extends BackendBusinessError<"internalError"> {
+export class BackendConfigError extends BackendError<"internalError"> {
   constructor(
     message: string,
-    options?: IBackendBusinessErrorOptions & { name?: string },
+    options?: IBackendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "BackendConfigError",
@@ -128,23 +128,22 @@ export class BackendConfigError extends BackendBusinessError<"internalError"> {
 }
 
 /**
- * 统一的下游服务错误。
+ * 统一的 Graph 请求错误。
  */
-export class BackendUpstreamError extends BackendBusinessError<
-  "upstreamFailure" | "throttled" | "serviceUnavailable" | "graphFailure"
+export class BackendGraphError extends BackendError<
+  "throttled" | "serviceUnavailable" | "graphFailure"
 > {
   constructor(
     code:
-      | "upstreamFailure"
       | "throttled"
       | "serviceUnavailable"
       | "graphFailure",
     message: string,
-    options?: IBackendBusinessErrorOptions & { name?: string },
+    options?: IBackendErrorOptions & { name?: string },
   ) {
     super({
-      name: options?.name ?? "BackendUpstreamError",
-      category: "upstream",
+      name: options?.name ?? "BackendGraphError",
+      category: "graph",
       code,
       message,
       statusCode: options?.statusCode,
@@ -159,10 +158,10 @@ export class BackendUpstreamError extends BackendBusinessError<
 /**
  * 统一的内部错误。
  */
-export class BackendInternalError extends BackendBusinessError<"internalError"> {
+export class BackendInternalError extends BackendError<"internalError"> {
   constructor(
     message: string,
-    options?: IBackendBusinessErrorOptions & { name?: string },
+    options?: IBackendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "BackendInternalError",
@@ -204,7 +203,38 @@ const readHeaderValue = (
 };
 
 /**
- * 读取下游错误上的 HTTP 状态码。
+ * 提取 Graph 错误对象里可能承载响应头的容器。
+ *
+ * 不同来源的错误对象结构不完全一致，所以这里按常见位置依次兜底。
+ */
+const readErrorHeadersCandidate = (error: unknown): unknown => {
+  const record = readRecord(error);
+  return (
+    record.headers ??
+    record.responseHeaders ??
+    readRecord(record.response).headers ??
+    readRecord(record.body).headers
+  );
+};
+
+/**
+ * 提取 Graph 错误对象里的 innerError。
+ *
+ * Graph SDK 有时会把 innerError 放在 body.error.innerError，
+ * 也有时直接挂在 error.innerError 上，这里统一收口。
+ */
+const readErrorInnerError = (error: unknown): Record<string, unknown> => {
+  const record = readRecord(error);
+  const bodyInnerError = readRecord(readRecord(record.body).innerError);
+  const errorInnerError = readRecord(readRecord(record.error).innerError);
+
+  return Object.keys(bodyInnerError).length > 0
+    ? bodyInnerError
+    : errorInnerError;
+};
+
+/**
+ * 读取 Graph 错误上的 HTTP 状态码。
  */
 export const readErrorStatusCode = (error: unknown): number | undefined => {
   const record = readRecord(error);
@@ -213,15 +243,10 @@ export const readErrorStatusCode = (error: unknown): number | undefined => {
 };
 
 /**
- * 读取下游错误上的 request id。
+ * 读取 Graph 错误上的 request id。
  */
 export const readErrorRequestId = (error: unknown): string | undefined => {
-  const record = readRecord(error);
-  const headersCandidate =
-    record.headers ??
-    record.responseHeaders ??
-    readRecord(record.response).headers ??
-    readRecord(record.body).headers;
+  const headersCandidate = readErrorHeadersCandidate(error);
 
   const headerRequestId =
     readHeaderValue(headersCandidate, "request-id") ??
@@ -232,10 +257,7 @@ export const readErrorRequestId = (error: unknown): string | undefined => {
     return headerRequestId;
   }
 
-  const bodyInnerError = readRecord(readRecord(record.body).innerError);
-  const errorInnerError = readRecord(readRecord(record.error).innerError);
-  const innerError =
-    Object.keys(bodyInnerError).length > 0 ? bodyInnerError : errorInnerError;
+  const innerError = readErrorInnerError(error);
   const requestId =
     innerError["request-id"] ??
     innerError.requestId ??
@@ -245,17 +267,12 @@ export const readErrorRequestId = (error: unknown): string | undefined => {
 };
 
 /**
- * 读取下游错误上的 Retry-After 秒数。
+ * 读取 Graph 错误上的 Retry-After 秒数。
  */
 export const readErrorRetryAfterSeconds = (
   error: unknown,
 ): number | undefined => {
-  const record = readRecord(error);
-  const headersCandidate =
-    record.headers ??
-    record.responseHeaders ??
-    readRecord(record.response).headers ??
-    readRecord(record.body).headers;
+  const headersCandidate = readErrorHeadersCandidate(error);
 
   const headerValue =
     readHeaderValue(headersCandidate, "Retry-After") ??
@@ -268,10 +285,7 @@ export const readErrorRetryAfterSeconds = (
     }
   }
 
-  const bodyInnerError = readRecord(readRecord(record.body).innerError);
-  const errorInnerError = readRecord(readRecord(record.error).innerError);
-  const innerError =
-    Object.keys(bodyInnerError).length > 0 ? bodyInnerError : errorInnerError;
+  const innerError = readErrorInnerError(error);
   const retryAfter =
     innerError.retryAfter ??
     innerError.retryAfterSeconds ??
@@ -306,9 +320,9 @@ const readErrorMessage = (error: unknown, fallbackMessage: string): string => {
 };
 
 /**
- * 把未知下游异常收口为统一的上游服务错误。
+ * 把未知 Graph 异常收口为统一的 Graph 错误。
  */
-export const toBackendUpstreamError = (
+export const toBackendGraphError = (
   error: unknown,
   options?: {
     defaultMessage?: string;
@@ -316,16 +330,16 @@ export const toBackendUpstreamError = (
     serviceUnavailableMessage?: string;
     graphFailureMessage?: string;
   },
-): BackendUpstreamError => {
-  if (error instanceof BackendUpstreamError) {
+): BackendGraphError => {
+  if (error instanceof BackendGraphError) {
     return error;
   }
 
   if (
-    error instanceof BackendBusinessError &&
-    error.category === "upstream"
+    error instanceof BackendError &&
+    error.category === "graph"
   ) {
-    return error as BackendUpstreamError;
+    return error as BackendGraphError;
   }
 
   const statusCode = readErrorStatusCode(error);
@@ -333,14 +347,14 @@ export const toBackendUpstreamError = (
   const retryAfterSeconds = readErrorRetryAfterSeconds(error);
   const fallbackMessage =
     options?.defaultMessage ??
-    "The upstream service request failed after the retry policy completed.";
+    "The Microsoft Graph request failed after the retry policy completed.";
   const message = readErrorMessage(error, fallbackMessage);
 
   if (statusCode === 429) {
-    return new BackendUpstreamError(
+    return new BackendGraphError(
       "throttled",
       options?.throttledMessage ??
-        "The upstream service throttled this request after retries were exhausted.",
+        "Microsoft Graph throttled this request after retries were exhausted.",
       {
         statusCode,
         requestId,
@@ -351,10 +365,10 @@ export const toBackendUpstreamError = (
   }
 
   if (statusCode === 503 || statusCode === 504) {
-    return new BackendUpstreamError(
+    return new BackendGraphError(
       "serviceUnavailable",
       options?.serviceUnavailableMessage ??
-        `The upstream service is temporarily unavailable: ${message}`,
+        `Microsoft Graph is temporarily unavailable: ${message}`,
       {
         statusCode,
         requestId,
@@ -364,8 +378,8 @@ export const toBackendUpstreamError = (
     );
   }
 
-  return new BackendUpstreamError(
-    "upstreamFailure",
+  return new BackendGraphError(
+    "graphFailure",
     options?.graphFailureMessage ?? message,
     {
       statusCode: statusCode ?? 502,
