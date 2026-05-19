@@ -1,43 +1,10 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { BackendGraphError } from "../common/errors";
 import { createGraphClient } from "../auth";
-import {
-  FlatFile,
-  GraphDriveItemWithDownloadUrl,
-} from "./downloadTypes";
+import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 import { toDownloadGraphError } from "./downloadErrors";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;
-
-/**
- * 从 /content 302 响应中提取下载地址；缺失时抛出稳定错误。
- *
- * @param location 响应头中的 Location。
- * @param driveId 当前 Drive ID。
- * @param itemId 当前文件 ID。
- * @param status 本次下游 HTTP 状态码。
- * @returns 可直接下载文件内容的 URL。
- */
-const readDownloadLocationOrThrow = (
-  location: string | null,
-  driveId: string,
-  itemId: string,
-  status: number,
-): string => {
-  if (location) {
-    return location;
-  }
-
-  throw new BackendGraphError(
-    "graphFailure",
-    `Unable to resolve the download url for item ${itemId}.`,
-    {
-      name: "DownloadUrlNotFoundError",
-      statusCode: status,
-      details: { driveId, itemId },
-    },
-  );
-};
 
 /**
  * 递归展开用户选择的项目，返回严格模式下的扁平文件列表。
@@ -102,11 +69,19 @@ export const resolveDownloadUrl = async (
       redirect: "manual",
     });
 
-    return readDownloadLocationOrThrow(
-      response.headers.get("location"),
-      driveId,
-      itemId,
-      response.status,
+    const location = response.headers.get("location");
+    if (location) {
+      return location;
+    }
+
+    throw new BackendGraphError(
+      "graphFailure",
+      `Unable to resolve the download url for item ${itemId}.`,
+      {
+        name: "DownloadUrlNotFoundError",
+        statusCode: response.status,
+        details: { driveId, itemId },
+      },
     );
   } catch (error: unknown) {
     if (error instanceof BackendGraphError) {
@@ -144,10 +119,7 @@ async function expandItem(
       .select("id,name,folder,file,size")
       .get()) as DriveItem;
   } catch (error: unknown) {
-    throw toDownloadGraphError(
-      error,
-      "Unable to expand the selected items.",
-    );
+    throw toDownloadGraphError(error, "Unable to expand the selected items.");
   }
 
   const itemName = item.name ?? "";
@@ -200,10 +172,7 @@ async function expandFolder(
         .select("id,name,folder,file,size")
         .get();
     } catch (error: unknown) {
-      throw toDownloadGraphError(
-        error,
-        "Unable to expand the selected items.",
-      );
+      throw toDownloadGraphError(error, "Unable to expand the selected items.");
     }
 
     const children = page.value ?? [];

@@ -154,9 +154,7 @@ export const createArchiveTooManyFilesError = (
  * @param maxBytes 系统允许的最大总字节数。
  * @returns 对应 409 的业务错误。
  */
-export const createArchiveTooLargeError = (
-  maxBytes: number,
-): BackendError =>
+export const createArchiveTooLargeError = (maxBytes: number): BackendError =>
   new BackendError({
     name: "ArchiveTooLargeError",
     code: "conflict",

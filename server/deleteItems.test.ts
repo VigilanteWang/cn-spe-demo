@@ -4,7 +4,7 @@ import { deleteItems } from "./deleteItems";
 
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),
-  getGraphToken: vi.fn(),
+  getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
 
@@ -16,7 +16,9 @@ describe("deleteItems error handling", () => {
   });
 
   it("should return invalidRequest when itemIds is empty", async () => {
-    authMocks.requireContainerManageRequest.mockResolvedValue({ token: "user-token" });
+    authMocks.requireContainerManageRequest.mockResolvedValue({
+      token: "user-token",
+    });
 
     const req = {
       body: {

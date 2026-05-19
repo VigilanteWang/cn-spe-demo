@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BackendError } from "./common/errors";
 import { withErrorHandling } from "./common/errorResponse";
-import { getDownloadManifestRequest, getDownloadProgressRequest } from "./downloadHandlers";
+import {
+  getDownloadManifestRequest,
+  getDownloadProgressRequest,
+} from "./downloadHandlers";
 
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),

@@ -35,7 +35,9 @@ vi.mock("../files", () => {
 // 容器测试只验证对话框的静态 UI，不测权限 API 行为；
 // mock 服务层避免 containerPermissionApi → apiClient → config.ts 在测试环境立即求值报错。
 vi.mock("../../services/containerPermissionApi", () => ({
-  listContainerPermissions: vi.fn().mockResolvedValue({ people: [], groups: [] }),
+  listContainerPermissions: vi
+    .fn()
+    .mockResolvedValue({ people: [], groups: [] }),
   applyContainerPermissionChanges: vi.fn(),
   ContainerPermissionApiError: class extends Error {
     code = "";

@@ -43,16 +43,7 @@ import { CreateContainerDialog } from "./components/CreateContainerDialog";
 import { ContainerPermissionDialog } from "../permissions";
 
 /**
- * Containers 组件属性接口（当前无属性，预留未来扩展）
- **/
-interface IContainersProps {
-  // 当前暂无属性需求；勿删除此接口，下一次需要新增属性时直接在此补充即可。
-}
-
-/**
  * 容器管理页面
- *
- * @param _props 组件属性（当前未使用具体属性）
  *
  * 状态管理：
  * - containers: 容器列表数据（从后端 API 获取）
@@ -65,7 +56,7 @@ interface IContainersProps {
  * - 创建容器的表单细节已经下沉到 CreateContainerDialog。
  * - 权限弹窗的静态骨架已经下沉到 ContainerPermissionDialog。
  **/
-export const Containers = (_props: IContainersProps) => {
+export const Containers = () => {
   const styles = useContainersStyles();
 
   // =============== 容器列表相关状态 ===============

@@ -168,7 +168,8 @@ export const toContainerPermissionsApiErrorResponseBody = (
   message: error.message,
   retryAfterSeconds: error.retryAfterSeconds,
   requestId: error.requestId,
-  statusCode: error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
+  statusCode:
+    error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
   details: error.details,
 });
 

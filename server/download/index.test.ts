@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getJobManifest, getJobProgress, startDownloadJob } from "./index";
-import { resetDownloadJobsForTest } from "./downloadJobStore";
 
 const authMocks = vi.hoisted(() => ({
   createGraphClient: vi.fn(),
-  getGraphToken: vi.fn(),
+  getGraphOBOToken: vi.fn(),
 }));
 
 vi.mock("../auth", () => authMocks);
+
+type DownloadModule = typeof import("./index");
+
+let getJobManifest: DownloadModule["getJobManifest"];
+let getJobProgress: DownloadModule["getJobProgress"];
+let startDownloadJob: DownloadModule["startDownloadJob"];
 
 interface IMockGraphResponseMap {
   [path: string]:
@@ -68,14 +72,18 @@ const waitForJobStatus = async (
 };
 
 describe("download module", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
-    resetDownloadJobsForTest();
+    vi.resetModules();
     vi.unstubAllGlobals();
+
+    ({ getJobManifest, getJobProgress, startDownloadJob } = await import(
+      "./index"
+    ));
   });
 
   it("should fail the job when graph token acquisition fails", async () => {
-    authMocks.getGraphToken.mockRejectedValue(new Error("token boom"));
+    authMocks.getGraphOBOToken.mockRejectedValue(new Error("token boom"));
 
     const jobId = await startDownloadJob(
       "drive-1",
@@ -92,7 +100,7 @@ describe("download module", () => {
   });
 
   it("should fail the job when expanding an item fails", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/item-1": {
@@ -118,7 +126,7 @@ describe("download module", () => {
   });
 
   it("should fail the job when resolving a download url fails", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/item-1": {
@@ -150,7 +158,7 @@ describe("download module", () => {
   });
 
   it("should fail the job when no files are found", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/folder-1": {
@@ -181,7 +189,7 @@ describe("download module", () => {
   });
 
   it("should fail the job when file count exceeds the limit", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/folder-1": {
@@ -219,7 +227,7 @@ describe("download module", () => {
   });
 
   it("should fail the job when total size exceeds the limit", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/item-1": {
@@ -248,7 +256,7 @@ describe("download module", () => {
   });
 
   it("should build the manifest when every file is prepared successfully", async () => {
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue(
       createMockGraphClient({
         "/drives/drive-1/items/item-1": {

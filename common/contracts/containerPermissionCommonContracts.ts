@@ -1,7 +1,4 @@
-import type {
-  ApiErrorCode,
-  IApiErrorResponseBody,
-} from "./apiErrorContracts";
+import type { ApiErrorCode, IApiErrorResponseBody } from "./apiErrorContracts";
 
 /**
  * 容器权限模块在前后端之间共享的主体类型。

@@ -13,7 +13,6 @@ import {
   InputProps,
   Label,
   Spinner,
-  Text,
 } from "@fluentui/react-components";
 import Preview from "../preview";
 import { IDriveItemExtended } from "../../common/types";

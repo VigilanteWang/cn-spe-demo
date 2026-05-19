@@ -65,6 +65,8 @@ export const readJob = (jobId: string): Job | undefined => jobs.get(jobId);
  * @returns 去掉内部字段后的公开进度对象。
  */
 export const toJobProgress = (job: Job): JobProgress => {
+  //解构赋值的方式丢掉 manifest 等内部字段，
+  //只保留对前端展示有用的进度信息。
   const {
     manifest: _manifest,
     createdAt: _createdAt,
@@ -101,11 +103,4 @@ export const markJobFailed = (job: Job, message: string): void => {
   if (job.errors.length === 0) {
     job.errors.push(message);
   }
-};
-
-/**
- * 清空测试中的任务状态，避免跨用例污染。
- */
-export const resetDownloadJobsForTest = (): void => {
-  jobs.clear();
 };

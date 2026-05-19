@@ -14,10 +14,7 @@
  * 4. archiveDownloader.downloadArchiveFromManifest() → 前端流式下载并压缩成 ZIP
  */
 
-import {
-  IAbortRequestOptions,
-  sendAuthorizedRequest,
-} from "./apiClient";
+import { IAbortRequestOptions, sendAuthorizedRequest } from "./apiClient";
 import { FrontendApiError, FrontendUserActionError } from "../common/errors.ts";
 import {
   IArchiveManifest,
@@ -220,9 +217,9 @@ export async function selectDownloadSaveTarget(
     const writable = await handle.createWritable();
     // 统一用 filename 承载最终文件名：优先使用用户在保存对话框中确认的名称
     return { filename: handle.name || filename, writable };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 用户取消保存对话框时，不应继续后续下载流程
-    if (error?.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       throw new DownloadSaveTargetSelectionCancelledError();
     }
     throw error;

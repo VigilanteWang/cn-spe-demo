@@ -44,9 +44,7 @@ interface IFetchUserPhotoUrlMapOptions {
  * 统一清洗 Graph presence 字符串值。
  * 例如 "DoNotDisturb"、"do-not-disturb"、"do_not_disturb" 都会归一化。
  */
-const normalizePresenceToken = (
-  rawToken: string | undefined,
-): string => {
+const normalizePresenceToken = (rawToken: string | undefined): string => {
   if (!rawToken) {
     return "";
   }

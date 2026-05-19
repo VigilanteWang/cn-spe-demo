@@ -12,7 +12,9 @@ describe("normalizeError", () => {
 
     expect(normalizedError.code).toBe("internalError");
     expect(normalizedError.statusCode).toBe(500);
-    expect(normalizedError.message).toBe("An unexpected server error occurred.");
+    expect(normalizedError.message).toBe(
+      "An unexpected server error occurred.",
+    );
   });
 
   it("should map status-based conflicts to stable business errors", () => {

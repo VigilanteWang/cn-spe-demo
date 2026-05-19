@@ -16,8 +16,7 @@ export interface IBackendErrorOptions {
   retryAfterSeconds?: number;
 }
 
-interface IBackendErrorInit<TCode extends string>
-  extends IBackendErrorOptions {
+interface IBackendErrorInit<TCode extends string> extends IBackendErrorOptions {
   name: string;
   code: TCode;
   category: BackendErrorCategory;
@@ -134,10 +133,7 @@ export class BackendGraphError extends BackendError<
   "throttled" | "serviceUnavailable" | "graphFailure"
 > {
   constructor(
-    code:
-      | "throttled"
-      | "serviceUnavailable"
-      | "graphFailure",
+    code: "throttled" | "serviceUnavailable" | "graphFailure",
     message: string,
     options?: IBackendErrorOptions & { name?: string },
   ) {
@@ -335,10 +331,7 @@ export const toBackendGraphError = (
     return error;
   }
 
-  if (
-    error instanceof BackendError &&
-    error.category === "graph"
-  ) {
+  if (error instanceof BackendError && error.category === "graph") {
     return error as BackendGraphError;
   }
 

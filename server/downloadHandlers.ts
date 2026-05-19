@@ -100,6 +100,7 @@ const readStringArray = (value: unknown): string[] => {
   }
 
   return value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0,
   );
 };

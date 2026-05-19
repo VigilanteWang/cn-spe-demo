@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  BackendError,
-  toBackendGraphError,
-} from "./errors";
+import { BackendError, toBackendGraphError } from "./errors";
 
 describe("toBackendGraphError", () => {
   it("should map 429 errors with Retry-After and request id", () => {

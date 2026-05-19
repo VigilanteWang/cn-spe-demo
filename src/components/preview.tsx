@@ -44,7 +44,6 @@ import {
   OpenRegular,
   DismissRegular,
 } from "@fluentui/react-icons";
-import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { Providers } from "@microsoft/mgt-element";
 import { IDriveItemExtended } from "../common/types";
 

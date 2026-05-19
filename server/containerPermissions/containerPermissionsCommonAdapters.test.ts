@@ -61,13 +61,16 @@ describe("mapGraphPermissionToEntryOnUI", () => {
       },
       "groups",
     ],
-  ])("should map %s identities into common entries", (_kind, permission, expectedTab) => {
-    const entry = mapGraphPermissionToEntryOnUI(permission);
+  ])(
+    "should map %s identities into common entries",
+    (_kind, permission, expectedTab) => {
+      const entry = mapGraphPermissionToEntryOnUI(permission);
 
-    expect(entry.principalType).toBe(expectedTab);
-    expect(entry.permissionId).toBe(permission.id);
-    expect(entry.id).toBe(`permission:${permission.id}`);
-  });
+      expect(entry.principalType).toBe(expectedTab);
+      expect(entry.permissionId).toBe(permission.id);
+      expect(entry.id).toBe(`permission:${permission.id}`);
+    },
+  );
 
   it("should generate fallback principal ids when people identities lack graph id", () => {
     const entry = mapGraphPermissionToEntryOnUI({

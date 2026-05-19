@@ -490,8 +490,8 @@ export const ContainerPermissionDialog = ({
               </div>
 
               <Text size={200} className={styles.searchStatusText}>
-                Select someone from the results to add them. Duplicates won't be
-                added twice.
+                Select someone from the results to add them. Duplicates
+                won&apos;t be added twice.
               </Text>
             </div>
 

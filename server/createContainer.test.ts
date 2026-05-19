@@ -4,7 +4,7 @@ import { createContainer } from "./createContainer";
 
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),
-  getGraphToken: vi.fn(),
+  getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
 
@@ -19,7 +19,9 @@ describe("createContainer error handling", () => {
   });
 
   it("should return invalidRequest when displayName is missing", async () => {
-    authMocks.requireContainerManageRequest.mockResolvedValue({ token: "user-token" });
+    authMocks.requireContainerManageRequest.mockResolvedValue({
+      token: "user-token",
+    });
 
     const req = { body: {} } as never;
     const res = { send: vi.fn() } as never;

@@ -214,10 +214,7 @@ server.post("/api/deleteItems", withErrorHandling(deleteItems));
  * 1. 后端只负责展开目录、校验限制、解析下载地址、维护任务状态
  * 2. 前端拿到 manifest 后再逐项下载并流式压缩成 ZIP
  */
-server.post(
-  "/api/download/start",
-  withErrorHandling(startDownloadRequest),
-);
+server.post("/api/download/start", withErrorHandling(startDownloadRequest));
 
 // ── 归档下载：查询进度 ─────────────────────────────────────────────────────
 /**

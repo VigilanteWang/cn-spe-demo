@@ -102,7 +102,7 @@ export const normalizeError = (error: unknown): BackendError => {
           ? "validation"
           : normalizedCode === "throttled" ||
               normalizedCode === "serviceUnavailable"
-            ? "upstream"
+            ? "graph"
             : "business",
       message,
       statusCode,

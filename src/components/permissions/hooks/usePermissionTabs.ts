@@ -10,7 +10,8 @@ export const usePermissionTabs = (
   initialTab: PermissionTabValue = "people",
 ) => {
   // selectedTab 决定当前界面正在编辑 People 还是 Groups。
-  const [selectedTab, setSelectedTab] = useState<PermissionTabValue>(initialTab);
+  const [selectedTab, setSelectedTab] =
+    useState<PermissionTabValue>(initialTab);
 
   return {
     selectedTab,

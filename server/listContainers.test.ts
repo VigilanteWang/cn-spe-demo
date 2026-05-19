@@ -4,7 +4,7 @@ import { listContainers } from "./listContainers";
 
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),
-  getGraphToken: vi.fn(),
+  getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
 
@@ -19,8 +19,10 @@ describe("listContainers error handling", () => {
   });
 
   it("should return throttled error metadata for Graph 429 failures", async () => {
-    authMocks.requireContainerManageRequest.mockResolvedValue({ token: "user-token" });
-    authMocks.getGraphToken.mockResolvedValue("graph-token");
+    authMocks.requireContainerManageRequest.mockResolvedValue({
+      token: "user-token",
+    });
+    authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
     authMocks.createGraphClient.mockReturnValue({
       api: vi.fn().mockReturnValue({
         version: vi.fn().mockReturnValue({
