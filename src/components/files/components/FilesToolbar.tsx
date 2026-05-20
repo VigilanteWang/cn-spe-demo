@@ -1,7 +1,4 @@
-import {
-  Toolbar,
-  ToolbarButton,
-} from "@fluentui/react-components";
+import { Toolbar, ToolbarButton } from "@fluentui/react-components";
 import {
   AddRegular,
   ArrowDownloadRegular,
@@ -10,6 +7,7 @@ import {
   DeleteRegular,
   FolderAddRegular,
 } from "@fluentui/react-icons";
+import { useFilesStyles } from "../filesStyles";
 
 interface IFilesToolbarProps {
   /** 是否可以返回上级目录。 */
@@ -48,9 +46,12 @@ export const FilesToolbar = ({
   onDownload,
   onDelete,
 }: IFilesToolbarProps) => {
+  const styles = useFilesStyles();
   return (
-    <Toolbar>
+    <Toolbar className={styles.toolbar}>
+      {/* 第一个按钮移除左侧 padding，使整行工具栏与容器左边缘对齐 */}
       <ToolbarButton
+        className={styles.toolbarFirstButton}
         vertical
         icon={<ArrowLeftRegular />}
         onClick={() => void onBack()}
@@ -61,10 +62,18 @@ export const FilesToolbar = ({
       <ToolbarButton vertical icon={<AddRegular />} onClick={onCreateFolder}>
         New Folder
       </ToolbarButton>
-      <ToolbarButton vertical icon={<ArrowUploadRegular />} onClick={onUploadFile}>
+      <ToolbarButton
+        vertical
+        icon={<ArrowUploadRegular />}
+        onClick={onUploadFile}
+      >
         Upload File
       </ToolbarButton>
-      <ToolbarButton vertical icon={<FolderAddRegular />} onClick={onUploadFolder}>
+      <ToolbarButton
+        vertical
+        icon={<FolderAddRegular />}
+        onClick={onUploadFolder}
+      >
         Upload Folder
       </ToolbarButton>
       <ToolbarButton

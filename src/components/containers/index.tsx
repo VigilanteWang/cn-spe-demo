@@ -1,0 +1,185 @@
+/**
+ * 容器管理组件模块
+ *
+ * 本模块负责：
+ * 1. 列出当前用户可访问的所有 SharePoint Embedded 存储容器
+ * 2. 提供下拉框供用户选择容器
+ * 3. 负责“创建容器”和“管理容器权限”两个弹窗的打开/关闭编排
+ * 4. 选中容器后渲染 <Files /> 组件展示容器内文件
+ *
+ * 组件结构：
+ *   <div root>
+ *     <div headerSection>
+ *       <Dropdown />                    ← 容器选择下拉框
+ *       <div actionGroup>
+ *         <Button />                    ← Create container 按钮
+ *         <Button />                    ← Manage Container Permission 按钮
+ *       </div>
+ *     </div>
+ *     <CreateContainerDialog />         ← 创建容器对话框
+ *     <ContainerPermissionDialog />     ← 容器权限对话框骨架
+ *     <Files container={selectedContainer} />  ← 仅在选中容器后渲染
+ *   </div>
+ *
+ * 数据流：
+ * - 组件初始化时调用 spe.listContainers() 获取容器列表
+ * - 用户选择容器 → setSelectedContainer → 传递给 <Files />
+ * - 用户创建容器 → 对话框内部调用 spe.createContainer() → 回调给本组件更新列表 + 自动选中新容器
+ * - 用户点击管理权限 → 仅打开权限对话框骨架，本步不加载真实权限数据
+ **/
+
+import { useEffect, useState } from "react";
+import { Button, Dropdown, Option } from "@fluentui/react-components";
+import type {
+  OptionOnSelectData,
+  SelectionEvents,
+} from "@fluentui/react-combobox";
+import { IContainer } from "../../common/types";
+import { readErrorMessage } from "../../common/errors.ts";
+import { listContainers } from "../../services/backendApi";
+import { Files } from "../files";
+import { useContainersStyles } from "./containersStyles";
+import { CreateContainerDialog } from "./components/CreateContainerDialog";
+import { ContainerPermissionDialog } from "../permissions";
+
+/**
+ * 容器管理页面
+ *
+ * 状态管理：
+ * - containers: 容器列表数据（从后端 API 获取）
+ * - selectedContainer: 当前选中的容器（传递给 <Files /> 子组件）
+ * - isCreateDialogOpen: 创建容器对话框是否打开
+ * - isPermissionDialogOpen: 容器权限对话框是否打开
+ *
+ * 说明：
+ * - 本组件现在只保留页面级职责：数据入口、页面编排、弹窗开关和文件区挂载。
+ * - 创建容器的表单细节已经下沉到 CreateContainerDialog。
+ * - 权限弹窗的静态骨架已经下沉到 ContainerPermissionDialog。
+ **/
+export const Containers = () => {
+  const styles = useContainersStyles();
+
+  // =============== 容器列表相关状态 ===============
+  const [containers, setContainers] = useState<IContainer[]>([]);
+  const [selectedContainer, setSelectedContainer] = useState<
+    IContainer | undefined
+  >(undefined);
+
+  // =============== 页面弹窗开关状态 ===============
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+
+  // =============== 错误状态：容器加载失败或创建失败时展示 ===============
+  const [containerError, setContainerError] = useState<string | null>(null);
+
+  // =============== 副作用：初始加载容器列表 ===============
+  // 组件挂载时立即调用后端 API 获取容器列表
+  useEffect(() => {
+    (async () => {
+      try {
+        const nextContainers = await listContainers();
+        setContainers(nextContainers);
+      } catch (error) {
+        // 加载容器列表失败时，在按鈕旁显示错误提示
+        setContainerError(readErrorMessage(error, "Failed to load containers"));
+      }
+    })();
+  }, []);
+
+  /**
+   * 下拉框选择变化处理：根据选中的 optionValue（容器 ID）查找并设置选中容器
+   **/
+  const handleContainerSelect = (
+    _event: SelectionEvents,
+    data: OptionOnSelectData,
+  ) => {
+    const nextSelectedContainer = containers.find(
+      (container) => container.id === data.optionValue,
+    );
+
+    setSelectedContainer(nextSelectedContainer);
+  };
+
+  /**
+   * 创建容器成功后的回调处理
+   *
+   * 执行流程：
+   * 1. 将新容器追加到当前列表
+   * 2. 自动把新容器设为当前选中容器
+   * 3. Files 区域会因此自动切换到新容器上下文
+   **/
+  const handleContainerCreated = (container: IContainer) => {
+    setContainers((currentContainers) => [...currentContainers, container]);
+    setSelectedContainer(container);
+    // 创建成功后清除之前的错误提示
+    setContainerError(null);
+  };
+
+  return (
+    <div className={styles.root} data-testid="containers-page">
+      {/* ── 顶部容器控制区域：下拉框 + 创建按钮 + 权限按钮，整体左对齐 ── */}
+      <div className={styles.headerSection} data-testid="containers-header">
+        <div className={styles.controlsRow}>
+          {/* 容器选择下拉框：每个 Option 的 value 是容器 ID，选中后触发 handleContainerSelect */}
+          <Dropdown
+            placeholder="Select a Storage Container"
+            className={styles.containerDropdown}
+            onOptionSelect={handleContainerSelect}
+            data-testid="container-selector"
+          >
+            {containers.map((container) => (
+              <Option key={container.id} value={container.id}>
+                {container.displayName}
+              </Option>
+            ))}
+          </Dropdown>
+
+          {/* 操作按钮组：与容器选择器同一行排列，必要时允许换行，但逻辑上仍属于同一控制区 */}
+          <div className={styles.actionGroup} data-testid="container-actions">
+            <Button
+              appearance="primary"
+              disabled={!selectedContainer}
+              onClick={() => setIsPermissionDialogOpen(true)}
+            >
+              Manage Permission
+            </Button>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              Create container
+            </Button>
+            {/* 创建容器失败或加载错误时，在按鈕右侧显示错误文字 */}
+            {containerError && (
+              <span className={styles.errorLabel}>{containerError}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 创建容器对话框：页面层只控制开关，具体表单和创建流程在子组件内部 */}
+      <CreateContainerDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onContainerCreated={handleContainerCreated}
+        onError={(error) =>
+          setContainerError(
+            readErrorMessage(error, "Failed to create container"),
+          )
+        }
+      />
+
+      {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}
+      <ContainerPermissionDialog
+        open={isPermissionDialogOpen}
+        containerId={selectedContainer?.id}
+        containerName={selectedContainer?.displayName}
+        onClose={() => setIsPermissionDialogOpen(false)}
+      />
+
+      {/* 仅在用户选中容器后才渲染文件列表组件，传入选中的容器对象 */}
+      <div className={styles.filesRegion} data-testid="containers-files-region">
+        {selectedContainer && <Files container={selectedContainer} />}
+      </div>
+    </div>
+  );
+};
+
+export default Containers;

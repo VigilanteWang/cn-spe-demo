@@ -192,9 +192,9 @@ server.get("/api/listContainers", async (req, res) => {
 - `GET /api/listContainers`
 - `POST /api/createContainer`
 - `POST /api/deleteItems`
-- `POST /api/downloadArchive/start`
-- `GET /api/downloadArchive/progress/:jobId`
-- `GET /api/downloadArchive/manifest/:jobId`
+- `POST /api/download/start`
+- `GET /api/download/progress/:jobId`
+- `GET /api/download/manifest/:jobId`
 
 同时在文件头部新增了一段 JSDoc 注释（`Handler 风格说明`），向后续开发者解释这个约定，防止同样的错误再次发生。
 
@@ -234,7 +234,7 @@ server.get("/api/listContainers", async (req, res) => {
 > **`instanceof Error` 是什么？**  
 > `instanceof` 是 JavaScript 的运算符，用来检查一个值是否是某个类的实例。`error instanceof Error` 检查 `error` 是否是 `Error` 类（或其子类）的实例，只有这时才能安全地访问 `.message`。
 
-**涉及文件**：`server/index.ts`、`server/listContainers.ts`、`server/downloadArchive.ts`、`src/components/files.tsx`、`src/services/spembedded.ts`
+**涉及文件**：`server/index.ts`、`server/listContainers.ts`、`server/download/`、`src/components/files.tsx`、`src/services/downloadApi.ts`
 
 ---
 
@@ -466,7 +466,7 @@ export const Containers = (_props: IContainersProps) => { ... }
 | `src/services/spembedded.ts`    | 修改 | `catch` 类型 `any` → `unknown`                                         |
 | `server/index.ts`               | 修改 | 6 个路由删除 `next` 参数，CORS 白名单，`catch` 类型安全化              |
 | `server/listContainers.ts`      | 修改 | `catch` 类型 `any` → `unknown`                                         |
-| `server/downloadArchive.ts`     | 修改 | `catch` 类型 `any` → `unknown`                                         |
+| `server/download/`              | 修改 | 下载准备模块拆分与错误处理下沉                                         |
 | `server/tsconfig.json`          | 修改 | 目标 ES2022，lib 去掉 DOM，加 `skipLibCheck`                           |
 | `.vscode/tasks.json`            | 修改 | 前端任务匹配模式从 Webpack 改为 Vite                                   |
 | `.vscode/launch.json`           | 修改 | `pwa-chrome` → `chrome`，新增 Vite sourceMapPathOverrides              |

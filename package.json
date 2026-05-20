@@ -40,6 +40,8 @@
     "start": "npm run dev",
     "start:prod": "run-s build:prod start:backend:prod",
     "start:backend:prod": "cross-env NODE_ENV=production env-cmd --silent -f .env.production.local node ./server/dist/index.js",
+    "lint": "eslint eslint.config.mjs package.json src server common --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint eslint.config.mjs package.json src server common --fix --no-error-on-unmatched-pattern",
     "test": "vitest"
   },
   "browserslist": {
@@ -65,7 +67,7 @@
     "@vitejs/plugin-react": "^4.4.0",
     "cross-env": "^7.0.3",
     "env-cmd": "10.1.0",
-    "eslint": "^8.57.1",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.4.0",
     "eslint-plugin-react": "^7.37.5",

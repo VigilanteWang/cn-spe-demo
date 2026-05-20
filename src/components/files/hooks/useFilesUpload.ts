@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
+import { FrontendApiError, readErrorMessage } from "../../../common/errors.ts";
 import {
   IFileWithRelativePath,
   IFilesUploadItem,
@@ -8,6 +9,18 @@ import {
   IUploadProgress,
 } from "../filesTypes";
 import { formatFileSize } from "../filesUtils";
+
+/**
+ * 文件上传链路里的稳定 Graph/服务错误。
+ */
+class FilesUploadError extends FrontendApiError {
+  constructor(code: string, message: string, folderName: string) {
+    super(code, message, {
+      name: "FilesUploadError",
+      details: { folderName },
+    });
+  }
+}
 
 interface IUseFilesUploadOptions {
   /** 当前容器 ID。 */
@@ -122,9 +135,13 @@ export const useFilesUpload = ({
 
         return newFolder.id as string;
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = readErrorMessage(error, "Unknown upload error.");
         console.error(`Failed to create folder ${folderName}: ${message}`);
-        throw error;
+        throw new FilesUploadError(
+          "createFolderFailed",
+          `Failed to create folder ${folderName}: ${message}`,
+          folderName,
+        );
       }
     },
     [containerId],

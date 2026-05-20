@@ -172,8 +172,8 @@ await fetch("/api/data", { signal: combined });
 
 组件在开始任务时创建 `runController`，并把 `downloadAbortSignal` 传给服务层接口：
 
-- `startDownloadArchive(..., { requestAbortSignal })`
-- `getArchivePreparationProgress(..., { requestAbortSignal })`
+- `startDownload(..., { requestAbortSignal })`
+- `getDownloadProgress(..., { requestAbortSignal })`
 - `getDownloadManifest(..., { requestAbortSignal })`
 - `downloadArchiveFromManifest(..., { requestAbortSignal })`
 

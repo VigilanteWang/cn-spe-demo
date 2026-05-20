@@ -14,10 +14,11 @@
 
 import { Request, Response } from "restify";
 import {
-  authorizeContainerManageRequest,
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
+  requireContainerManageRequest,
 } from "./auth";
+import { BackendValidationError, toBackendGraphError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -32,16 +33,11 @@ import { serverConfig } from "./config";
  */
 export const createContainer = async (req: Request, res: Response) => {
   /** 所有创建操作都先经过统一权限校验。 */
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   try {
     /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
 
     /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
     const graphClient = createGraphClient(graphToken);
@@ -50,8 +46,15 @@ export const createContainer = async (req: Request, res: Response) => {
      * 请求体只允许前端控制名称和描述。
      * 容器类型由服务端配置决定，避免客户端绕过约束。
      */
+    if (
+      typeof req.body?.displayName !== "string" ||
+      !req.body.displayName.trim()
+    ) {
+      throw new BackendValidationError("displayName is required.");
+    }
+
     const containerRequestData = {
-      displayName: req.body!.displayName,
+      displayName: req.body.displayName.trim(),
       description: req.body?.description ? req.body.description : "",
       containerTypeId: serverConfig.containerTypeId,
     };
@@ -64,8 +67,13 @@ export const createContainer = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Failed to create container: ${msg}` });
-    return;
+    if (error instanceof BackendValidationError) {
+      throw error;
+    }
+
+    throw toBackendGraphError(error, {
+      failureMessage: "Failed to create container.",
+      operationDescription: "create-container",
+    });
   }
 };

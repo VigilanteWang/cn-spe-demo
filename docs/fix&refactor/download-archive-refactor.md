@@ -24,17 +24,17 @@
 
 ### 新方案（本次实现）
 
-1. 前端调用 `POST /api/downloadArchive/start` 创建任务，获得 `jobId`。
-2. 前端轮询 `GET /api/downloadArchive/progress/:jobId`。
+1. 前端调用 `POST /api/download/start` 创建任务，获得 `jobId`。
+2. 前端轮询 `GET /api/download/progress/:jobId`。
 3. 后端后台递归展开目录，解析每个文件 `downloadUrl`，构建 `manifest`。
-4. 任务就绪后，前端调用 `GET /api/downloadArchive/manifest/:jobId` 获取清单。
+4. 任务就绪后，前端调用 `GET /api/download/manifest/:jobId` 获取清单。
 5. 前端逐项流式下载文件并推入 `fflate`，边压缩边写入磁盘流（或 Blob 回退）。
 
 ## 3. 本次核心改动
 
 ## 后端改动
 
-### 文件：`server/downloadArchive.ts`
+### 文件：`server/download/`
 
 - 职责从“后端打包 ZIP”改为“准备下载清单（manifest）”。
 - 新增/确认类型：
@@ -52,18 +52,18 @@
 ### 文件：`server/index.ts`
 
 - 路由对齐新架构：
-  - 保留 `POST /api/downloadArchive/start`
-  - 保留 `GET /api/downloadArchive/progress/:jobId`
-  - 使用 `GET /api/downloadArchive/manifest/:jobId`
+  - 使用 `POST /api/download/start`
+  - 使用 `GET /api/download/progress/:jobId`
+  - 使用 `GET /api/download/manifest/:jobId`
 - 注释更新为“后端准备清单，前端压缩下载”。
 
 ## 前端改动
 
-### 文件：`src/services/spembedded.ts`
+### 文件：`src/services/downloadApi.ts`
 
 - 新增/完善能力：
   - `getDownloadManifest(jobId)`
-  - `selectArchiveSaveTarget(filename)`
+  - `selectDownloadSaveTarget(filename)`
   - `downloadArchiveFromManifest(manifest, saveTarget, onProgress)`
 - 使用 `fflate` 进行前端流式 ZIP：`Zip + AsyncZipDeflate`。
 - 支持两种输出路径：
@@ -76,7 +76,7 @@
 
 前端调用：
 
-- `startDownloadArchive(containerId, itemIds)` 获取 `jobId`
+- `startDownload(containerId, itemIds)` 获取 `jobId`
 - `getDownloadProgress(jobId)` 轮询状态
 
 后端状态大致流转：

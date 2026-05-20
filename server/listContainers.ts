@@ -14,10 +14,11 @@
 
 import { Request, Response } from "restify";
 import {
-  authorizeContainerManageRequest,
   createGraphClient,
-  getGraphToken,
+  getGraphOBOToken,
+  requireContainerManageRequest,
 } from "./auth";
+import { toBackendGraphError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -31,16 +32,11 @@ import { serverConfig } from "./config";
  */
 export const listContainers = async (req: Request, res: Response) => {
   /** 先做权限校验，避免未授权请求访问下游服务。 */
-  const authorizationResult = await authorizeContainerManageRequest(req);
-
-  if (!authorizationResult.ok) {
-    res.send(authorizationResult.status, authorizationResult.body);
-    return;
-  }
+  const authorizationResult = await requireContainerManageRequest(req);
 
   try {
     /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
-    const graphToken = await getGraphToken(authorizationResult.token);
+    const graphToken = await getGraphOBOToken(authorizationResult.token);
 
     /** Graph 客户端负责封装认证和请求链式调用。 */
     const graphClient = createGraphClient(graphToken);
@@ -58,8 +54,9 @@ export const listContainers = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    res.send(500, { message: `Unable to list containers: ${msg}` });
-    return;
+    throw toBackendGraphError(error, {
+      failureMessage: "Unable to list containers.",
+      operationDescription: "container list",
+    });
   }
 };

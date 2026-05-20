@@ -13,6 +13,8 @@
  * - 可观测：关键阶段持续上报 downloaded/zipped/progress
  */
 import { AsyncZipDeflate, Zip } from "fflate";
+import { FrontendApiError } from "../common/errors.ts";
+import { IAbortRequestOptions } from "./apiClient";
 import {
   IArchiveClientProgress,
   IArchiveDownloadSession,
@@ -20,9 +22,24 @@ import {
   IArchiveSaveTarget,
 } from "../common/types";
 
-/** 可选请求参数：用于透传调用方 AbortSignal 到 fetch，支持统一取消链路。 */
-interface IAbortRequestOptions {
-  requestAbortSignal?: AbortSignal;
+/**
+ * 归档下载过程中单个文件的下载错误。
+ */
+export class ArchiveItemDownloadError extends FrontendApiError {
+  readonly relativePath: string;
+
+  constructor(relativePath: string, statusCode: number) {
+    super(
+      "downloadItemFailed",
+      `Failed to download ${relativePath}. HTTP ${statusCode}`,
+      {
+        name: "ArchiveItemDownloadError",
+        statusCode,
+        details: { relativePath },
+      },
+    );
+    this.relativePath = relativePath;
+  }
 }
 
 /**
@@ -420,8 +437,9 @@ export const downloadArchiveFromManifest = (
 
               if (!response.ok) {
                 // HTTP 返回失败时，直接中断整个归档流程。
-                throw new Error(
-                  `Failed to download ${item.relativePath}. HTTP ${response.status}`,
+                throw new ArchiveItemDownloadError(
+                  item.relativePath,
+                  response.status,
                 );
               }
 

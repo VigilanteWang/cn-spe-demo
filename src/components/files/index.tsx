@@ -13,11 +13,10 @@ import {
   InputProps,
   Label,
   Spinner,
-  Text,
 } from "@fluentui/react-components";
 import Preview from "../preview";
 import { IDriveItemExtended } from "../../common/types";
-import SpEmbedded from "../../services/spembedded";
+import { deleteItems } from "../../services/backendApi";
 import { useFilesStyles } from "./filesStyles";
 import { IFilesProps } from "./filesTypes";
 import { toProgressValue } from "./filesUtils";
@@ -61,16 +60,15 @@ import { Providers } from "@microsoft/mgt-element";
  * - POST /drives/{driveId}/items/{itemId}/children  → 创建子文件夹
  * - PUT  /drives/{driveId}/items/{itemId}:/{name}:/content  → 上传文件
  *
- * 后端 API 调用（通过 SpEmbedded 服务层）：
+ * 后端 API 调用（通过 backendApi 模块）：
  * - deleteItems()            → 批量删除文件
- * - startDownloadArchive()   → 启动 ZIP 归档任务
- * - getArchivePreparationProgress() → 轮询归档准备进度
+ * - startDownload()          → 启动 ZIP 下载准备任务
+ * - getDownloadProgress()    → 轮询归档准备进度
  * - getDownloadManifest()    → 获取归档清单
  *
  * 前端归档模块调用（通过 archiveDownloader 模块）：
  * - downloadArchiveFromManifest() → 前端流式下载并压缩
  */
-const spEmbedded = new SpEmbedded();
 
 /**
  * Files 文件管理组件。
@@ -192,7 +190,7 @@ export const Files = ({ container }: IFilesProps) => {
     const folderIdSnapshot = folderId || "root";
 
     try {
-      const result = await spEmbedded.deleteItems(container.id, selectedIds);
+      const result = await deleteItems(container.id, selectedIds);
 
       if (result.failed.length > 0) {
         console.warn(
@@ -282,7 +280,7 @@ export const Files = ({ container }: IFilesProps) => {
     const folderIdSnapshot = folderId || "root";
 
     try {
-      await spEmbedded.deleteItems(container.id, [currentPreviewFile.id as string]);
+      await deleteItems(container.id, [currentPreviewFile.id as string]);
     } catch (error: unknown) {
       console.error(
         "Preview delete failed:",
@@ -461,7 +459,8 @@ export const Files = ({ container }: IFilesProps) => {
           <DialogBody>
             {/* 动态标题：单项显示 "Delete Item"，多项显示 "Delete N items" */}
             <DialogTitle>
-              Delete {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
+              Delete{" "}
+              {selectedRows.size > 1 ? `${selectedRows.size} items` : "Item"}
             </DialogTitle>
             <DialogContent>
               <p>
@@ -481,7 +480,10 @@ export const Files = ({ container }: IFilesProps) => {
                   Cancel
                 </Button>
               </DialogTrigger>
-              <Button appearance="primary" onClick={() => void onDeleteItemClick()}>
+              <Button
+                appearance="primary"
+                onClick={() => void onDeleteItemClick()}
+              >
                 Delete
               </Button>
             </DialogActions>
@@ -494,14 +496,18 @@ export const Files = ({ container }: IFilesProps) => {
         - items: 当前文件夹的 DriveItem 列表（IDriveItemExtended）
         - selectionMode="multiselect": 支持多选，选中集合存入 selectedRows
       */}
-      <FilesDataGrid
-        driveItems={driveItems}
-        selectedRows={selectedRows}
-        onSelectionChange={onSelectionChange}
-        onOpenFolder={navigateToFolder}
-        onPreviewFile={handlePreviewOpen}
-        actionsButtonGroupClassName={styles.actionsButtonGroup}
-      />
+      {/* DataGrid 独立滚动区：仅表格横向溢出时滚动，不影响页面其他部分 */}
+      <div className={styles.dataGridWrapper}>
+        <FilesDataGrid
+          driveItems={driveItems}
+          selectedRows={selectedRows}
+          onSelectionChange={onSelectionChange}
+          onOpenFolder={navigateToFolder}
+          onPreviewFile={handlePreviewOpen}
+          actionsButtonGroupClassName={styles.actionsButtonGroup}
+          nameCellContentClassName={styles.nameCellContent}
+        />
+      </div>
 
       {/*
         文件预览对话框（全屏）：点击文件名时打开。

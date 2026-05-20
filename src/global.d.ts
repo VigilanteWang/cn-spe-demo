@@ -7,7 +7,7 @@ declare module "*.css";
  * 这里通过声明合并（Declaration Merging）安全地添加，避免使用 `as any`。
  */
 declare namespace React {
-  interface InputHTMLAttributes<T> {
+  interface InputHTMLAttributes<_T> {
     webkitdirectory?: string;
   }
 }

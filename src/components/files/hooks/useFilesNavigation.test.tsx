@@ -20,7 +20,9 @@ describe("useFilesNavigation", () => {
     });
 
     expect(result.current.folderId).toBe("root");
-    expect(result.current.breadcrumbPath).toEqual([{ id: "root", name: "Root" }]);
+    expect(result.current.breadcrumbPath).toEqual([
+      { id: "root", name: "Root" },
+    ]);
   });
 
   it("should append breadcrumb when navigating into child folder", async () => {

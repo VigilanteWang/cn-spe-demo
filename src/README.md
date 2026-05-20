@@ -77,7 +77,7 @@ src/
 | 创建文件夹 | `graph.client.api(/drives/.../children).post()`              | Graph API 直接 |
 | 删除文件   | `SpEmbedded.deleteItems()` → 后端 `/api/deleteItems`         | 后端 API       |
 | 下载文件   | `@microsoft.graph.downloadUrl` 直链                          | Graph 直链     |
-| 下载归档   | `SpEmbedded.startDownloadArchive()` → 后端 ZIP 任务          | 后端 API       |
+| 下载归档   | `downloadApi.startDownload()` → 后端 ZIP 准备任务           | 后端 API       |
 | 预览文件   | `graph.client.api(/drives/.../preview).post()`               | Graph API 直接 |
 
 ## 主要功能流程
@@ -115,13 +115,13 @@ src/
 ```
 用户选中多个文件/文件夹 → 点击 Download
                                     ↓
-                         spEmbedded.startDownloadArchive() → 获取 jobId
+                         downloadApi.startDownload() → 获取 jobId
                                     ↓
-                         每 800ms 轮询 getArchivePreparationProgress()
+                         每 800ms 轮询 getDownloadProgress()
                                     ↓
-                         状态: queued → preparing → zipping → ready
+                         状态: queued → preparing → ready / failed
                                     ↓
-                         triggerArchiveFileDownload() → 浏览器下载 ZIP
+                         getDownloadManifest() + downloadArchiveFromManifest()
 ```
 
 ### 4. 文件预览

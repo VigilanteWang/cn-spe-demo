@@ -4,13 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import { FilesDataGrid } from "./FilesDataGrid";
 import { IDriveItemExtended } from "../../../common/types";
 
-if (typeof globalThis.NodeFilter === "undefined") {
-  globalThis.NodeFilter = {
-    SHOW_ELEMENT: 1,
-  } as typeof NodeFilter;
-}
-
-const createItem = (overrides: Partial<IDriveItemExtended>): IDriveItemExtended =>
+const createItem = (
+  overrides: Partial<IDriveItemExtended>,
+): IDriveItemExtended =>
   ({
     id: "1",
     name: "file.txt",
@@ -33,6 +29,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={onPreviewFile}
         actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
       />,
     );
 
@@ -45,16 +42,43 @@ describe("FilesDataGrid", () => {
 
     render(
       <FilesDataGrid
-        driveItems={[createItem({ id: "folder-1", name: "Folder A", isFolder: true })]}
+        driveItems={[
+          createItem({ id: "folder-1", name: "Folder A", isFolder: true }),
+        ]}
         selectedRows={new Set()}
         onSelectionChange={vi.fn()}
         onOpenFolder={onOpenFolder}
         onPreviewFile={vi.fn()}
         actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
       />,
     );
 
     fireEvent.click(screen.getByText("Folder A"));
     expect(onOpenFolder).toHaveBeenCalledWith("folder-1", "Folder A");
+  });
+
+  it("should render formatted relative time for recent timestamps", () => {
+    render(
+      <FilesDataGrid
+        driveItems={[
+          createItem({
+            id: "file-2",
+            name: "Recent file.txt",
+            lastModifiedDateTime: new Date(
+              Date.now() - 60 * 60 * 1000,
+            ).toISOString(),
+          }),
+        ]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    expect(screen.getByText("1 hour ago")).toBeTruthy();
   });
 });

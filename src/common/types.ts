@@ -11,11 +11,41 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 
 /**
+ * 用户在线状态类型
+ *
+ * 与 Fluent UI PresenceBadge 的 status 枚举保持一致。
+ * 注意：Out of office 在 Fluent UI 中应通过 outOfOffice 布尔值叠加，
+ * 不应仅靠 status = "out-of-office" 表达所有组合状态。
+ **/
+export type UserPresenceStatus =
+  | "available"
+  | "away"
+  | "busy"
+  | "do-not-disturb"
+  | "offline"
+  | "out-of-office"
+  | "blocked"
+  | "unknown";
+
+/**
+ * 人员徽章在线状态视图模型。
+ *
+ * - status: PresenceBadge 的基础状态。
+ * - outOfOffice: 是否叠加 OOF 视觉样式。
+ */
+export interface IUserPresenceBadgeState {
+  status: UserPresenceStatus;
+  outOfOffice: boolean;
+}
+
+/**
  * 扩展的 DriveItem 接口，用于文件列表 DataGrid 展示
  *
  * 继承自 Microsoft Graph 的 DriveItem 基础类型，新增以下 UI 辅助属性：
  * - isFolder: 判断是否为文件夹（DriveItem.folder 存在即为 true）
  * - modifiedByName: 最后修改者的显示名称（从嵌套的 lastModifiedBy.user.displayName 提取）
+ * - modifiedById: 最后修改者的用户 ID（从嵌套的 lastModifiedBy.user.id 提取，用于 presence 查询）
+ * - modifiedByPresence: 最后修改者的 Teams 在线状态（基础状态 + OOF 叠加）
  * - iconElement: 文件/文件夹图标的 JSX 元素（FolderRegular 或 DocumentRegular）
  * - downloadUrl: 文件的直接下载链接（来自 @microsoft.graph.downloadUrl 属性）
  *
@@ -24,6 +54,9 @@ import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 export interface IDriveItemExtended extends DriveItem {
   isFolder: boolean;
   modifiedByName: string;
+  modifiedById?: string;
+  modifiedByPresence?: IUserPresenceBadgeState;
+  modifiedByPhotoUrl?: string;
   iconElement: JSX.Element;
   downloadUrl?: string;
 }
