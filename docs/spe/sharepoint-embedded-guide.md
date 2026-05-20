@@ -1,6 +1,6 @@
 # SharePoint Embedded 核心概念指南
 
-本文档帮助你在 **5-10 分钟** 内建立对 SharePoint Embedded（以下简称 SPE）的整体认知：它是什么、解决什么问题、关键对象之间如何协作、权限与计费如何运作、以及落地实施需要关注的关键步骤。
+本文档帮助开发人员，管理员在 **5-10 分钟** 内建立对 SharePoint Embedded（以下简称 SPE）的整体认知：它是什么、解决什么问题、关键对象之间如何协作、权限与计费如何运作、以及落地实施需要关注的关键步骤。
 
 ---
 
@@ -53,14 +53,12 @@ Owning Tenant（开发租户）
 
 - **Container（容器）**：SPE 最基本的存储单元，也是安全与合规的边界。可以类比为一个"仅通过 API 访问的 Document Library"。每个 Container 可以独立设置成员权限，存储多层级文件和文件夹。
 
-- **Container Type（容器类型）**：Container 的配置模板——它对同类型的所有 Container 实例定义三个核心配置：
+- **Container Type（容器类型）**：Container 的配置**模板**：
 
   - **访问授权**：规定哪些 App 可以访问该类型的 Container。每个 Container 实例都携带一个不可变的 `ContainerTypeID` 属性，用于在整个 SPE 识别其所属 Container Type。
 
   - **计费归属**：决定账单由谁承担。`trial` ，`standard` ，`directToCustomer` 三种计费模式。
   - **行为配置**：Container Type 可以设置该类型下所有 [Container 的属性](https://learn.microsoft.com/en-us/graph/api/resources/filestoragecontainertypesettings)，如共享模式、存储上限、可发现性等。
-
-  每个 Container Type 与一个 Owning Application 严格 **1:1 绑定**，且创建后类型（Trial / Standard / directToCustomer）**不可互转**。
 
 - **Application（应用）**：分为 Owning Application 和 Guest Application 两种角色：
 
@@ -79,11 +77,18 @@ SPE 引入了两个关键租户角色：
 - **Owning Tenant（拥有租户/开发租户）**：开发并管理 App 和 Container Type 的租户。通常就是 ISV 或企业开发团队所在的 M365 租户。
 - **Consuming Tenant（消费租户/客户租户）**：实际使用 App、存储文件的租户。所有 Container 和内容都存储在 Consuming Tenant 内部。
 
-> 同一个租户可以同时充当 Owning Tenant 和 Consuming Tenant（例如企业内部自建 LOB App 的场景）。
+### Container Type Registration（容器类型注册）
 
-### 多 App 架构
+- Container Type 作为 **模板**，仅存在 Owning Tenant 中，由开发商管理。
+- 部署到客户 Consuming Tenant 时，注册后的 **实例** 就是 Container Type Registration（可类比 AAD 中 App Registration 和 Service Principal 的关系）。
+- 它的主要作用是：
+  - 承载 App 对 Container Type 下所有 Container 的访问权限，包括 owning 和 guest app。
+  - 若设置允许，可覆盖 Container Type 的默认 settings，参见 [fileStorageContainerTypeRegistration](https://learn.microsoft.com/en-us/graph/api/resources/filestoragecontainertyperegistration)
+  - direct to customer 计费模式下，绑定客户租户的计费信息。
 
-一个 Consuming Tenant 中可以部署多个 SPE App，每个 App 只能访问自己 Container Type 对应的 Container。不过也可以通过 Guest Application 机制让多个 App 共享同一组 Container 。
+> 同一个租户可以同时充当 Owning Tenant 和 Consuming Tenant（例如企业内部自建 LOB App 的场景）。此时 Owning Application 可以是 Single Tenant 的。
+>
+> Tenant 不同时，Owning Application 必须是 Multi Tenant 的。部署时，首先得在 Consuming Tenant 安装 Owning app 的 service principal 以及必要 consent，然后才能注册 Container Type。
 
 #### 场景示例
 
@@ -117,14 +122,13 @@ App 需要在 Azure AD App Registration 中声明以下核心 Graph API 权限�
 
 ### 第二层：Container Type 权限 (APP 权限2)
 
-通过 Container Type Registration API 配置，决定了 App 对某个 Container Type 下所有 Container 能做什么操作。常用权限如下：
-
-| 权限                           | 说明                 |
+通过 Container Type Registration API 注册后，生成 Container Type Registration，决定了 App 对Container Type下所有 Container 能做的操作。常用权限如下：
+| 权限 | 说明 |
 | ------------------------------ | -------------------- |
 | `ReadContent` / `WriteContent` | 读/写 Container 内容 |
-| `Create` / `Delete`            | 创建/删除 Container  |
-| `ManagePermissions`            | 管理 Container 成员  |
-| `Full`                         | 拥有全部权限         |
+| `Create` / `Delete` | 创建/删除 Container |
+| `ManagePermissions` | 管理 Container 成员 |
+| `Full` | 拥有全部权限 |
 
 > Graph API 权限 + Container Type 权限的 **交集** 才构成完整的 **App 权限**。
 
@@ -146,6 +150,8 @@ App 需要在 Azure AD App Registration 中声明以下核心 Graph API 权限�
 - **Delegated（委托/用户代理）**：推荐方式。 App 代表登录用户操作，有效权限 = App 权限 ∩ 用户权限。可审计到具体用户。
 - **App-only（纯应用）**： App 使用 Service Principal 直接操作，**不受 Container 权限限制**。适合后台任务，但审计粒度较低。
 
+> 文档中还有一种 [Container Type Owner](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/auth#container-type-owner-capabilities)的角色，当开发者用 Delegated 方式创建 Container Type 时，创建者会自动成为 Container Type Owner。可以理解为**模板管理员**，可授予3人，仅在 Owning Tenant 有意义。
+
 ---
 
 ## 5. 共享与权限管理
@@ -158,9 +164,18 @@ Container 内的内容默认继承父级权限（Container → Folder → File�
 >
 > <img src="./img/DirectAccessShare.jpg" alt="Direct Access" width="600" />
 >
-> 其次， **没有** 文档表示 SPE 支持 **Shareable Link**（即 Copy Link：匿名, 组织内, 或特定用户 ）
+> 其次， **没有** 文档表示 SPE 支持 **Shareable Link**。
+>
+> Note: 经验证，用 createLink API 去创建 link 会报错。
 
-<br/>**限制：** 不能对 Container 本身添加 Additive Permission（这相当于直接修改角色了），且只能通过 Delegated 模式设置。
+具体操作，使用 driveItem 的 [invite](https://learn.microsoft.com/en-us/graph/api/driveitem-invite?view=graph-rest-1.0&tabs=http) 为文件文件夹添加权限。
+
+经实测，
+
+1. 可以仅共享单个文件，而无需授予用户 Container 访问权限。
+2. 用户仍须通过 App 访问（上文已提过，SPE中的权限必须是 App 权限 ∩ 用户权限）。比如只共享了一个文件，那访问 container 就只能看到这个文件，这与普通 SharePoint 是一致的。
+
+**限制：** 不能对 Container 本身添加 Additive Permission（这相当于直接修改角色了），且只能通过 Delegated 模式设置。
 
 ### 谁能给文件添加 Additive Permission?
 
