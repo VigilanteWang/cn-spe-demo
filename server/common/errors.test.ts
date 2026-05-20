@@ -19,6 +19,22 @@ describe("toBackendGraphError", () => {
     expect(mappedError.requestId).toBe("req-429");
   });
 
+  it("should derive operation-specific messages from a concise options object", () => {
+    const mappedError = toBackendGraphError(
+      Object.assign(new Error("Retry attempts exhausted"), {
+        statusCode: 429,
+      }),
+      {
+        failureMessage: "Unable to list containers.",
+        operationDescription: "container list",
+      },
+    );
+
+    expect(mappedError.message).toBe(
+      "Microsoft Graph throttled the container list request after retries were exhausted.",
+    );
+  });
+
   it("should keep an existing graph error instance", () => {
     const existingError = new BackendError({
       name: "ExistingError",

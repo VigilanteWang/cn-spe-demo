@@ -55,12 +55,8 @@ export const listContainers = async (req: Request, res: Response) => {
     return;
   } catch (error: unknown) {
     throw toBackendGraphError(error, {
-      defaultMessage: "Unable to list containers.",
-      throttledMessage:
-        "Microsoft Graph throttled the container list request after retries were exhausted.",
-      serviceUnavailableMessage:
-        "Microsoft Graph is temporarily unavailable for the container list request.",
-      graphFailureMessage: "Unable to list containers.",
+      failureMessage: "Unable to list containers.",
+      operationDescription: "container list",
     });
   }
 };

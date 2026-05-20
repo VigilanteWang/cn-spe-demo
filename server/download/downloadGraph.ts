@@ -1,13 +1,13 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
-import { BackendGraphError } from "../common/errors";
 import { createGraphClient } from "../auth";
-import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
+import { BackendGraphError } from "../common/errors";
 import { toDownloadGraphError } from "./downloadErrors";
+import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;
 
 /**
- * 递归展开用户选择的项目，返回严格模式下的扁平文件列表。
+ * 递归展开用户选择的项目，返回严格失败模式下的扁平文件列表。
  *
  * @param graphClient 已认证的 Graph 客户端。
  * @param driveId 当前容器对应的 Drive ID。
@@ -22,7 +22,7 @@ export const flattenDriveItems = async (
   const result: FlatFile[] = [];
 
   for (const itemId of itemIds) {
-    // 严格失败模式下不吞错，任一子项展开失败都直接中断整个任务准备流程。
+    // 任何一个选中项展开失败，都直接中断整次下载准备流程。
     await expandItem(graphClient, driveId, itemId, "", result);
   }
 
@@ -36,7 +36,7 @@ export const flattenDriveItems = async (
  * @param graphToken Graph 访问令牌。
  * @param driveId 当前容器对应的 Drive ID。
  * @param itemId 当前文件 ID。
- * @returns 前端可直接 fetch 的下载地址。
+ * @returns 前端可直接 `fetch` 的下载地址。
  */
 export const resolveDownloadUrl = async (
   graphClient: DownloadGraphClient,
@@ -49,7 +49,7 @@ export const resolveDownloadUrl = async (
       .api(`/drives/${driveId}/items/${itemId}`)
       .get()) as GraphDriveItemWithDownloadUrl;
 
-    // Graph 若已直接返回临时下载直链，就优先复用，避免额外打一跳 /content。
+    // 如果 Graph 已直接返回临时下载直链，就优先复用，少走一次兜底请求。
     if (item["@microsoft.graph.downloadUrl"]) {
       return item["@microsoft.graph.downloadUrl"];
     }
@@ -61,7 +61,7 @@ export const resolveDownloadUrl = async (
   }
 
   try {
-    // 兜底方案：使用 /content 端点的 302 Location 作为下载地址。
+    // 某些场景下 Graph 不返回 downloadUrl，这时通过 /content 的 302 Location 兜底获取。
     const contentEndpoint = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/content`;
     const response = await fetch(contentEndpoint, {
       method: "GET",
@@ -101,7 +101,7 @@ export const resolveDownloadUrl = async (
  * @param graphClient 已认证的 Graph 客户端。
  * @param driveId 当前容器对应的 Drive ID。
  * @param itemId 当前项目 ID。
- * @param basePath 当前项目在 ZIP 内的父级路径。
+ * @param basePath 当前项目在 ZIP 中的父级路径。
  * @param result 扁平文件输出数组。
  */
 async function expandItem(
@@ -124,7 +124,7 @@ async function expandItem(
 
   const itemName = item.name ?? "";
   if (item.folder) {
-    // 文件夹不直接进入 manifest，而是继续展开子项，直到拿到实际文件。
+    // 文件夹本身不会直接进入 manifest，而是继续展开它的子项。
     await expandFolder(
       graphClient,
       driveId,
@@ -135,7 +135,7 @@ async function expandItem(
     return;
   }
 
-  // 普通文件在这里被收敛成最小结构，供后续统一计算大小和解析下载地址。
+  // 普通文件只保留后续真正需要的最小字段，避免把整份 Graph 响应一路往后传。
   result.push({
     itemId,
     name: itemName,
@@ -146,12 +146,12 @@ async function expandItem(
 }
 
 /**
- * 枚举文件夹下所有子项，并处理 Graph 分页结果。
+ * 枚举文件夹下的所有子项，并处理 Graph 分页结果。
  *
  * @param graphClient 已认证的 Graph 客户端。
  * @param driveId 当前容器对应的 Drive ID。
  * @param folderId 当前文件夹 ID。
- * @param folderPath 当前文件夹在 ZIP 内的路径。
+ * @param folderPath 当前文件夹在 ZIP 中的路径。
  * @param result 扁平文件输出数组。
  */
 async function expandFolder(
@@ -182,7 +182,7 @@ async function expandFolder(
       const childName = child.name ?? "";
 
       if (child.folder) {
-        // 子文件夹继续递归，并把父路径拼进来，保证 ZIP 目录结构与源结构一致。
+        // 子文件夹继续递归，并把父级路径拼进去，保证 ZIP 目录结构不丢失。
         await expandFolder(
           graphClient,
           driveId,
@@ -193,7 +193,7 @@ async function expandFolder(
         continue;
       }
 
-      // 文件直接写入结果列表，后面统一做大小累加和下载地址解析。
+      // 子文件则直接落入结果列表，后面统一做大小累计和下载地址解析。
       result.push({
         itemId: childId,
         name: childName,
@@ -203,7 +203,7 @@ async function expandFolder(
       });
     }
 
-    // Graph 使用 @odata.nextLink 做分页，继续沿着 nextLink 向后取完全部子项。
+    // Graph 使用 @odata.nextLink 做分页，必须一路取完才能拿到完整文件列表。
     endpoint = page["@odata.nextLink"] ?? null;
   }
 }

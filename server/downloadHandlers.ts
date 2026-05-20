@@ -1,7 +1,7 @@
 import { Request, Response } from "restify";
 import { requireContainerManageRequest } from "./auth";
-import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
 import { BackendValidationError } from "./common/errors";
+import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
 
 interface IStartDownloadRequestBody {
   containerId?: unknown;
@@ -26,7 +26,7 @@ export const startDownloadRequest = async (req: Request, res: Response) => {
     );
   }
 
-  // 任务创建后只返回 jobId，前端通过轮询继续读取准备进度和最终 manifest。
+  // 这里只返回 jobId，让前端通过轮询继续读取准备进度和最终 manifest。
   const jobId = await startDownloadJob(
     containerId,
     itemIds,
@@ -54,12 +54,12 @@ export const getDownloadProgressRequest = async (
   }
 
   const requesterOid = authResult.claims.oid ?? "";
-  // 所有权校验已经下沉到 download 模块，这里只负责把结果直接返回给 HTTP 层。
+  // 所有权校验已经下沉到 download 模块，这里只负责把结果映射回 HTTP。
   res.send(200, getJobProgress(jobId, requesterOid));
 };
 
 /**
- * 读取归档任务清单。
+ * 读取归档任务的下载清单。
  *
  * @param req Restify 请求对象。
  * @param res Restify 响应对象。
@@ -80,18 +80,18 @@ export const getDownloadManifestRequest = async (
 };
 
 /**
- * 把未知值读取成去首尾空白后的非空字符串。
+ * 把未知输入读取成去首尾空白后的非空字符串。
  *
- * @param value 待解析的未知输入。
- * @returns 合法字符串；否则返回 undefined。
+ * @param value 待解析的输入值。
+ * @returns 合法字符串；否则返回 `undefined`。
  */
 const readNonEmptyString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
 /**
- * 从未知值中筛出非空字符串数组。
+ * 从未知输入中过滤出非空字符串数组。
  *
- * @param value 待解析的未知输入。
+ * @param value 待解析的输入值。
  * @returns 过滤后的字符串数组。
  */
 const readStringArray = (value: unknown): string[] => {

@@ -5,13 +5,14 @@ const JOB_TTL_MS = 10 * 60 * 1000;
 const jobs = new Map<string, Job>();
 
 /**
- * 定时清理过期任务，避免内存中的状态无限增长。
+ * 定时清理过期任务，避免内存中的任务状态无限增长。
  */
 const cleanupTimer = setInterval(
   () => {
     const now = Date.now();
 
     for (const [id, job] of jobs) {
+      // 已完成任务按 completedAt 计算保留时间，未完成任务则回退到 createdAt。
       if (now - (job.completedAt ?? job.createdAt) > JOB_TTL_MS) {
         jobs.delete(id);
       }
@@ -45,7 +46,7 @@ export const createQueuedJob = (jobId: string, ownerOid: string): Job => {
     ownerOid,
   };
 
-  // 任务一创建就立刻放入内存表，后续轮询才能根据 jobId 立即查到状态。
+  // 任务一创建就立刻放入内存表，前端才能马上根据 jobId 查询状态。
   jobs.set(jobId, job);
   return job;
 };
@@ -54,19 +55,18 @@ export const createQueuedJob = (jobId: string, ownerOid: string): Job => {
  * 根据任务 ID 读取任务。
  *
  * @param jobId 任务 ID。
- * @returns 找到的任务对象；不存在时返回 undefined。
+ * @returns 找到的任务；不存在时返回 `undefined`。
  */
 export const readJob = (jobId: string): Job | undefined => jobs.get(jobId);
 
 /**
- * 读取对外可见的任务进度。
+ * 把内部任务对象裁剪成对外暴露的进度结构。
  *
  * @param job 内部完整任务对象。
- * @returns 去掉内部字段后的公开进度对象。
+ * @returns 前端可见的任务进度。
  */
 export const toJobProgress = (job: Job): JobProgress => {
-  //解构赋值的方式丢掉 manifest 等内部字段，
-  //只保留对前端展示有用的进度信息。
+  // manifest、所有者、时间戳属于服务端内部字段，不对前端直接暴露。
   const {
     manifest: _manifest,
     createdAt: _createdAt,
@@ -83,7 +83,7 @@ export const toJobProgress = (job: Job): JobProgress => {
  *
  * @param job 当前任务。
  * @param requesterOid 请求者 oid。
- * @returns 是否允许访问该任务。
+ * @returns 是否允许访问。
  */
 export const canAccessJob = (job: Job, requesterOid?: string): boolean =>
   requesterOid === undefined || job.ownerOid === requesterOid;
@@ -99,7 +99,7 @@ export const markJobFailed = (job: Job, message: string): void => {
   job.currentItem = "";
   job.completedAt = Date.now();
 
-  // 严格失败模式下只保留首个致命错误，避免后续兜底覆盖更有价值的原始原因。
+  // 只保留第一个关键错误，避免后续兜底错误覆盖掉真正的根因。
   if (job.errors.length === 0) {
     job.errors.push(message);
   }

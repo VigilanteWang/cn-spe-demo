@@ -72,12 +72,8 @@ export const createContainer = async (req: Request, res: Response) => {
     }
 
     throw toBackendGraphError(error, {
-      defaultMessage: "Failed to create container.",
-      throttledMessage:
-        "Microsoft Graph throttled the create-container request after retries were exhausted.",
-      serviceUnavailableMessage:
-        "Microsoft Graph is temporarily unavailable for the create-container request.",
-      graphFailureMessage: "Failed to create container.",
+      failureMessage: "Failed to create container.",
+      operationDescription: "create-container",
     });
   }
 };

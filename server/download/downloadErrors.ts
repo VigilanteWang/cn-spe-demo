@@ -1,17 +1,17 @@
 import {
   BackendError,
-  BackendInternalError,
   BackendGraphError,
+  BackendInternalError,
   BackendValidationError,
   toBackendGraphError,
 } from "../common/errors";
 
 /**
- * 读取适合写入任务状态的稳定错误文案。
+ * 提取适合写入任务状态的稳定错误文案。
  *
  * @param error 原始异常对象。
- * @param fallbackMessage 无法提取 message 时的兜底文案。
- * @returns 适合写入 `job.errors` 的稳定文案。
+ * @param fallbackMessage 无法提取 message 时使用的兜底文案。
+ * @returns 适合写入 `job.errors` 的错误文案。
  */
 export const getDownloadJobFailureMessage = (
   error: unknown,
@@ -25,27 +25,23 @@ export const getDownloadJobFailureMessage = (
 };
 
 /**
- * 统一构造下载模块的 Graph 错误。
+ * 统一构造下载模块里的 Graph 错误。
  *
  * @param error 原始 Graph 异常。
- * @param defaultMessage 面向调用方的默认错误文案。
+ * @param failureMessage 面向调用方的默认错误文案。
  * @returns 统一的 Graph 错误对象。
  */
 export const toDownloadGraphError = (
   error: unknown,
-  defaultMessage: string,
+  failureMessage: string,
 ): BackendGraphError =>
   toBackendGraphError(error, {
-    defaultMessage,
-    throttledMessage:
-      "Microsoft Graph throttled the download preparation request after retries were exhausted.",
-    serviceUnavailableMessage:
-      "Microsoft Graph is temporarily unavailable for the download preparation request.",
-    graphFailureMessage: defaultMessage,
+    failureMessage,
+    operationDescription: "download preparation",
   });
 
 /**
- * 统一构造任务不存在错误。
+ * 构造“任务不存在或不可访问”错误。
  *
  * @returns 对应 404 的业务错误。
  */
@@ -59,7 +55,7 @@ export const createArchiveJobNotFoundError = (): BackendError =>
   });
 
 /**
- * 统一构造清单尚未就绪错误。
+ * 构造“清单尚未准备完成”错误。
  *
  * @param status 当前任务状态。
  * @returns 对应 409 的业务错误。
@@ -76,7 +72,7 @@ export const createArchiveManifestNotReadyError = (
   });
 
 /**
- * 统一构造清单缺失错误。
+ * 构造“清单缺失”错误。
  *
  * @returns 对应 404 的业务错误。
  */
@@ -90,9 +86,9 @@ export const createArchiveManifestNotFoundError = (): BackendError =>
   });
 
 /**
- * 统一构造下载参数校验错误。
+ * 校验创建下载任务所需的输入参数。
  *
- * @param containerId 当前容器 ID。
+ * @param containerId 容器 ID。
  * @param itemIds 用户选择的项目 ID 列表。
  * @param ownerOid 当前登录用户 oid。
  */
@@ -115,7 +111,7 @@ export const validateDownloadJobInput = (
 };
 
 /**
- * 统一构造“无可下载文件”错误。
+ * 构造“没有可归档文件”错误。
  *
  * @returns 对应 409 的业务错误。
  */
@@ -129,10 +125,10 @@ export const createArchiveEmptyError = (): BackendError =>
   });
 
 /**
- * 统一构造文件数量超限错误。
+ * 构造“文件数超限”错误。
  *
  * @param totalFiles 实际文件数。
- * @param maxFiles 系统允许的最大文件数。
+ * @param maxFiles 允许的最大文件数。
  * @returns 对应 409 的业务错误。
  */
 export const createArchiveTooManyFilesError = (
@@ -149,9 +145,9 @@ export const createArchiveTooManyFilesError = (
   });
 
 /**
- * 统一构造体积超限错误。
+ * 构造“总大小超限”错误。
  *
- * @param maxBytes 系统允许的最大总字节数。
+ * @param maxBytes 允许的最大总字节数。
  * @returns 对应 409 的业务错误。
  */
 export const createArchiveTooLargeError = (maxBytes: number): BackendError =>
