@@ -66,12 +66,17 @@ export const mapGraphPermissionToEntryOnUI = (
     principalId:
       principal.graphId ??
       createFallbackPrincipalId(principalType, permissionId),
+    principalObjectId: principal.graphId,
     // people 新增时后续写回 Graph 需要 userPrincipalName，所以读取时也尽量保留下来。
     principalUserPrincipalName:
       principalType === "people" ? principal.userPrincipalName : undefined,
+    principalMail: principal.mail,
     principalName: principal.displayName,
     principalType,
     description: principal.description,
+    isInherited: false,
+    isEditable: true,
+    isRemovable: true,
     // 这里把 Graph 小写角色翻译成 UI / 共同契约里使用的大写角色。
     role: mapGraphContainerPermissionRoleToUi(primaryRole),
   };
@@ -89,6 +94,7 @@ export const normalizeGraphPermissionIdentity = (
 
   const record = readGraphToRecord(identity);
   const graphId = readOptionalString(record.id);
+  const mail = readOptionalString(record.mail) ?? readOptionalString(record.email);
   const userPrincipalName = readOptionalString(record.userPrincipalName);
   // Graph 在不同 identity 形状下，可用的人类可读字段并不完全一致。
   // 这里按“最适合展示给用户”的优先级依次兜底，尽量稳定产出可显示名称。
@@ -96,7 +102,7 @@ export const normalizeGraphPermissionIdentity = (
     readOptionalString(record.displayName) ??
     readOptionalString(record.email) ??
     userPrincipalName ??
-    readOptionalString(record.mail) ??
+    mail ??
     readOptionalString(record.loginName) ??
     graphId ??
     "Unknown principal";
@@ -104,7 +110,7 @@ export const normalizeGraphPermissionIdentity = (
   const description =
     readOptionalString(record.email) ??
     userPrincipalName ??
-    readOptionalString(record.mail) ??
+    mail ??
     readOptionalString(record.loginName) ??
     "";
 
@@ -112,6 +118,7 @@ export const normalizeGraphPermissionIdentity = (
     graphId,
     displayName,
     description,
+    mail,
     userPrincipalName,
   };
 };

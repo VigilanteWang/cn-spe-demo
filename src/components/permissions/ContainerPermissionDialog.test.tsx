@@ -26,8 +26,8 @@ vi.mock(
   },
 );
 
-vi.mock("../../services/containerPermissionApi", () => ({
-  ContainerPermissionApiError: class ContainerPermissionApiError extends Error {
+vi.mock("../../services/containerPermissionApi", () => {
+  class PermissionApiError extends Error {
     readonly code: string;
 
     readonly retryAfterSeconds?: number;
@@ -46,16 +46,21 @@ vi.mock("../../services/containerPermissionApi", () => ({
       },
     ) {
       super(message);
-      this.name = "ContainerPermissionApiError";
+      this.name = "PermissionApiError";
       this.code = code;
       this.retryAfterSeconds = options?.retryAfterSeconds;
       this.requestId = options?.requestId;
       this.statusCode = options?.statusCode;
     }
-  },
-  listContainerPermissions: vi.fn(),
-  applyContainerPermissionChanges: vi.fn(),
-}));
+  }
+
+  return {
+    PermissionApiError,
+    ContainerPermissionApiError: PermissionApiError,
+    listContainerPermissions: vi.fn(),
+    applyContainerPermissionChanges: vi.fn(),
+  };
+});
 
 const searchDirectoryPrincipalsMock = vi.mocked(searchDirectoryPrincipals);
 const listContainerPermissionsMock = vi.mocked(listContainerPermissions);
@@ -121,6 +126,7 @@ const createSearchResult = (
   displayName: "Adele Vance",
   secondaryText: "adele.vance@contoso.com",
   principalType: "user",
+  mail: "adele.vance@contoso.com",
   userPrincipalName: "adele.vance@contoso.com",
   ...overrides,
 });
@@ -134,9 +140,14 @@ const createPermissionEntry = (
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
+  principalObjectId: "user-adele-vance",
+  principalMail: "adele.vance@contoso.com",
   principalName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
+  isInherited: false,
+  isEditable: true,
+  isRemovable: true,
   role: "Writer",
   ...overrides,
 });

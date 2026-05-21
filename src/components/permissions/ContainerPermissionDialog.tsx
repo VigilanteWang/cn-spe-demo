@@ -53,9 +53,9 @@ import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSear
 import { IContainerPermissionDialogProps } from "./permissionsTypes";
 import { usePermissionsStyles } from "./permissionsStyles";
 import {
-  ContainerPermissionApiError,
   applyContainerPermissionChanges,
   listContainerPermissions,
+  PermissionApiError,
 } from "../../services/containerPermissionApi";
 import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
 
@@ -84,7 +84,7 @@ const getPermissionRequestErrorMessage = (
   error: unknown,
   fallbackMessage: string,
 ): string => {
-  if (error instanceof ContainerPermissionApiError) {
+  if (error instanceof PermissionApiError) {
     if (error.code === "throttled" && error.retryAfterSeconds) {
       return `${error.message} Retry after ${error.retryAfterSeconds} seconds.`;
     }

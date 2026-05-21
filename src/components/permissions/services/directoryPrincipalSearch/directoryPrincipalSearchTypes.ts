@@ -100,6 +100,7 @@ export interface IDirectoryPrincipalSearchResult {
   principalType: DirectoryPrincipalType;
   mail?: string;
   userPrincipalName?: string;
+  mailNickname?: string;
   groupTypes?: string[];
   mailEnabled?: boolean;
   securityEnabled?: boolean;

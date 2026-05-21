@@ -8,7 +8,7 @@
 - 这样才能最大化复用现有 `container permission` 的组件、hooks、contracts、error handling，以及当前已经稳定下来的“前端搜索 / 后端权限写回”边界。
 - `item permission` 不应复刻 container 的 API 细节，而应抽成“共享核心 + scope-specific adapter”：
   - `container` adapter 继续处理 4 个角色和 container Graph shape。
-  - `item` adapter 处理 additive permission、`inheritedFrom`、`invite` 请求体和 2 个角色。
+  - `item` adapter 处理 additive permission、父子权限集合比对、`invite` 请求体和 2 个角色。
 - 当前容器对话框真实实现仍是 `Combobox`，不是旧 issue 里的 `TagPicker`。为了满足“风格一致且最大复用”，item dialog 应先复用当前 `Combobox` 风格；不要只给 item 单独上 `TagPicker`。
 
 ## Key Changes
@@ -31,6 +31,7 @@
 - 顶部增加 item 名称副标题，超出 32 字符优雅截断。
 - 增加 additive 说明文案和 `Manage Container Permission` link button。
 - 同一张 access list 里按 “explicit / inherited” 两类语义展示；继承行沿用相同行组件，但 role 下拉禁用、删除按钮禁用，并显示只读提示。
+- 如果某一行被判定为 inherited permission，则在该行第一列内容区域的右对齐位置显示 `ConvertRangeRegular` 图标，用于明确表达“来自上级传播”。
 - 当前 container dialog 实际是 `Combobox` 风格，不是 TagPicker；item dialog 必须与它保持一致，避免权限 UI 分叉。
 
 ### 3. Item Permission 的 Graph 与后端策略
@@ -42,7 +43,15 @@
 - 不使用 `POST /drives/{drive-id}/items/{item-id}/permissions` 作为普通用户/组授权主路径；该接口在 SPE 文档里限制更偏向 `sharePointGroup` 的 app-only 场景。
 - `GET /drives/{drive-id}/items/{item-id}/permissions` 返回的是 effective permissions，因此必须显式识别：
   - 显式 additive permission
-  - `inheritedFrom` 不为空的继承 permission
+  - 来自父级传播的 inherited permission
+- 不把 `inheritedFrom` 作为正式判别依据。当前 Microsoft 文档与社区答复都说明，针对 OneDrive for Business / SharePoint document libraries，`inheritedFrom` 不可靠；当前实测里它虽然会出现，但常常只是空对象 `{}`，不能提供稳定来源信息。
+- 正式判别策略定为“即时父项 effective permission 集合比对”：
+  - 先读取当前 item 的 `parentReference`，定位即时父项。
+  - 再读取即时父项的 `GET /permissions`。
+  - 以 `permissionId` 为主键，把“当前 item 某条 permission 是否也存在于父项 effective permission 集合中”作为 inherited 判定主条件。
+  - 若未来遇到极少数 `permissionId` 缺失或 shape 漂移，再以规范化后的 `principal identity + permission facet kind + role set` 作为保守 fallback，只用于“显示为 inherited”，不用它做写操作目标。
+  - 如果 item 没有 `parentReference`，或父项读取失败，则保守降级为“不自动判成 inherited”，避免误禁用本可编辑的显式权限。
+- 之所以只比对即时父项，而不是回溯整条祖先链，是因为父项返回的也是 effective permissions；祖先继承下来的权限应已出现在即时父项集合中，因此即时父项比对已经足够覆盖常见继承场景，同时请求数更可控。
 - 删除只允许显式权限；继承权限不可删。
 - 角色修改策略必须先做租户验证：
   - 如果当前租户对显式 invite permission 的 `PATCH /permissions/{id}` 可用，则直接 PATCH。
@@ -61,6 +70,9 @@
 
 - 契约与适配层：
   - item permission payload 中 explicit / inherited 的区分。
+  - `inheritedFrom` 出现、缺失或为空对象 `{}` 时，都不会被当作正式判别依据。
+  - 当前 item 与即时父项存在相同 `permissionId` 时，会稳定判定为 inherited。
+  - 父项读取失败时，分类逻辑保守降级，不误把显式权限判成 inherited。
   - `driveRecipient` body 的 `objectId / email / alias` 选择规则。
   - role update 的 `PATCH` 与 `delete + recreate` 分流。
   - 非 identity permission 的忽略或提示行为。
@@ -73,7 +85,7 @@
   - item name 32 字符截断。
   - additive 文案与 container link button。
   - dirty 状态下从 item 切到 container 的放弃确认。
-  - inherited 行不可改、不可删。
+  - inherited 行显示 `ConvertRangeRegular` 图标，且不可改、不可删。
   - explicit 行可增删改。
 - 最小验证命令：
   - `npm test -- --run src/components/permissions`
@@ -125,7 +137,12 @@
    - 保留 objectId
    - 保留 user 的 UPN / mail
    - 保留 group 的 mail / alias 候选信息
-5. 最后只验证 container 现有测试仍通过，并总结共享层边界。
+5. 共享 entry base 需要从一开始就预留 item-only 只读状态字段：
+   - `isInherited`
+   - `isEditable`
+   - `isRemovable`
+   - 可选的 `inheritanceSource` 或等价内部分类字段，但不要把 `inheritedFrom` 原样暴露成前端正式语义
+6. 最后只验证 container 现有测试仍通过，并总结共享层边界。
 ```
 
 ### Step 2：实现 item backend/OBO adapter 与 item contracts
@@ -141,14 +158,21 @@
 3. item list 要把 effective permissions 映射为两类：
    - explicit additive permissions
    - inherited permissions
-4. 仅把 user/group/siteUser/siteGroup 这类 identity permission 纳入此对话框模型；
+4. inherited permission 判别不能依赖 `inheritedFrom`。请按以下固定方案实现：
+   - 读取当前 item metadata，拿到 `parentReference`
+   - 若存在父项，则额外读取父项 `GET /permissions`
+   - 以 `permissionId` 比对父子 effective permission 集合；同一 `permissionId` 同时出现在父项与当前项时，当前项该行标记为 inherited
+   - 若 `permissionId` 不足以覆盖个别形状，则再用规范化后的 `principal identity + facet kind + sorted roles` 做只读分类 fallback
+   - 父项读取失败、无父项、或分类存在不确定性时，宁可不判 inherited，也不要误禁用显式权限
+   - 该规则写进代码注释和测试，说明原因是 Microsoft 文档与社区答复都表明 `inheritedFrom` 在 SharePoint / OneDrive for Business 中不可靠
+5. 仅把 user/group/siteUser/siteGroup 这类 identity permission 纳入此对话框模型；
    link / application 等非本对话框管理对象不要做可编辑行，必要时返回一个“存在未纳入管理的权限类型”的提示标记。
-5. item create 使用 invite；recipient 默认优先 objectId，验证不通过时再按 Step 0 结论切到 email 或 alias。
-6. item role update 策略：
+6. item create 使用 invite；recipient 默认优先 objectId，验证不通过时再按 Step 0 结论切到 email 或 alias。
+7. item role update 策略：
    - Step 0 结论确认 PATCH 稳定可用：直接 PATCH
    - 否则：remove old explicit permission + create new explicit permission
-7. 继承权限行必须标记为只读，不允许 update/remove。
-8. 最后补 adapter/parser/diff 测试。
+8. 继承权限行必须标记为只读，不允许 update/remove。
+9. 最后补 adapter/parser/diff 测试。
 ```
 
 ### Step 3：实现 ItemPermissionDialog 与 Files/Containers 编排接线
@@ -171,8 +195,16 @@
 6. 从 item dialog 跳转到 container dialog 的流程：
    - 若无未保存改动：关闭 item dialog，再通知父层打开 container dialog
    - 若有未保存改动：先弹放弃确认，再执行切换
-7. inherited rows 要显示清晰只读提示，role dropdown 禁用，delete 禁用。
-8. 最后补 UI 测试和交互测试。
+7. inherited rows 的视觉与交互要求：
+   - 第一列右对齐位置显示 `ConvertRangeRegular` 图标
+   - role dropdown 禁用
+   - delete 按钮禁用
+   - 需要有清晰的只读提示文案，但不要把表格挤得过重
+8. 测试至少覆盖：
+   - inherited rows 显示 `ConvertRangeRegular`
+   - inherited rows 的 role 和 delete 都不可点击
+   - explicit rows 不受影响
+9. 最后补 UI 测试和交互测试。
 ```
 
 ## Assumptions
@@ -181,7 +213,11 @@
 - 默认保持当前“前端搜索、后端 OBO 读写”的权限边界，不回退到 `issue #6` 原始的前端直写 Graph。
 - 如果 Step 0 发现 item permission API 需要额外 Graph delegated scopes，则优先只补到后端 OBO 下游权限，不默认把 `Files.ReadWrite` 加到前端登录 scopes。
 - 如果微软文档与真实 SPE payload 继续冲突，以 Step 0 的租户实测为准；尤其是 `inheritedFrom` 与 item permission `PATCH` 能力。
-- 截至 `2026-05-20`，规划依据的官方文档是：
+- 当前默认结论是：
+  - `PATCH /permissions/{id}` 在本租户可用，应优先直接 PATCH
+  - `inheritedFrom` 不能作为正式判别依据
+  - inherited 判别默认采用“即时父项 effective permission 集合比对”，主键为 `permissionId`
+- 截至 `2026-05-21`，规划依据的官方文档是：
   - `Sharing and Permissions`
   - `driveItem invite`
   - `driveItem list permissions`

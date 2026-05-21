@@ -17,9 +17,9 @@ import { useState } from "react";
 import {
   IContainerPermissionEntry,
   IPermissionPrincipalCandidate,
-  PermissionEntriesByTab,
   PermissionTabValue,
 } from "../models/permissionModels";
+import type { PermissionEntriesByTab } from "../models/permissionSharedModels";
 import { usePermissionDraft } from "./usePermissionDraft";
 import { usePermissionTabs } from "./usePermissionTabs";
 
@@ -161,9 +161,14 @@ const createPermissionEntryFromCandidate = (
   // 使用“principal 类型 + principal ID”生成前端唯一键，方便表格渲染和本地更新定位。
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,
+  principalObjectId: candidate.objectId,
   principalUserPrincipalName: candidate.userPrincipalName,
+  principalMail: candidate.mail,
   principalName: candidate.name,
   principalType: candidate.type,
   description: candidate.secondaryText,
+  isInherited: false,
+  isEditable: true,
+  isRemovable: true,
   role: "Reader",
 });

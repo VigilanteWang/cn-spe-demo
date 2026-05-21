@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   ContainerPermissionRole,
-  IContainerPermissionEntry,
-  PermissionEntriesByTab,
   PermissionTabValue,
 } from "../models/permissionModels";
+import type {
+  IPermissionEntryBaseForUI,
+  PermissionEntriesByTab,
+} from "../models/permissionSharedModels";
 
 /**
  * 复制权限列表，避免不同快照共享同一份引用。
@@ -15,9 +17,9 @@ import {
  *
  * 两份列表必须互相独立，也不能直接引用外部传入的 `initial` 数据。
  */
-const cloneEntriesByTab = (
-  entriesByTab: PermissionEntriesByTab,
-): PermissionEntriesByTab => ({
+const cloneEntriesByTab = <TEntry extends IPermissionEntryBaseForUI>(
+  entriesByTab: PermissionEntriesByTab<TEntry>,
+): PermissionEntriesByTab<TEntry> => ({
   people: entriesByTab.people.map((entry) => ({ ...entry })),
   groups: entriesByTab.groups.map((entry) => ({ ...entry })),
 });
@@ -25,9 +27,9 @@ const cloneEntriesByTab = (
 /**
  * 比较两份权限列表是否完全一致。
  */
-const areEntriesByTabEqual = (
-  left: PermissionEntriesByTab,
-  right: PermissionEntriesByTab,
+const areEntriesByTabEqual = <TEntry extends IPermissionEntryBaseForUI>(
+  left: PermissionEntriesByTab<TEntry>,
+  right: PermissionEntriesByTab<TEntry>,
 ) => JSON.stringify(left) === JSON.stringify(right);
 
 /**
@@ -48,8 +50,8 @@ const areEntriesByTabEqual = (
  *
  * - initial 依靠父组件的 re-render 来更新，apply 后会没来得及更新至最新值，用户也会看到还有未保存更改
  */
-export const usePermissionDraft = (
-  initialEntriesByTab: PermissionEntriesByTab,
+export const usePermissionDraft = <TEntry extends IPermissionEntryBaseForUI>(
+  initialEntriesByTab: PermissionEntriesByTab<TEntry>,
   resetKey: string,
 ) => {
   // 保存“本次编辑会话里最近一次确认后的基线快照”，Close / Reset 时需要回到这份数据。
@@ -74,7 +76,7 @@ export const usePermissionDraft = (
    */
   const addEntry = (
     tab: PermissionTabValue,
-    entry: IContainerPermissionEntry,
+    entry: TEntry,
   ) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
       ...currentEntriesByTab,
@@ -127,7 +129,7 @@ export const usePermissionDraft = (
    * 1. Dialog 初次打开后，用加载回来的真实容器权限同步状态；
    * 2. Apply 成功后，用后端最新结果覆盖本地草稿，清空脏状态。
    */
-  const replaceEntries = (entriesByTab: PermissionEntriesByTab) => {
+  const replaceEntries = (entriesByTab: PermissionEntriesByTab<TEntry>) => {
     const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
     setOriginalEntriesByTab(nextOriginalEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));

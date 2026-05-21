@@ -6,12 +6,15 @@ import type {
   IContainerPermissionsApiErrorBody,
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import type { PermissionEntriesByTab } from "../components/permissions/models/permissionModels";
+import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
 
 /**
- * 容器权限后端 API 失败时抛出的稳定错误类型。
+ * 权限后端 API 失败时抛出的稳定错误类型。
+ *
+ * container 当前先复用这份共享错误；
+ * 之后 item-level 也可以沿用同一套前端错误表面。
  */
-export class ContainerPermissionApiError extends FrontendApiError {
+export class PermissionApiError extends FrontendApiError {
   readonly retryAfterSeconds?: number;
 
   readonly requestId?: string;
@@ -26,13 +29,15 @@ export class ContainerPermissionApiError extends FrontendApiError {
     },
   ) {
     super(code, message, {
-      name: "ContainerPermissionApiError",
+      name: "PermissionApiError",
       statusCode: options?.statusCode,
     });
     this.retryAfterSeconds = options?.retryAfterSeconds;
     this.requestId = options?.requestId;
   }
 }
+
+export { PermissionApiError as ContainerPermissionApiError };
 
 /**
  * 加载指定容器的当前权限列表。
@@ -106,14 +111,14 @@ const mapEntriesToTabs = (
  */
 const buildPermissionApiError = async (
   response: Response,
-): Promise<ContainerPermissionApiError> => {
+): Promise<PermissionApiError> => {
   const payload = await tryReadErrorPayload(response);
   const code = payload?.code ?? "graphFailure";
   const message =
     payload?.message ??
     `Container permission request failed: ${response.status}`;
 
-  return new ContainerPermissionApiError(code, message, {
+  return new PermissionApiError(code, message, {
     retryAfterSeconds: payload?.retryAfterSeconds,
     requestId: payload?.requestId,
     statusCode: payload?.statusCode ?? response.status,

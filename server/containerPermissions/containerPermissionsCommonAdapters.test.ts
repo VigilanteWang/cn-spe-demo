@@ -69,6 +69,9 @@ describe("mapGraphPermissionToEntryOnUI", () => {
       expect(entry.principalType).toBe(expectedTab);
       expect(entry.permissionId).toBe(permission.id);
       expect(entry.id).toBe(`permission:${permission.id}`);
+      expect(entry.isInherited).toBe(false);
+      expect(entry.isEditable).toBe(true);
+      expect(entry.isRemovable).toBe(true);
     },
   );
 
@@ -86,6 +89,7 @@ describe("mapGraphPermissionToEntryOnUI", () => {
 
     expect(entry.principalId).toBe("people:permission:perm-no-user-id");
     expect(entry.principalUserPrincipalName).toBe("no.id@contoso.com");
+    expect(entry.principalMail).toBeUndefined();
   });
 
   it("should fold principalOwner into Owner", () => {

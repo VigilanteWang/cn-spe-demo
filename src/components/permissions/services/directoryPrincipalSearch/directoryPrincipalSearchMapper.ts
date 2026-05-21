@@ -79,6 +79,7 @@ export const mapGraphGroup = (
       securityEnabled,
     ),
     mail,
+    mailNickname,
     groupTypes,
     mailEnabled,
     securityEnabled,
