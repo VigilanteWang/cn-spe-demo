@@ -6,6 +6,7 @@
 
 - 本轮核心写操作验证完成于北京时间 `2026-05-21 00:01` 左右
 - 本轮补充只读 `inheritedFrom` 探针完成于北京时间 `2026-05-21` 同一轮会话
+- 本轮补充“直接授予用户 write 权限”验证完成于北京时间 `2026-05-21 18:29`
 
 验证范围：
 
@@ -21,6 +22,7 @@
 - 仅新增临时验证脚本：
   - [temp/itemPermissionValidation.ts](/Users/vigilante/Documents/code/cn-spe-demo/temp/itemPermissionValidation.ts)
   - [temp/itemPermissionInheritedProbe.ts](/Users/vigilante/Documents/code/cn-spe-demo/temp/itemPermissionInheritedProbe.ts)
+  - [temp/itemPermissionUserInviteProbe.ts](/Users/vigilante/Documents/code/cn-spe-demo/temp/itemPermissionUserInviteProbe.ts)
 - 验证时复用当前仓库的真实前端登录配置、后端 API scope、后端 OBO Graph token 路径
 
 ## 1. 结论摘要
@@ -121,6 +123,31 @@
 1. 默认发 `objectId`
 2. 如果前端候选缺少 `objectId`，再退到 `email`
 3. 不把 `alias` 作为默认主路径；最多只当特殊 fallback，并且要准备好失败处理
+
+### 1.5 直接授予用户 write 权限后是什么情况
+
+结论：
+
+- 已补测用户 `MiriamG@<tenant>.onmicrosoft.com` 的显式 `write` 授权。
+- `POST /invite` 成功后，会创建一条显式 item permission，`roles` 为 `["write"]`。
+- 这条用户 permission **没有** `inheritedFrom`，因此应被视为 explicit permission。
+- 用户场景与 group 场景一样，也存在“`invite` 返回体”和“后续 `GET permission` / `list permissions` 返回体” shape 不完全一致的问题。
+
+本轮实测到的用户 payload 特征：
+
+- `invite` 返回体：
+  - `grantedToV2.user`
+  - `grantedTo.user`
+- 后续 `GET permission` / `list permissions`：
+  - `grantedToV2.user`
+  - `grantedToV2.siteUser`
+  - `grantedTo.user`
+
+因此正式实现建议：
+
+1. 用户 permission 也不要只靠单一路径字段做解析。
+2. 后端 normalization 需要同时兼容 `user` 与 `siteUser`。
+3. Apply 成功后仍应重新 `list`，不要把 `invite` 返回体当作最终本地状态。
 
 ## 2. 分接口验证结果
 
@@ -232,6 +259,92 @@
   ]
 }
 ```
+
+### 2.3.1 补充：直接授予用户 `write` 的实测结果
+
+补测对象：
+
+- 用户：`MiriamG@<tenant>.onmicrosoft.com`
+- objectId：`89cb17b1-...-87f8`
+- 角色：`write`
+
+请求核心语义：
+
+```json
+{
+  "recipients": [
+    {
+      "objectId": "89cb17b1-...-87f8"
+    }
+  ],
+  "requireSignIn": true,
+  "sendInvitation": false,
+  "roles": ["write"]
+}
+```
+
+`invite` 返回关键字段：
+
+```json
+{
+  "value": [
+    {
+      "id": "<permission-id-prefix>...",
+      "roles": ["write"],
+      "grantedToV2": {
+        "user": {
+          "displayName": "Miriam",
+          "email": "MiriamG@<tenant>.onmicrosoft.com",
+          "id": "89cb17b1-...-87f8"
+        }
+      },
+      "grantedTo": {
+        "user": {
+          "displayName": "Miriam",
+          "email": "MiriamG@<tenant>.onmicrosoft.com",
+          "id": "89cb17b1-...-87f8"
+        }
+      }
+    }
+  ]
+}
+```
+
+随后 `GET /permissions/{permissionId}` 的关键字段：
+
+```json
+{
+  "id": "<permission-id-prefix>...",
+  "roles": ["write"],
+  "grantedToV2": {
+    "user": {
+      "displayName": "Miriam",
+      "email": "MiriamG@<tenant>.onmicrosoft.com",
+      "id": "89cb17b1-...-87f8"
+    },
+    "siteUser": {
+      "displayName": "Miriam",
+      "email": "MiriamG@<tenant>.onmicrosoft.com",
+      "id": "20",
+      "loginName": "i:0#.f|membership|miriamg@<tenant>.onmicrosoft.com"
+    }
+  },
+  "grantedTo": {
+    "user": {
+      "displayName": "Miriam",
+      "email": "MiriamG@<tenant>.onmicrosoft.com",
+      "id": "89cb17b1-...-87f8"
+    }
+  }
+}
+```
+
+结论：
+
+- 当前租户下，直接授予用户 `write` 权限可成功落到 item permission。
+- 该 permission 是显式权限，不带 `inheritedFrom`。
+- 用户场景同样体现出“创建响应较简略、读取响应较完整”的 shape 差异。
+- 本次用户补测重点是“创建后真实 payload 长什么样”；并**未单独再次执行**用户样本的 `PATCH` / `DELETE`，因此这两项仍主要沿用前文对显式 invite permission 的通用结论。
 
 ### 2.4 `PATCH /drives/{driveId}/items/{itemId}/permissions/{permissionId}`
 
@@ -398,6 +511,12 @@ PATCH 后再次 `GET` 的关键字段：
 
 - Apply 成功后重新 `list`，不要长期依赖 `invite` 原始返回体作为本地最终状态
 
+补充：
+
+- 这条风险不仅出现在 group 样本里，用户 `MiriamG@<tenant>.onmicrosoft.com` 的 `write` 授权样本里也同样出现：
+  - `invite` 返回体只出现 `grantedToV2.user`
+  - 后续 `GET permission` / `list permissions` 会多出 `grantedToV2.siteUser`
+
 ### 3.3 group 的显示名可能与目录搜索候选不完全一致
 
 本轮样本里：
@@ -477,6 +596,7 @@ PATCH 后再次 `GET` 的关键字段：
 - principal candidate 需要稳定保留：
   - `objectId`
   - `email`
+  - `userPrincipalName`
   - group 相关目录字段
 - 不能只保留显示名
 
@@ -488,6 +608,7 @@ PATCH 后再次 `GET` 的关键字段：
 - 当前实测租户下，不需要额外新增 `Files.Read` 或 `Files.ReadWrite` delegated permission
 - 当前实测租户已观测到 `inheritedFrom` 会出现在子项继承场景，但其内部 shape 仍需继续观察，不应在实现里假设为带明细字段的对象
 - 当前实测租户下，group invite 推荐优先使用 `objectId`，`email` 可作为 fallback，`alias` 不可靠
+- 当前实测租户下，用户 `MiriamG@<tenant>.onmicrosoft.com` 的显式 `write` 授权可成功创建；其读取 payload 同时可能出现 `user` 与 `siteUser` 视角
 
 ## 5. 下一步建议
 
