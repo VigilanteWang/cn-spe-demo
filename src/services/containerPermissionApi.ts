@@ -1,50 +1,24 @@
 import { sendAuthorizedRequest } from "./apiClient";
-import { FrontendApiError } from "../common/errors.ts";
 import type {
   IContainerPermissionChangeSetFromUI,
   IContainerPermissionEntryForUI,
-  IContainerPermissionsApiErrorBody,
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
+import {
+  buildPermissionApiError,
+  mapPermissionEntriesToTabs,
+  PermissionApiError,
+} from "./permissionApiShared";
 
-/**
- * 权限后端 API 失败时抛出的稳定错误类型。
- *
- * container 当前先复用这份共享错误；
- * 之后 item-level 也可以沿用同一套前端错误表面。
- */
-export class PermissionApiError extends FrontendApiError {
-  readonly retryAfterSeconds?: number;
-
-  readonly requestId?: string;
-
-  constructor(
-    code: string,
-    message: string,
-    options?: {
-      retryAfterSeconds?: number;
-      requestId?: string;
-      statusCode?: number;
-    },
-  ) {
-    super(code, message, {
-      name: "PermissionApiError",
-      statusCode: options?.statusCode,
-    });
-    this.retryAfterSeconds = options?.retryAfterSeconds;
-    this.requestId = options?.requestId;
-  }
-}
-
-export { PermissionApiError as ContainerPermissionApiError };
+export { PermissionApiError, PermissionApiError as ContainerPermissionApiError };
 
 /**
  * 加载指定容器的当前权限列表。
  */
 export const listContainerPermissions = async (
   containerId: string,
-): Promise<PermissionEntriesByTab> => {
+): Promise<PermissionEntriesByTab<IContainerPermissionEntryForUI>> => {
   const response = await sendAuthorizedRequest(
     `/api/containerPermissions/${encodeURIComponent(containerId)}`,
     {
@@ -53,12 +27,12 @@ export const listContainerPermissions = async (
   );
 
   if (!response.ok) {
-    throw await buildPermissionApiError(response);
+    throw await buildPermissionApiError(response, "Container permission request");
   }
 
   const payload =
     (await response.json()) as IContainerPermissionsResponseFromApi;
-  return mapEntriesToTabs(payload.entries);
+  return mapPermissionEntriesToTabs(payload.entries);
 };
 
 /**
@@ -67,7 +41,7 @@ export const listContainerPermissions = async (
 export const applyContainerPermissionChanges = async (
   containerId: string,
   changes: IContainerPermissionChangeSetFromUI,
-): Promise<PermissionEntriesByTab> => {
+): Promise<PermissionEntriesByTab<IContainerPermissionEntryForUI>> => {
   const response = await sendAuthorizedRequest(
     `/api/containerPermissions/${encodeURIComponent(containerId)}/apply`,
     {
@@ -80,60 +54,10 @@ export const applyContainerPermissionChanges = async (
   );
 
   if (!response.ok) {
-    throw await buildPermissionApiError(response);
+    throw await buildPermissionApiError(response, "Container permission apply request");
   }
 
   const payload =
     (await response.json()) as IContainerPermissionsResponseFromApi;
-  return mapEntriesToTabs(payload.entries);
-};
-
-/**
- * 把后端返回的权限数组重新按 people/groups 分组。
- */
-const mapEntriesToTabs = (
-  entries: IContainerPermissionEntryForUI[],
-): PermissionEntriesByTab => {
-  const nextEntries: PermissionEntriesByTab = {
-    people: [],
-    groups: [],
-  };
-
-  for (const entry of entries) {
-    nextEntries[entry.principalType].push(entry);
-  }
-
-  return nextEntries;
-};
-
-/**
- * 解析后端权限 API 的错误响应。
- */
-const buildPermissionApiError = async (
-  response: Response,
-): Promise<PermissionApiError> => {
-  const payload = await tryReadErrorPayload(response);
-  const code = payload?.code ?? "graphFailure";
-  const message =
-    payload?.message ??
-    `Container permission request failed: ${response.status}`;
-
-  return new PermissionApiError(code, message, {
-    retryAfterSeconds: payload?.retryAfterSeconds,
-    requestId: payload?.requestId,
-    statusCode: payload?.statusCode ?? response.status,
-  });
-};
-
-/**
- * 尝试把错误响应解析成 JSON。
- */
-const tryReadErrorPayload = async (
-  response: Response,
-): Promise<IContainerPermissionsApiErrorBody | null> => {
-  try {
-    return (await response.json()) as IContainerPermissionsApiErrorBody;
-  } catch {
-    return null;
-  }
+  return mapPermissionEntriesToTabs(payload.entries);
 };

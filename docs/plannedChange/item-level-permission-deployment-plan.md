@@ -49,7 +49,7 @@
   - 先读取当前 item 的 `parentReference`，定位即时父项。
   - 再读取即时父项的 `GET /permissions`。
   - 以 `permissionId` 为主键，把“当前 item 某条 permission 是否也存在于父项 effective permission 集合中”作为 inherited 判定主条件。
-  - 若未来遇到极少数 `permissionId` 缺失或 shape 漂移，再以规范化后的 `principal identity + permission facet kind + role set` 作为保守 fallback，只用于“显示为 inherited”，不用它做写操作目标。
+  - 正式实现只以 `permissionId` 作为 inherited 判定主键；如果未来真实遇到 `permissionId` 无法覆盖的 payload，再基于实测样本重新设计。
   - 如果 item 没有 `parentReference`，或父项读取失败，则保守降级为“不自动判成 inherited”，避免误禁用本可编辑的显式权限。
 - 之所以只比对即时父项，而不是回溯整条祖先链，是因为父项返回的也是 effective permissions；祖先继承下来的权限应已出现在即时父项集合中，因此即时父项比对已经足够覆盖常见继承场景，同时请求数更可控。
 - 删除只允许显式权限；继承权限不可删。
@@ -162,10 +162,10 @@
    - 读取当前 item metadata，拿到 `parentReference`
    - 若存在父项，则额外读取父项 `GET /permissions`
    - 以 `permissionId` 比对父子 effective permission 集合；同一 `permissionId` 同时出现在父项与当前项时，当前项该行标记为 inherited
-   - 若 `permissionId` 不足以覆盖个别形状，则再用规范化后的 `principal identity + facet kind + sorted roles` 做只读分类 fallback
+   - 不再额外保留 `principal identity + facet kind + sorted roles` 这一类只读 fallback；当前实现只信任 `permissionId`
    - 父项读取失败、无父项、或分类存在不确定性时，宁可不判 inherited，也不要误禁用显式权限
    - 该规则写进代码注释和测试，说明原因是 Microsoft 文档与社区答复都表明 `inheritedFrom` 在 SharePoint / OneDrive for Business 中不可靠
-5. 仅把 user/group/siteUser/siteGroup 这类 identity permission 纳入此对话框模型；
+5. 仅把 AAD `user` / `group` 这类 identity permission 纳入此对话框模型；
    link / application 等非本对话框管理对象不要做可编辑行，必要时返回一个“存在未纳入管理的权限类型”的提示标记。
 6. item create 使用 invite；recipient 默认优先 objectId，验证不通过时再按 Step 0 结论切到 email 或 alias。
 7. item role update 策略：

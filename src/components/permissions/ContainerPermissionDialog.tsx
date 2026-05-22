@@ -13,7 +13,7 @@
  * - Close 继续放弃未提交草稿；Apply 则提交差异并用服务端最新结果刷新本地基线
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   Avatar,
   Button,
@@ -45,7 +45,7 @@ import {
 import { readErrorMessage } from "../../common/errors.ts";
 import {
   ContainerPermissionRole,
-  PermissionEntriesByTab,
+  IContainerPermissionEntriesByTab,
   PermissionTabValue,
 } from "./models/permissionModels";
 import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
@@ -105,7 +105,7 @@ const getPermissionRequestErrorMessage = (
  * Dialog 打开前先以空列表初始化本地草稿，
  * 等后端返回真实容器权限后再整体替换进去。
  */
-const createEmptyPermissionEntries = (): PermissionEntriesByTab => ({
+const createEmptyPermissionEntries = (): IContainerPermissionEntriesByTab => ({
   people: [],
   groups: [],
 });
@@ -245,7 +245,7 @@ export const ContainerPermissionDialog = ({
    * 处理 Combobox 输入变化。
    */
   const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
-    event,
+    event: ChangeEvent<HTMLInputElement>,
   ) => {
     handleQueryChange(event.target.value);
   };
@@ -532,7 +532,7 @@ export const ContainerPermissionDialog = ({
                               aria-label={`${entry.principalName} role`}
                               disabled={interactionDisabled}
                               value={entry.role}
-                              onChange={(event) =>
+                              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                                 updateEntryRole(
                                   selectedTab,
                                   entry.id,

@@ -16,10 +16,10 @@
 import { useState } from "react";
 import {
   IContainerPermissionEntry,
+  IContainerPermissionEntriesByTab,
   IPermissionPrincipalCandidate,
   PermissionTabValue,
 } from "../models/permissionModels";
-import type { PermissionEntriesByTab } from "../models/permissionSharedModels";
 import { usePermissionDraft } from "./usePermissionDraft";
 import { usePermissionTabs } from "./usePermissionTabs";
 
@@ -40,7 +40,7 @@ import { usePermissionTabs } from "./usePermissionTabs";
  * @returns 提供给权限弹窗 UI 使用的状态、派生数据和操作函数。
  */
 export const useContainerPermissionDialogState = (
-  initialEntriesByTab: PermissionEntriesByTab,
+  initialEntriesByTab: IContainerPermissionEntriesByTab,
   resetKey: string,
 ) => {
   // 当前选中的 tab 决定了搜索框、候选列表和表格正在操作 people 还是 groups。

@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ContainerPermissionRole,
-  PermissionTabValue,
-} from "../models/permissionModels";
+import { PermissionTabValue } from "../models/permissionModels";
 import type {
   IPermissionEntryBaseForUI,
   PermissionEntriesByTab,
@@ -50,7 +47,9 @@ const areEntriesByTabEqual = <TEntry extends IPermissionEntryBaseForUI>(
  *
  * - initial 依靠父组件的 re-render 来更新，apply 后会没来得及更新至最新值，用户也会看到还有未保存更改
  */
-export const usePermissionDraft = <TEntry extends IPermissionEntryBaseForUI>(
+export const usePermissionDraft = <
+  TEntry extends IPermissionEntryBaseForUI & { role: string },
+>(
   initialEntriesByTab: PermissionEntriesByTab<TEntry>,
   resetKey: string,
 ) => {
@@ -91,7 +90,7 @@ export const usePermissionDraft = <TEntry extends IPermissionEntryBaseForUI>(
   const updateEntryRole = (
     tab: PermissionTabValue,
     entryId: string,
-    role: ContainerPermissionRole,
+    role: TEntry["role"],
   ) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
       ...currentEntriesByTab,

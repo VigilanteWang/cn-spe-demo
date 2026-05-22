@@ -33,6 +33,10 @@ import {
   applyContainerPermissions,
   listContainerPermissions,
 } from "./containerPermissions";
+import {
+  applyItemPermissions,
+  listItemPermissions,
+} from "./itemPermissions";
 import { deleteItems } from "./deleteItems";
 import {
   getDownloadManifestRequest,
@@ -170,6 +174,38 @@ server.get(
 server.post(
   "/api/containerPermissions/:containerId/apply",
   withErrorHandling(applyContainerPermissions),
+);
+
+/**
+ * GET /api/itemPermissions/:driveId/:itemId
+ *
+ * 这个接口读取指定 item 的 effective permissions，
+ * 再由服务端把它们分类成：
+ * 1. explicit additive permissions
+ * 2. inherited permissions
+ *
+ * 分类逻辑统一放在后端，原因是：
+ * 1. 需要继续走 OBO 读取 Graph
+ * 2. inherited 判别依赖当前项与父项的权限集合比对
+ * 3. 只想把稳定的对话框模型返回给前端，而不是把 Graph shape 直接暴露出去
+ */
+server.get(
+  "/api/itemPermissions/:driveId/:itemId",
+  withErrorHandling(listItemPermissions),
+);
+
+/**
+ * POST /api/itemPermissions/:driveId/:itemId/apply
+ *
+ * 这个接口接收 item 权限草稿差异，
+ * 再由服务端统一执行 invite / patch / delete 等 Graph 写操作。
+ *
+ * 这样可以继续保持当前项目已经稳定下来的边界：
+ * 前端只负责草稿与交互，真正写 Graph 始终走后端 OBO。
+ */
+server.post(
+  "/api/itemPermissions/:driveId/:itemId/apply",
+  withErrorHandling(applyItemPermissions),
 );
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────

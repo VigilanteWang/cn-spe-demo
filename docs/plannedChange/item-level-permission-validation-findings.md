@@ -146,7 +146,7 @@
 因此正式实现建议：
 
 1. 用户 permission 也不要只靠单一路径字段做解析。
-2. 后端 normalization 需要同时兼容 `user` 与 `siteUser`。
+2. 后端 normalization 需要兼容读取返回里的 `user` 与 `siteUser` 现象，但当前项目可以只把 AAD `user` 当作正式可管理身份。
 3. Apply 成功后仍应重新 `list`，不要把 `invite` 返回体当作最终本地状态。
 
 ## 2. 分接口验证结果
@@ -608,7 +608,7 @@ PATCH 后再次 `GET` 的关键字段：
 - 当前实测租户下，不需要额外新增 `Files.Read` 或 `Files.ReadWrite` delegated permission
 - 当前实测租户已观测到 `inheritedFrom` 会出现在子项继承场景，但其内部 shape 仍需继续观察，不应在实现里假设为带明细字段的对象
 - 当前实测租户下，group invite 推荐优先使用 `objectId`，`email` 可作为 fallback，`alias` 不可靠
-- 当前实测租户下，用户 `MiriamG@<tenant>.onmicrosoft.com` 的显式 `write` 授权可成功创建；其读取 payload 同时可能出现 `user` 与 `siteUser` 视角
+- 当前实测租户下，用户 `MiriamG@<tenant>.onmicrosoft.com` 的显式 `write` 授权可成功创建；其读取 payload 同时可能出现 `user` 与 `siteUser` 视角，但项目实现可以只采纳 AAD `user`
 
 ## 5. 下一步建议
 

@@ -7,7 +7,7 @@ import type {
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 import type {
   IContainerPermissionEntry,
-  PermissionEntriesByTab,
+  IContainerPermissionEntriesByTab,
 } from "../models/permissionModels";
 
 export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
@@ -38,8 +38,8 @@ interface IRequiredFieldErrorOptions {
  * 计算权限草稿相对初始快照的差异，以便一次性保存权限修改。
  */
 export const computeContainerPermissionChanges = (
-  originalEntriesByTab: PermissionEntriesByTab,
-  draftEntriesByTab: PermissionEntriesByTab,
+  originalEntriesByTab: IContainerPermissionEntriesByTab,
+  draftEntriesByTab: IContainerPermissionEntriesByTab,
 ): IContainerPermissionChangeSetFromUI => {
   const create: IContainerPermissionCreateChange[] = [];
   const update: IContainerPermissionUpdateChange[] = [];

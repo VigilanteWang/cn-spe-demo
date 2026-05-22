@@ -19,20 +19,6 @@ describe("mapGraphPermissionToEntryOnUI", () => {
       "people",
     ],
     [
-      "siteUser",
-      {
-        id: "perm-site-user",
-        roles: ["reader"],
-        grantedToV2: {
-          siteUser: {
-            displayName: "Site User",
-            email: "site.user@contoso.com",
-          },
-        },
-      },
-      "people",
-    ],
-    [
       "group",
       {
         id: "perm-group",
@@ -42,20 +28,6 @@ describe("mapGraphPermissionToEntryOnUI", () => {
             id: "group-1",
             displayName: "Project Owners",
             mail: "owners@contoso.com",
-          },
-        },
-      },
-      "groups",
-    ],
-    [
-      "siteGroup",
-      {
-        id: "perm-site-group",
-        roles: ["owner"],
-        grantedToV2: {
-          siteGroup: {
-            id: "site-group-1",
-            loginName: "Site Members",
           },
         },
       },
@@ -107,6 +79,34 @@ describe("mapGraphPermissionToEntryOnUI", () => {
     expect(entry.role).toBe("Owner");
   });
 
+  it("should treat site-only identities as unsupported", () => {
+    expect(() =>
+      mapGraphPermissionToEntryOnUI({
+        id: "perm-site-user",
+        roles: ["reader"],
+        grantedToV2: {
+          siteUser: {
+            displayName: "Site User",
+            email: "site.user@contoso.com",
+          },
+        },
+      }),
+    ).toThrow("is missing a supported identity facet");
+
+    expect(() =>
+      mapGraphPermissionToEntryOnUI({
+        id: "perm-site-group",
+        roles: ["owner"],
+        grantedToV2: {
+          siteGroup: {
+            id: "site-group-1",
+            loginName: "Site Members",
+          },
+        },
+      }),
+    ).toThrow("is missing a supported identity facet");
+  });
+
   it("should throw when grantedToV2 identity is missing", () => {
     expect(() =>
       mapGraphPermissionToEntryOnUI({
@@ -114,6 +114,6 @@ describe("mapGraphPermissionToEntryOnUI", () => {
         roles: ["reader"],
         grantedToV2: {},
       }),
-    ).toThrow("is missing grantedToV2 identity");
+    ).toThrow("is missing a supported identity facet");
   });
 });
