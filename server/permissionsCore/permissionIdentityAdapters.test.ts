@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveGraphPermissionIdentity } from "./permissionIdentityAdapters";
 
 describe("resolveGraphPermissionIdentity", () => {
-  it("should resolve aad user and group identities from grantedTo and grantedToV2", () => {
+  it("should resolve aad user and group identities from grantedToV2", () => {
     expect(
       resolveGraphPermissionIdentity({
         grantedToV2: {
@@ -22,7 +22,7 @@ describe("resolveGraphPermissionIdentity", () => {
 
     expect(
       resolveGraphPermissionIdentity({
-        grantedTo: {
+        grantedToV2: {
           group: {
             id: "group-1",
             displayName: "Retail Members",
@@ -52,10 +52,24 @@ describe("resolveGraphPermissionIdentity", () => {
 
     expect(
       resolveGraphPermissionIdentity({
-        grantedTo: {
+        grantedToV2: {
           siteGroup: {
             id: "7",
             displayName: "Site Members",
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("should ignore deprecated grantedTo-only permissions", () => {
+    expect(
+      resolveGraphPermissionIdentity({
+        grantedTo: {
+          user: {
+            id: "legacy-user-1",
+            displayName: "Legacy Adele",
+            userPrincipalName: "legacy@contoso.com",
           },
         },
       }),

@@ -1,6 +1,6 @@
 export {
   applyItemPermissionChangeSet,
-  applyItemPermissionsToGraph as applyItemPermissions,
-  fetchMapItemPermissionsFromGraphToResponse as fetchItemPermissions,
-  listItemPermissionsFromGraph as listItemPermissions,
+  applyItemPermissionsToGraph,
+  fetchMapItemPermissionsFromGraphToResponse,
+  listItemPermissionsFromGraph,
 } from "./itemPermissionsHandlers";

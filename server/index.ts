@@ -34,8 +34,8 @@ import {
   listContainerPermissions,
 } from "./containerPermissions";
 import {
-  applyItemPermissions,
-  listItemPermissions,
+  applyItemPermissionsToGraph,
+  listItemPermissionsFromGraph,
 } from "./itemPermissions";
 import { deleteItems } from "./deleteItems";
 import {
@@ -191,7 +191,7 @@ server.post(
  */
 server.get(
   "/api/itemPermissions/:driveId/:itemId",
-  withErrorHandling(listItemPermissions),
+  withErrorHandling(listItemPermissionsFromGraph),
 );
 
 /**
@@ -205,7 +205,7 @@ server.get(
  */
 server.post(
   "/api/itemPermissions/:driveId/:itemId/apply",
-  withErrorHandling(applyItemPermissions),
+  withErrorHandling(applyItemPermissionsToGraph),
 );
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────

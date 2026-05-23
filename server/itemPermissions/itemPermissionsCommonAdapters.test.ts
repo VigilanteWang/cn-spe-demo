@@ -36,7 +36,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
         {
           id: "perm-child",
           roles: ["read"],
-          grantedTo: {
+          grantedToV2: {
             group: {
               id: "group-1",
               displayName: "Retail Members",
@@ -96,7 +96,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
     expect(response.entries[0].isInherited).toBe(false);
   });
 
-  it("should flag unmanaged permissions and skip them from editable entries", () => {
+  it("should skip unsupported permissions from editable entries", () => {
     const response = mapGraphItemPermissionsToResponse({
       currentPermissions: [
         {
@@ -109,7 +109,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
         {
           id: "perm-group",
           roles: ["write"],
-          grantedTo: {
+          grantedToV2: {
             group: {
               id: "group-1",
               displayName: "Retail Members",
@@ -122,6 +122,26 @@ describe("mapGraphItemPermissionsToResponse", () => {
 
     expect(response.entries).toHaveLength(1);
     expect(response.entries[0].principalType).toBe("groups");
+  });
+
+  it("should skip deprecated grantedTo-only permissions", () => {
+    const response = mapGraphItemPermissionsToResponse({
+      currentPermissions: [
+        {
+          id: "perm-legacy",
+          roles: ["read"],
+          grantedTo: {
+            user: {
+              id: "legacy-user-1",
+              displayName: "Legacy Adele",
+              userPrincipalName: "legacy@contoso.com",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(response.entries).toHaveLength(0);
   });
 });
 

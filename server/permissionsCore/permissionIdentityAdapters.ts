@@ -21,7 +21,8 @@ export const normalizeGraphPermissionIdentity = (
 
   const record = readGraphToRecord(identity);
   const graphId = readOptionalString(record.id);
-  const mail = readOptionalString(record.mail) ?? readOptionalString(record.email);
+  const mail =
+    readOptionalString(record.mail) ?? readOptionalString(record.email);
   const userPrincipalName = readOptionalString(record.userPrincipalName);
   const displayName =
     readOptionalString(record.displayName) ??
@@ -48,13 +49,15 @@ export const normalizeGraphPermissionIdentity = (
 };
 
 /**
- * 从 item/container permission 的多种 grantedTo 形状里提取“当前项目支持管理”的 identity。
+ * 从 item/container permission 的 `grantedToV2` 里提取“当前项目支持管理”的 identity。
  *
  * 说明：
  * - 当前项目只把 AAD user / group 当作正式可管理对象。
- * - Graph 可能把同一个 AAD identity 放在 `grantedToV2` 或 `grantedTo` 的不同分支里，
- *   所以这里继续兼容读取这两条路径。
- * - `siteUser` / `siteGroup` 属于 SharePoint-specific identity，当前实现故意忽略；
+ * - Microsoft Graph 已将 `grantedTo` 标记为 deprecated，这里只继续读取 `grantedToV2`，
+ *   避免新服务路径里继续扩散旧字段兼容逻辑。
+ * - `siteUser` / `siteGroup` 属于 SharePoint-specific identity，当前实现故意忽略，因为
+ * 对于SPE而言，SharePoint user/group 不一定容易管理，未有文档提到 User Profile service，
+ * 但的确有 graph api 提到可以建 sharepoint group，暂时忽略。
  *   如果某条权限只暴露这两类身份，就把它视为未纳管权限。
  */
 export const resolveGraphPermissionIdentity = (
@@ -62,13 +65,10 @@ export const resolveGraphPermissionIdentity = (
 ): IResolvedGraphPermissionIdentity | null => {
   const permissionRecord = readGraphToRecord(permission);
   const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
-  const grantedTo = readGraphToRecord(permissionRecord.grantedTo);
 
   const facets = [
     { principalType: "groups", value: grantedToV2.group },
-    { principalType: "groups", value: grantedTo.group },
     { principalType: "people", value: grantedToV2.user },
-    { principalType: "people", value: grantedTo.user },
   ] as const;
 
   const normalizedFacets = facets
