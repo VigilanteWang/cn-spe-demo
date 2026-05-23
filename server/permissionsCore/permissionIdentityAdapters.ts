@@ -49,86 +49,39 @@ export const normalizeGraphPermissionIdentity = (
 };
 
 /**
- * 从 item/container permission 的 `grantedToV2` 里提取“当前项目支持管理”的 identity。
+ * 从 item/container permission 的 `grantedToV2` 里提取当前项目真正支持管理的主体。
  *
  * 说明：
- * - 当前项目只把 AAD user / group 当作正式可管理对象。
- * - Microsoft Graph 已将 `grantedTo` 标记为 deprecated，这里只继续读取 `grantedToV2`，
- *   避免新服务路径里继续扩散旧字段兼容逻辑。
- * - `siteUser` / `siteGroup` 属于 SharePoint-specific identity，当前实现故意忽略，因为
- * 对于SPE而言，SharePoint user/group 不一定容易管理，未有文档提到 User Profile service，
- * 但的确有 graph api 提到可以建 sharepoint group，暂时忽略。
- *   如果某条权限只暴露这两类身份，就把它视为未纳管权限。
+ * - 当前实现只读取 `grantedToV2.group` 和 `grantedToV2.user`。
+ * - Microsoft Graph 已将 `grantedTo` 标记为 deprecated，这里不再回退读取旧字段，
+ *   避免在新代码路径里继续扩散旧兼容逻辑。
+ * - `siteUser` / `siteGroup` 这类 SharePoint-specific identity 当前故意忽略。
+ *   如果一条权限没有 `group`，只有 `user`，就按 `people` 返回。
+ *   如果 `group` 和 `user` 同时存在，就优先按 `groups` 返回，避免把组权限误判成 people。
+ *   如果这条权限只暴露 `siteUser` / `siteGroup` 等未纳管身份，就返回 `null`。
  */
 export const resolveGraphPermissionIdentity = (
   permission: unknown,
 ): IResolvedGraphPermissionIdentity | null => {
   const permissionRecord = readGraphToRecord(permission);
   const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
-
-  const facets = [
-    { principalType: "groups", value: grantedToV2.group },
-    { principalType: "people", value: grantedToV2.user },
-  ] as const;
-
-  const normalizedFacets = facets
-    .map((facet) => {
-      const normalized = normalizeGraphPermissionIdentity(facet.value);
-      if (!normalized) {
-        return null;
-      }
-
-      return {
-        principalType: facet.principalType,
-        ...normalized,
-      };
-    })
-    .filter(
-      (
-        facet,
-      ): facet is {
-        principalType: "people" | "groups";
-        graphId?: string;
-        displayName: string;
-        description: string;
-        mail?: string;
-        userPrincipalName?: string;
-      } => Boolean(facet),
-    );
-
-  if (normalizedFacets.length === 0) {
-    return null;
+  // 当前只支持 AAD group / user 两种正式可管理主体。
+  // 如果两者同时存在，优先使用 group，避免把组权限误当成 people。
+  const groupIdentity = normalizeGraphPermissionIdentity(grantedToV2.group);
+  if (groupIdentity) {
+    return {
+      principalType: "groups",
+      ...groupIdentity,
+    };
   }
 
-  const resolvedPrincipalType = normalizedFacets.some(
-    (facet) => facet.principalType === "groups",
-  )
-    ? "groups"
-    : "people";
-  const principalTypeFacets = normalizedFacets.filter(
-    (facet) => facet.principalType === resolvedPrincipalType,
-  );
-  const primaryFacet = principalTypeFacets[0];
+  const userIdentity = normalizeGraphPermissionIdentity(grantedToV2.user);
+  if (userIdentity) {
+    return {
+      principalType: "people",
+      ...userIdentity,
+    };
+  }
 
-  return {
-    principalType: resolvedPrincipalType,
-    graphId:
-      primaryFacet.graphId ??
-      principalTypeFacets.find((facet) => facet.graphId)?.graphId,
-    displayName:
-      primaryFacet.displayName ??
-      principalTypeFacets.find((facet) => facet.displayName)?.displayName ??
-      "Unknown principal",
-    description:
-      primaryFacet.description ??
-      principalTypeFacets.find((facet) => facet.description)?.description ??
-      "",
-    mail:
-      primaryFacet.mail ??
-      principalTypeFacets.find((facet) => facet.mail)?.mail,
-    userPrincipalName:
-      primaryFacet.userPrincipalName ??
-      principalTypeFacets.find((facet) => facet.userPrincipalName)
-        ?.userPrincipalName,
-  };
+  return null;
 };
