@@ -17,7 +17,7 @@ import {
   mapGraphContainerPermissionRoleToUi,
   mapUiContainerPermissionRoleToGraph,
 } from "./containerPermissionRoleMapper";
-import type { IGraphIdentityInPermission } from "./containerPermissionsInternalContracts";
+
 import {
   readGraphToRecord,
   readRequiredString,
@@ -26,7 +26,7 @@ import {
 import { resolveGraphPermissionIdentity } from "../permissionsCore/permissionIdentityAdapters";
 
 /**
- * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntry。
+ * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntryForUI
  */
 export const mapGraphPermissionToEntryOnUI = (
   permission: unknown,

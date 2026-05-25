@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseItemPermissionChangeSet } from "./itemPermissionsRequestParser";
 
+/**
+ * 验证 item 权限请求解析器会同时处理字段兼容、recipient 校验和枚举值收窄。
+ */
 describe("parseItemPermissionChangeSet", () => {
   it("should parse create, update and remove arrays", () => {
     const parsed = parseItemPermissionChangeSet({
@@ -50,6 +53,7 @@ describe("parseItemPermissionChangeSet", () => {
     const parsed = parseItemPermissionChangeSet({
       create: [],
       update: [],
+      // 旧版前端仍可能发送 delete；解析器需要继续兼容并归并到 remove。
       delete: [{ permissionId: "perm-legacy" }],
     });
 

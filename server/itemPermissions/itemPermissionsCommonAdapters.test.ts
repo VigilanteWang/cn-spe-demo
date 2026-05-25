@@ -5,6 +5,9 @@ import {
   mapGraphItemPermissionsToResponse,
 } from "./itemPermissionsCommonAdapters";
 
+/**
+ * 验证 item 权限适配层的继承判断、候选过滤和 Graph invite recipient 构造规则。
+ */
 describe("mapGraphItemPermissionsToResponse", () => {
   it("should classify matching parent permissionId entries as inherited", () => {
     const response = mapGraphItemPermissionsToResponse({
@@ -47,6 +50,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
       ],
     });
 
+    // 父子两层 permissionId 相同时，当前项这条权限应被视为 inherited。
     expect(response.entries).toHaveLength(2);
     expect(response.entries[0]).toMatchObject({
       permissionId: "perm-child",
@@ -120,6 +124,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
       ],
     });
 
+    // link permission 当前不进入 UI 可编辑列表，只保留支持的 group/user 权限。
     expect(response.entries).toHaveLength(1);
     expect(response.entries[0].principalType).toBe("groups");
   });
@@ -145,6 +150,9 @@ describe("mapGraphItemPermissionsToResponse", () => {
   });
 });
 
+/**
+ * 验证单条 Graph permission 是否会进入“支持的候选权限”集合。
+ */
 describe("mapGraphPermissionCandidate", () => {
   it("should return null for site-only permissions", () => {
     expect(
@@ -176,6 +184,9 @@ describe("mapGraphPermissionCandidate", () => {
   });
 });
 
+/**
+ * 验证 Graph invite recipient 的优先级始终为 objectId -> email -> alias。
+ */
 describe("buildGraphInviteRecipient", () => {
   it("should prefer objectId before email and alias", () => {
     expect(

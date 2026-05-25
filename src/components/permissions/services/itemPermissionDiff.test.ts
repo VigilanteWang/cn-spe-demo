@@ -5,6 +5,12 @@ import {
   ItemPermissionValidationError,
 } from "./itemPermissionDiff";
 
+/**
+ * 构造一条默认可编辑的 item 权限行，便于测试时只覆盖当前场景关心的字段。
+ *
+ * @param overrides 当前用例需要覆盖的字段。
+ * @returns 带稳定默认值的测试权限行。
+ */
 const createPermissionEntry = (
   overrides: Partial<IItemPermissionEntry>,
 ): IItemPermissionEntry => ({
@@ -24,6 +30,9 @@ const createPermissionEntry = (
   ...overrides,
 });
 
+/**
+ * 验证前端 diff 逻辑会把草稿拆成 create/update/remove，并阻止 inherited 只读行写回。
+ */
 describe("computeItemPermissionChanges", () => {
   it("should split draft changes into create, update and remove buckets", () => {
     const originalEntriesByTab = {
@@ -75,6 +84,7 @@ describe("computeItemPermissionChanges", () => {
     expect(
       computeItemPermissionChanges(originalEntriesByTab, draftEntriesByTab),
     ).toEqual({
+      // 草稿中新出现且原始快照里不存在的行会进入 create。
       create: [
         {
           principalType: "people",
@@ -91,6 +101,7 @@ describe("computeItemPermissionChanges", () => {
           role: "Writer",
         },
       ],
+      // 仅 role 变化的既有显式权限会进入 update。
       update: [
         {
           permissionId: "perm-adele",
@@ -101,6 +112,7 @@ describe("computeItemPermissionChanges", () => {
           role: "Reader",
         },
       ],
+      // 原始快照里存在、草稿里被移除的显式权限会进入 remove。
       remove: [
         {
           permissionId: "perm-group-existing",

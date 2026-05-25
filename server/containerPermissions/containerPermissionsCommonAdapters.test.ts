@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { mapGraphPermissionToEntryOnUI } from "./containerPermissionsCommonAdapters";
 
+/**
+ * 验证容器权限适配层会把 Graph permission 稳定映射成前端可消费的权限行。
+ */
 describe("mapGraphPermissionToEntryOnUI", () => {
   it.each([
     [
@@ -36,6 +39,7 @@ describe("mapGraphPermissionToEntryOnUI", () => {
   ])(
     "should map %s identities into common entries",
     (_kind, permission, expectedTab) => {
+      // user / group 两种主体都应该落到共享的 people/groups 页签模型上。
       const entry = mapGraphPermissionToEntryOnUI(permission);
 
       expect(entry.principalType).toBe(expectedTab);
@@ -80,6 +84,7 @@ describe("mapGraphPermissionToEntryOnUI", () => {
   });
 
   it("should treat site-only identities as unsupported", () => {
+    // 当前容器权限模块只支持 AAD user/group，不接受 SharePoint site-only 身份。
     expect(() =>
       mapGraphPermissionToEntryOnUI({
         id: "perm-site-user",

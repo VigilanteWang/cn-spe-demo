@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { resolveGraphPermissionIdentity } from "./permissionIdentityAdapters";
 
+/**
+ * 验证共享 identity 解析器只接收当前产品支持的 AAD user/group 身份。
+ */
 describe("resolveGraphPermissionIdentity", () => {
   it("should resolve aad user and group identities from grantedToV2", () => {
     expect(
@@ -65,6 +68,7 @@ describe("resolveGraphPermissionIdentity", () => {
   it("should ignore deprecated grantedTo-only permissions", () => {
     expect(
       resolveGraphPermissionIdentity({
+        // 新代码路径故意不再回退读取 deprecated grantedTo。
         grantedTo: {
           user: {
             id: "legacy-user-1",
@@ -114,6 +118,7 @@ describe("resolveGraphPermissionIdentity", () => {
         },
       }),
     ).toMatchObject({
+      // 当 AAD 身份和 site-only 身份并存时，应优先返回可管理的 AAD group。
       principalType: "groups",
       graphId: "group-1",
       displayName: "Retail Members",
