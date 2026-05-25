@@ -3,9 +3,7 @@ import type {
   IPermissionApiErrorBody,
   IPermissionEntryBaseForUI,
 } from "../../common/contracts/permissionCommonContracts";
-import type {
-  PermissionEntriesByTab,
-} from "../components/permissions/models/permissionSharedModels";
+import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
 
 /**
  * 权限后端 API 失败时抛出的稳定错误类型。

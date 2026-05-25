@@ -73,10 +73,7 @@ export const usePermissionDraft = <
    * 向指定页签追加一条新的草稿权限记录。
    * 这里要返回新数组而不是直接修改原数组，这样才能符合 React state 的“不可变”更新要求。
    */
-  const addEntry = (
-    tab: PermissionTabValue,
-    entry: TEntry,
-  ) => {
+  const addEntry = (tab: PermissionTabValue, entry: TEntry) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
       ...currentEntriesByTab,
       [tab]: [...currentEntriesByTab[tab], entry],

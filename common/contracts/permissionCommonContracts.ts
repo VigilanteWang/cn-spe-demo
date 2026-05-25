@@ -17,7 +17,7 @@ export type PermissionTabValue = "people" | "groups";
 export type PermissionInheritanceSource = "parent" | "container" | "unknown";
 
 /**
- * Access List 一行权限记录共享的基础字段。
+ * Access List 权限记录共享的基础字段。
  *
  * container / item 都会复用这些字段；
  * scope-specific 的 role 与额外字段由各自契约继续扩展。
