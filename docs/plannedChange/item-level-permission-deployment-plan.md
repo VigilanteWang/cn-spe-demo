@@ -47,12 +47,17 @@
 - 不把 `inheritedFrom` 作为正式判别依据。当前 Microsoft 文档与社区答复都说明，针对 OneDrive for Business / SharePoint document libraries，`inheritedFrom` 不可靠；当前实测里它虽然会出现，但常常只是空对象 `{}`，不能提供稳定来源信息。
 - 正式判别策略定为“即时父项 effective permission 集合比对”：
   - 先读取当前 item 的 `parentReference`，定位即时父项。
+  - 如果 `parentReference.path` 已经指向 `.../root:`，则把它视为 drive root / container 边界，不再继续读取“父项权限”。
   - 再读取即时父项的 `GET /permissions`。
   - 以 `permissionId` 为主键，把“当前 item 某条 permission 是否也存在于父项 effective permission 集合中”作为 inherited 判定主条件。
   - 正式实现只以 `permissionId` 作为 inherited 判定主键；如果未来真实遇到 `permissionId` 无法覆盖的 payload，再基于实测样本重新设计。
   - 如果 item 没有 `parentReference`，或父项读取失败，则保守降级为“不自动判成 inherited”，避免误禁用本可编辑的显式权限。
 - 之所以只比对即时父项，而不是回溯整条祖先链，是因为父项返回的也是 effective permissions；祖先继承下来的权限应已出现在即时父项集合中，因此即时父项比对已经足够覆盖常见继承场景，同时请求数更可控。
 - 删除只允许显式权限；继承权限不可删。
+- 共享 identity 解析当前进一步收窄为：只接受 `grantedToV2` 里的 AAD `user` / `group`。
+  - `siteUser` / `siteGroup` 不纳入正式管理模型。
+  - 只出现在 deprecated `grantedTo`、而不在 `grantedToV2` 中出现的 identity，当前也不作为正式支持面。
+  - 这类未纳管 permission 不要在当前主流程里扩成新的只读 row model；如果后续产品确实需要提示，再单独加最小提示位。
 - 角色修改策略必须先做租户验证：
   - 如果当前租户对显式 invite permission 的 `PATCH /permissions/{id}` 可用，则直接 PATCH。
   - 如果不可用，则统一走“删除旧显式权限，再按新角色重建显式权限”的策略。
@@ -72,7 +77,9 @@
   - item permission payload 中 explicit / inherited 的区分。
   - `inheritedFrom` 出现、缺失或为空对象 `{}` 时，都不会被当作正式判别依据。
   - 当前 item 与即时父项存在相同 `permissionId` 时，会稳定判定为 inherited。
+  - 顶层 item 的 `parentReference.path` 指向 `/root:` 时，不会误触发父项权限读取，也不会被误判成 inherited。
   - 父项读取失败时，分类逻辑保守降级，不误把显式权限判成 inherited。
+  - 只有 `grantedToV2.user/group` 会进入正式可编辑模型；`siteUser` / `siteGroup` 与 `grantedTo`-only permission 会被排除在当前支持面之外。
   - `driveRecipient` body 的 `objectId / email / alias` 选择规则。
   - role update 的 `PATCH` 与 `delete + recreate` 分流。
   - 非 identity permission 的忽略或提示行为。
@@ -93,9 +100,25 @@
   - `npm test -- --run server`
   - `npx tsc --noEmit`
 
+## Current Status
+
+- `Step 0` 已完成：当前租户/OBO 路径下，`invite / list / get / delete / PATCH` 都已做过验证，当前默认结论仍是 item 显式 permission 可以直接 `PATCH`。
+- `Step 1` 已完成：共享权限核心、共享 contracts、共享 draft hook、共享错误模型已经抽出，container 现有行为保持不变。
+- `Step 2` 已完成，并且在 `d945ce06e7f65928beb91b93d0d387e5d9d184d3` 之后又继续收窄：
+  - item backend route / handler / parser / error mapper 已落地。
+  - item 前端 API client 与 diff 逻辑已落地。
+  - inherited 判定现在只依赖“当前项与即时父项的 `permissionId` 比对”，不再保留 fingerprint fallback。
+  - 顶层 item 如果 `parentReference.path` 指向 `/root:`，不会再把 drive root 误当成可比较父项。
+  - 共享 identity 解析当前只认 `grantedToV2` 中的 AAD `user` / `group`；`siteUser` / `siteGroup` 以及 `grantedTo`-only identity 继续留在未纳管边界之外。
+- 因此，当前真正剩下的主路径已经不是“继续实现 Step 2 后端”，而是把现有 Step 2 产物稳定接到前端 UI，并把 `200 + []` 的歧义处理清楚。
+- 当前已确认的产品取向是：
+  - 先允许打开 item permission dialog，不额外做前置 eligibility gate。
+  - 但如果当前 caller 读到的是空列表，UI 不能直接把它解释成“该文件没有 item-level permission”。
+  - 该场景要显示明确提示文案，并附上 Microsoft Graph 与 SharePoint Embedded 的说明链接。
+
 ## Step Prompts
 
-### Step 0：先做租户验证和 payload 取证
+### Step 0（已完成）：先做租户验证和 payload 取证
 
 目标：在当前租户、当前 app registration、当前 OBO 路径下确认 item permission 的真实可用性和返回 shape。
 
@@ -120,7 +143,7 @@
 5. 最后给出结论摘要和后续正式实现建议。
 ```
 
-### Step 1：抽共享权限核心，并让 container 先迁移到新核心
+### Step 1（已完成）：抽共享权限核心，并让 container 先迁移到新核心
 
 目标：先把复用边界做对，再接 item，避免 item 落地后再返工 container。
 
@@ -145,7 +168,7 @@
 6. 最后只验证 container 现有测试仍通过，并总结共享层边界。
 ```
 
-### Step 2：实现 item backend/OBO adapter 与 item contracts
+### Step 2（已完成）：实现 item backend/OBO adapter 与 item contracts
 
 目标：让 item 也走“前端草稿 + 后端 OBO apply”的稳定路径。
 
@@ -165,8 +188,8 @@
    - 不再额外保留 `principal identity + facet kind + sorted roles` 这一类只读 fallback；当前实现只信任 `permissionId`
    - 父项读取失败、无父项、或分类存在不确定性时，宁可不判 inherited，也不要误禁用显式权限
    - 该规则写进代码注释和测试，说明原因是 Microsoft 文档与社区答复都表明 `inheritedFrom` 在 SharePoint / OneDrive for Business 中不可靠
-5. 仅把 AAD `user` / `group` 这类 identity permission 纳入此对话框模型；
-   link / application 等非本对话框管理对象不要做可编辑行，必要时返回一个“存在未纳入管理的权限类型”的提示标记。
+5. 仅把 `grantedToV2` 中可解析出的 AAD `user` / `group` 这类 identity permission 纳入此对话框模型；
+   `siteUser` / `siteGroup`、link / application、以及 `grantedTo`-only 这类非当前正式支持面的对象，不要做可编辑行，也不要在这一步扩成新的只读模型。
 6. item create 使用 invite；recipient 默认优先 objectId，验证不通过时再按 Step 0 结论切到 email 或 alias。
 7. item role update 策略：
    - Step 0 结论确认 PATCH 稳定可用：直接 PATCH
@@ -177,34 +200,56 @@
 
 ### Step 3：实现 ItemPermissionDialog 与 Files/Containers 编排接线
 
-目标：把 UI 落地，并完成 item <-> container dialog 的切换链路。
+目标：在不重开 Step 2 范围的前提下，把当前已经存在的 item permission 后端、API client、diff 逻辑真正接到 UI，并完成 item <-> container dialog 的切换链路。
 
 ```text
-@github 请实现 item-level permission 的前端对话框和页面接线，严格复用现有 container permission 风格与逻辑。
+@github 请实现 item-level permission 的前端对话框和页面接线，严格复用现有 container permission 风格与逻辑，并以当前已经完成的 Step 2 代码为前提继续推进。
 
 要求：
-1. 新增 `ItemPermissionDialog`，复用共享 Dialog shell、tabs、picker、status area、apply/close 交互。
-2. item dialog 的顶部差异仅限：
+1. 先复用现有 Step 2 产物，不要重复建设新的接口层或前端差异计算：
+   - `src/services/itemPermissionApi.ts`
+   - `src/components/permissions/services/itemPermissionDiff.ts`
+   - 共享 `usePermissionDraft`、tabs、picker、status area、apply/close 交互
+   - 当前 `common/contracts/` 里的 item/common permission 契约
+2. 新增 `ItemPermissionDialog`，但不要在前端重新推导 inherited：
+   - 前端只信任后端返回的 `isInherited`、`isEditable`、`isRemovable`、`inheritanceSource`
+   - 不在 UI 层再做父子 permission 比对
+   - 顶层 item 是否可编辑，继续以服务端已经处理过的 `/root:` 边界结果为准
+3. item dialog 的顶部差异仅限：
    - 标题 `Manage Item Permission`
    - item name 副标题（32 字符截断）
    - additive 说明文案
    - `Manage Container Permission` link button
-3. 当前 container dialog 实际是 Combobox，不是 TagPicker；item dialog 必须先保持同样风格，避免 UI 分叉。
-4. `FilesDataGrid` 只负责抛出 `onManagePermissions(item)`，不要在表格里塞权限逻辑。
-5. `Files` 持有 item dialog 开关和当前 item；`Containers` 继续持有 container dialog 开关。
-6. 从 item dialog 跳转到 container dialog 的流程：
+4. 当前 container dialog 实际是 Combobox，不是 TagPicker；item dialog 必须先保持同样风格，避免 UI 分叉。
+5. `FilesDataGrid` 只负责抛出 `onManagePermissions(item)`，不要在表格里塞权限逻辑。
+6. `Files` 持有 item dialog 开关和当前 item；`Containers` 继续持有 container dialog 开关。
+7. 从 item dialog 跳转到 container dialog 的流程：
    - 若无未保存改动：关闭 item dialog，再通知父层打开 container dialog
    - 若有未保存改动：先弹放弃确认，再执行切换
-7. inherited rows 的视觉与交互要求：
+8. inherited rows 的视觉与交互要求：
    - 第一列右对齐位置显示 `ConvertRangeRegular` 图标
    - role dropdown 禁用
    - delete 按钮禁用
    - 需要有清晰的只读提示文案，但不要把表格挤得过重
-8. 测试至少覆盖：
+9. 当前版本先不要额外实现“打开前 eligibility gate”：
+   - 先允许用户进入 dialog
+   - 如果后端返回 `entries=[]`，不要自动解释成“没有 item-level permission”
+   - 需要显示下面这条 disclaimer，作为当前 demo app 的明确说明：
+     `This list may appear empty even when item-level permissions exist. If you only have **read access** to this file, Microsoft Graph **might not** return existing item-level permissions. Learn more [here](https://learn.microsoft.com/en-us/graph/api/driveitem-list-permissions?view=graph-rest-1.0&tabs=http#access-to-sharing-permissions) and [here](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/sharing-and-perm#role-based-sharing-setting).`
+   - 这条提示只用于“空列表但 caller 可能受 Graph 可见性限制”的场景；不要在已有 permission rows 时抢占主界面注意力
+10. 不要在这一步悄悄放大 Step 2 已经收窄的支持面：
+   - 当前仅纳管 AAD `user/group`
+   - `siteUser` / `siteGroup`、link、application、以及 `grantedTo`-only permission 继续留在未纳管/忽略边界
+   - 不要为这些对象临时补一套只读行模型
+11. 测试至少覆盖：
    - inherited rows 显示 `ConvertRangeRegular`
    - inherited rows 的 role 和 delete 都不可点击
    - explicit rows 不受影响
-9. 最后补 UI 测试和交互测试。
+   - item dialog 读取/提交时复用现有 `itemPermissionApi` 与 `itemPermissionDiff`
+   - item -> container 切换时的 dirty confirm
+   - 空列表时会显示上述 disclaimer 和两个 learn-more links
+12. 如果 `src/components/files/index.tsx` 里仍保留当前已知的两个 `implicit any` 报错，而本步又需要改这个文件，则应在同一轮里一并修掉，避免 `npx tsc --noEmit` 继续被旧报错卡住。
+13. 最后补 UI 测试和交互测试，并跑最小相关验证。
 ```
 
 ## Assumptions
@@ -217,6 +262,13 @@
   - `PATCH /permissions/{id}` 在本租户可用，应优先直接 PATCH
   - `inheritedFrom` 不能作为正式判别依据
   - inherited 判别默认采用“即时父项 effective permission 集合比对”，主键为 `permissionId`
+  - `parentReference.path` 指向 `/root:` 的顶层 item，不再继续做父项权限比对
+  - 当前正式支持面只包括 `grantedToV2` 中可解析出的 AAD `user/group`
+- 当前 demo app 对 `entries=[]` 的处理策略不是“判定没有 item-level permission”，而是显示免责声明：
+  - 空列表可能是真的没有 item-level permission
+  - 也可能是 caller 只有 **read access**，因此 Microsoft Graph **might not** 返回既有条目
+- 因此当前阶段不再把“reader 打不开 dialog”当成前置约束，而是把歧义通过 UI 文案显式告知用户。
+- 如果未来产品真的要求提示“存在未纳管权限”，应另开新步骤处理；不要在当前 Step 3 里顺手扩展新的提示模型或只读 row model。
 - 截至 `2026-05-21`，规划依据的官方文档是：
   - `Sharing and Permissions`
   - `driveItem invite`
