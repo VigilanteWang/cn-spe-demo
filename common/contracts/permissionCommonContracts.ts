@@ -3,18 +3,10 @@ import type { ApiErrorCode, IApiErrorResponseBody } from "./apiErrorContracts";
 /**
  * 权限弹窗共享的主体类型。
  *
- * people / groups 同时是当前 container dialog 的 tab 值，
- * 未来 item dialog 也会继续复用这套基础分类。
+ * `people / groups` 同时是当前 container dialog 的 tab 值，
+ * item dialog 也继续复用这套基础分类。
  */
 export type PermissionTabValue = "people" | "groups";
-
-/**
- * item-level 未来会用到的继承来源分类。
- *
- * 这里先预留一个“正式前端语义”，
- * 避免后续直接把 Graph 的 `inheritedFrom` 原样泄漏到 UI 契约里。
- */
-export type PermissionInheritanceSource = "parent" | "container" | "unknown";
 
 /**
  * Access List 权限记录共享的基础字段。
@@ -39,20 +31,20 @@ export interface IPermissionEntryBaseForUI {
    */
   principalId: string;
   /**
-   * people 分支在新增写回时需要保留 userPrincipalName。
+   * people 分支在新增或更新写回时需要保留 `userPrincipalName`。
    * groups 分支不依赖它，但保留该字段可以让共享草稿层不需要知道具体 scope。
    */
   principalUserPrincipalName?: string;
   /**
    * 用户或组的 mail 信息。
    *
-   * 未来 item invite 可能需要在 objectId 缺失时把它作为 recipient fallback。
+   * item invite 在 objectId 缺失时，可能会把它作为 recipient fallback。
    */
   principalMail?: string;
   /**
    * 用户或组的 object id。
    *
-   * 对 groups 来说通常等于 principalId；
+   * 对 groups 来说通常等于 `principalId`；
    * 对 people 读回时不一定稳定存在，所以单独保留更安全。
    */
   principalObjectId?: string;
@@ -71,8 +63,8 @@ export interface IPermissionEntryBaseForUI {
   /**
    * 该权限是否来自上层继承。
    *
-   * container 当前统一为 false；
-   * item 未来会基于 effective permission 分类填充。
+   * container 当前统一为 `false`；
+   * item 会基于 effective permission 分类填充。
    */
   isInherited: boolean;
   /**
@@ -83,12 +75,6 @@ export interface IPermissionEntryBaseForUI {
    * 当前行是否允许在本对话框中删除。
    */
   isRemovable: boolean;
-  /**
-   * 继承来源的内部分类。
-   *
-   * 它是产品语义层的预留字段，不直接等价于 Graph 原始字段名。
-   */
-  inheritanceSource?: PermissionInheritanceSource;
 }
 
 export type PermissionApiErrorCode = Extract<

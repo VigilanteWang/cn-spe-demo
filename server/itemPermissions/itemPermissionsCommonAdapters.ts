@@ -25,12 +25,12 @@ export interface IItemPermissionListContext {
 }
 
 /**
- * 把当前 item 和父项的 effective permissions 转成前端响应。
+ * 把当前 item 和父 folder 的 effective permissions 转成前端响应。
  *
  * 继承判断不依赖 `inheritedFrom`，而是改用父子两层的 `permissionId` 对比。
- * 只要当前项里的 permissionId 也出现在父项里，就把它视为 inherited。
+ * 只要当前项里的 `permissionId` 也出现在父 folder 里，就把它视为 inherited。
  *
- * @param context 当前 item 权限与可选的父项权限。
+ * @param context 当前 item 权限与可选的父 folder 权限。
  * @returns 返回前端可以直接消费的 item 权限列表。
  */
 export const mapGraphItemPermissionsToResponse = (
@@ -40,7 +40,7 @@ export const mapGraphItemPermissionsToResponse = (
   const currentCandidates = context.currentPermissions.map(
     mapGraphPermissionCandidate,
   );
-  // 父项权限也做同样转换；没有父项时就使用空数组。
+  // 父 folder 权限也做同样转换；没有父 folder 时就使用空数组。
   const parentCandidates =
     context.parentPermissions?.map(mapGraphPermissionCandidate) ?? [];
 
@@ -49,12 +49,12 @@ export const mapGraphItemPermissionsToResponse = (
     (candidate): candidate is ISupportedItemPermissionCandidate =>
       Boolean(candidate),
   );
-  // 父项也做一次同样过滤，避免把 null 误当成有效权限。
+  // 父 folder 也做一次同样过滤，避免把 `null` 误当成有效权限。
   const parentSupportedCandidates = parentCandidates.filter(
     (candidate): candidate is ISupportedItemPermissionCandidate =>
       Boolean(candidate),
   );
-  // 提前收集父项 permissionId，便于后面快速判断继承关系。
+  // 提前收集父 folder 的 `permissionId`，便于后面快速判断继承关系。
   const parentPermissionIds = new Set(
     parentSupportedCandidates.map((candidate) => candidate.permissionId),
   );
@@ -62,7 +62,7 @@ export const mapGraphItemPermissionsToResponse = (
   return {
     // 把当前项候选结构映射成最终返回给前端的权限行。
     entries: currentSupportedCandidates.map((candidate) => {
-      // 当前 permissionId 也存在于父项时，说明它是继承权限。
+      // 当前 `permissionId` 也存在于父 folder 时，说明它是继承权限。
       const isInherited = parentPermissionIds.has(candidate.permissionId);
 
       return {
@@ -74,8 +74,6 @@ export const mapGraphItemPermissionsToResponse = (
         isEditable: !isInherited,
         // 继承权限也不允许在当前 item 上直接删除。
         isRemovable: !isInherited,
-        // 当前只区分来自父项的继承来源。
-        inheritanceSource: isInherited ? "parent" : undefined,
       };
     }),
   };
@@ -111,10 +109,10 @@ export const mapGraphPermissionCandidate = (
     return null;
   }
 
-  // Graph 没有返回角色时，保守回退到 read。
+  // Graph 没有返回角色时，保守回退到 `read`。
   const primaryRole = roles[0] ?? "read";
   const entry: IItemPermissionEntryForUI = {
-    // 前端列表项本地 id 统一用 permissionId 派生。
+    // 前端列表项本地 id 统一用 `permissionId` 派生。
     id: `permission:${permissionId}`,
     permissionId,
     principalId:
@@ -123,7 +121,7 @@ export const mapGraphPermissionCandidate = (
       createFallbackPrincipalId(principal.principalType, permissionId),
     principalObjectId: principal.graphId,
     principalUserPrincipalName:
-      // 只有 people 类型才有 userPrincipalName 的业务意义。
+      // 只有 `people` 类型才有 `userPrincipalName` 的业务意义。
       principal.principalType === "people"
         ? principal.userPrincipalName
         : undefined,
@@ -140,7 +138,7 @@ export const mapGraphPermissionCandidate = (
   };
 
   return {
-    // 返回给上层的候选结构同时保留 entry 和 permissionId。
+    // 返回给上层的候选结构同时保留 `entry` 和 `permissionId`。
     entry,
     permissionId,
   };
@@ -196,17 +194,17 @@ export const buildGraphInviteRecipient = (
   email?: string;
   alias?: string;
 } => {
-  // objectId 最稳定，优先拿来作为 Graph recipient。
+  // `objectId` 最稳定，优先拿来作为 Graph recipient。
   if (change.recipientObjectId) {
     return { objectId: change.recipientObjectId };
   }
 
-  // 没有 objectId 时，再退回到 email。
+  // 没有 `objectId` 时，再退回到 `email`。
   if (change.recipientEmail) {
     return { email: change.recipientEmail };
   }
 
-  // 最后才使用 alias，避免比前两种更模糊的标识先命中。
+  // 最后才使用 `alias`，避免比前两种更模糊的标识先命中。
   if (change.recipientAlias) {
     return { alias: change.recipientAlias };
   }
@@ -218,9 +216,9 @@ export const buildGraphInviteRecipient = (
 };
 
 /**
- * 在 people 没有返回 object id 时，生成仅供前端本地识别的回退 id。
+ * 在 `people` 没有返回 object id 时，生成仅供前端本地识别的回退 id。
  *
- * 这个回退 id 不参与 Graph 写回，只用于让前端列表里每条权限有稳定主体标识。
+ * 这个回退 id 不参与 Graph 写回，只用于让前端列表里每条权限都有稳定主体标识。
  *
  * @param principalType 当前主体类型。
  * @param permissionId 当前权限 id。

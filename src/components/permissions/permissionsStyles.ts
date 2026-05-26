@@ -32,6 +32,41 @@ export const usePermissionsStyles = makeStyles({
     rowGap: "8px",
     minWidth: 0,
   },
+  itemHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    columnGap: "12px",
+    minWidth: 0,
+  },
+  itemHeaderText: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "4px",
+    minWidth: 0,
+    flex: 1,
+  },
+  itemHeaderMetaRow: {
+    display: "block",
+    minWidth: 0,
+  },
+  itemSubtitle: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  linkButton: {
+    paddingLeft: "0",
+    paddingRight: "0",
+    minWidth: "auto",
+  },
+  inlineLink: {
+    color: tokens.colorBrandForegroundLink,
+    fontSize: "inherit",
+    lineHeight: "inherit",
+    textDecorationLine: "underline",
+    verticalAlign: "baseline",
+  },
   principalInputWrapper: {
     width: "100%",
     minWidth: 0,
@@ -119,8 +154,54 @@ export const usePermissionsStyles = makeStyles({
     paddingTop: "8px",
     paddingBottom: "8px",
   },
+  principalCellContent: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    columnGap: "8px",
+    minWidth: 0,
+    width: "100%",
+  },
+  principalCellText: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "2px",
+    minWidth: 0,
+    flex: 1,
+  },
+  principalSecondaryText: {
+    color: tokens.colorNeutralForeground3,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+  },
+  inheritedIcon: {
+    color: tokens.colorNeutralForeground3,
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  inheritedIconWrapper: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  tooltipContent: {
+    animationName: {
+      from: {
+        opacity: 0,
+      },
+      to: {
+        opacity: 1,
+      },
+    },
+    animationDuration: "160ms",
+    animationTimingFunction: "ease-out",
+  },
   roleSelect: {
     width: "115px",
+  },
+  disclaimerBox: {
+    color: tokens.colorNeutralForeground3,
   },
   footerActions: {
     display: "flex",

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ChangeEvent } from "react";
 import {
   Button,
   Dialog,
@@ -29,6 +29,7 @@ import { useFilesNavigation } from "./hooks/useFilesNavigation";
 import { useFilesUpload } from "./hooks/useFilesUpload";
 import { useFilesArchiveDownload } from "./hooks/useFilesArchiveDownload";
 import { Providers } from "@microsoft/mgt-element";
+import { ItemPermissionDialog } from "../permissions";
 
 /**
  * 文件管理组件模块。
@@ -75,7 +76,10 @@ import { Providers } from "@microsoft/mgt-element";
  * @param props 组件属性。
  * @returns 文件管理页面。
  */
-export const Files = ({ container }: IFilesProps) => {
+export const Files = ({
+  container,
+  onOpenContainerPermissions,
+}: IFilesProps) => {
   // =============== 页面级编排状态 ===============
   const styles = useFilesStyles();
   // useRef 主要用于在多次 render 之间存储一个可变且持久的引用，而不会触发组件 re-render；
@@ -86,7 +90,11 @@ export const Files = ({ container }: IFilesProps) => {
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
+    useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =
+    useState<IDriveItemExtended | null>(null);
+  const [currentItemPermissionItem, setCurrentItemPermissionItem] =
     useState<IDriveItemExtended | null>(null);
 
   const {
@@ -242,7 +250,7 @@ export const Files = ({ container }: IFilesProps) => {
    * @param data 输入数据。
    */
   const onHandleFolderNameChange: InputProps["onChange"] = useCallback(
-    (_event: React.ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
+    (_event: ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
       setFolderName(data.value);
     },
     [],
@@ -301,6 +309,25 @@ export const Files = ({ container }: IFilesProps) => {
     setPreviewOpen(true);
   }, []);
 
+  /**
+   * 打开当前行 item 的权限管理对话框。
+   */
+  const handleManageItemPermissions = useCallback(
+    (item: IDriveItemExtended) => {
+      setCurrentItemPermissionItem(item);
+      setItemPermissionDialogOpen(true);
+    },
+    [],
+  );
+
+  /**
+   * 关闭 item 权限管理对话框，并清理当前 item 上下文。
+   */
+  const handleCloseItemPermissionDialog = useCallback(() => {
+    setItemPermissionDialogOpen(false);
+    setCurrentItemPermissionItem(null);
+  }, []);
+
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
 
   return (
@@ -312,7 +339,9 @@ export const Files = ({ container }: IFilesProps) => {
         ref={uploadFileRef}
         type="file"
         multiple
-        onChange={(event) => void onUploadFileSelected(event)}
+        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+          void onUploadFileSelected(event)
+        }
         style={{ display: "none" }}
       />
       {/*
@@ -325,7 +354,9 @@ export const Files = ({ container }: IFilesProps) => {
         type="file"
         webkitdirectory=""
         multiple
-        onChange={(event) => void onUploadFolderSelected(event)}
+        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+          void onUploadFolderSelected(event)
+        }
         style={{ display: "none" }}
       />
       {/*
@@ -504,10 +535,20 @@ export const Files = ({ container }: IFilesProps) => {
           onSelectionChange={onSelectionChange}
           onOpenFolder={navigateToFolder}
           onPreviewFile={handlePreviewOpen}
+          onManagePermissions={handleManageItemPermissions}
           actionsButtonGroupClassName={styles.actionsButtonGroup}
           nameCellContentClassName={styles.nameCellContent}
         />
       </div>
+
+      <ItemPermissionDialog
+        open={itemPermissionDialogOpen}
+        driveId={container.id}
+        itemId={currentItemPermissionItem?.id ?? undefined}
+        itemName={currentItemPermissionItem?.name ?? undefined}
+        onClose={handleCloseItemPermissionDialog}
+        onManageContainerPermission={onOpenContainerPermissions}
+      />
 
       {/*
         文件预览对话框（全屏）：点击文件名时打开。

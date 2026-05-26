@@ -40,7 +40,7 @@ import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";
 import { CreateContainerDialog } from "./components/CreateContainerDialog";
-import { ContainerPermissionDialog } from "../permissions";
+import { ContainerPermissionDialog } from "../permissions/ContainerPermissionDialog";
 
 /**
  * 容器管理页面
@@ -176,7 +176,12 @@ export const Containers = () => {
 
       {/* 仅在用户选中容器后才渲染文件列表组件，传入选中的容器对象 */}
       <div className={styles.filesRegion} data-testid="containers-files-region">
-        {selectedContainer && <Files container={selectedContainer} />}
+        {selectedContainer && (
+          <Files
+            container={selectedContainer}
+            onOpenContainerPermissions={() => setIsPermissionDialogOpen(true)}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import type { IJobProgress } from "../../services/downloadApi";
 export interface IFilesProps {
   /** 当前选中的容器信息。 */
   container: IContainer;
+  onOpenContainerPermissions: () => void;
 }
 
 /**

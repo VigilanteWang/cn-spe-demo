@@ -28,6 +28,7 @@ describe("FilesDataGrid", () => {
         onSelectionChange={vi.fn()}
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={onPreviewFile}
+        onManagePermissions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -49,6 +50,7 @@ describe("FilesDataGrid", () => {
         onSelectionChange={vi.fn()}
         onOpenFolder={onOpenFolder}
         onPreviewFile={vi.fn()}
+        onManagePermissions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -74,11 +76,33 @@ describe("FilesDataGrid", () => {
         onSelectionChange={vi.fn()}
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={vi.fn()}
+        onManagePermissions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
     );
 
     expect(screen.getByText("1 hour ago")).toBeTruthy();
+  });
+
+  it("should call manage permissions callback when clicking the permissions action", () => {
+    const onManagePermissions = vi.fn();
+    const targetItem = createItem({ id: "file-3", name: "report.docx" });
+
+    render(
+      <FilesDataGrid
+        driveItems={[targetItem]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        onManagePermissions={onManagePermissions}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Permissions" }));
+    expect(onManagePermissions).toHaveBeenCalledWith(targetItem);
   });
 });

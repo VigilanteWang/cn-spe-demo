@@ -1,19 +1,4 @@
-/**
- * 容器权限管理对话框模块。
- *
- * 本模块负责：
- * 1. 提供“容器级权限管理”弹窗外壳
- * 2. 展示当前容器名称
- * 3. 展示权限页签、搜索输入区和 access list
- * 4. 接入真实容器权限加载、差异计算与 Apply 写回
- *
- * 说明：
- * - 现有 `Combobox` 搜索交互、debounce、loading 和结果直加 access list 的行为保持不变
- * - 搜索 Hook 仍然只负责目录查找；真实权限加载/写回单独接入，避免把两条链路重新耦合
- * - Close 继续放弃未提交草稿；Apply 则提交差异并用服务端最新结果刷新本地基线
- */
-
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
   Avatar,
   Button,
@@ -24,6 +9,7 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
+  Link,
   Option,
   Select,
   Spinner,
@@ -35,56 +21,65 @@ import {
   TableCellLayout,
   TableRow,
   Text,
+  Tooltip,
 } from "@fluentui/react-components";
 import type { ComboboxProps } from "@fluentui/react-components";
 import {
   CheckmarkCircleRegular,
+  ConvertRangeRegular,
   DeleteRegular,
   DismissCircleRegular,
 } from "@fluentui/react-icons";
 import { readErrorMessage } from "../../common/errors.ts";
-import {
-  ContainerPermissionRole,
-  IContainerPermissionEntriesByTab,
-  PermissionTabValue,
-} from "./models/permissionModels";
-import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
+import type {
+  IItemPermissionEntriesByTab,
+  ItemPermissionRole,
+} from "./models/itemPermissionModels";
+import { useItemPermissionDialogState } from "./hooks/useItemPermissionDialogState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
-import { IContainerPermissionDialogProps } from "./permissionsTypes";
+import type { PermissionTabValue } from "./models/permissionModels";
 import { usePermissionsStyles } from "./permissionsStyles";
+import type { IItemPermissionDialogProps } from "./permissionsTypes";
 import {
-  applyContainerPermissionChanges,
-  listContainerPermissions,
-  PermissionApiError,
-} from "../../services/containerPermissionApi";
-import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
+  applyItemPermissionChanges,
+  ItemPermissionApiError,
+  listItemPermissions,
+} from "../../services/itemPermissionApi";
+import { computeItemPermissionChanges } from "./services/itemPermissionDiff";
 
-const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
-  "Reader",
-  "Writer",
-  "Manager",
-  "Owner",
-];
+const ITEM_PERMISSION_ROLES: ItemPermissionRole[] = ["Reader", "Writer"];
+const ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT =
+  "Inherited from the parent folder";
 
 type ApplyFeedbackStatus = "success" | "error" | null;
 
+const ITEM_PERMISSION_READ_VISIBILITY_LEARN_MORE_URL =
+  "https://learn.microsoft.com/en-us/graph/api/driveitem-list-permissions?view=graph-rest-1.0&tabs=http#access-to-sharing-permissions";
+const ITEM_PERMISSION_ROLE_BASED_SHARING_LEARN_MORE_URL =
+  "https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/sharing-and-perm#role-based-sharing-setting";
+
 /**
  * 根据页签值返回当前界面要显示的标题文案。
- *
- * 这里集中维护 people / groups 的显示映射，
- * 避免组件内部重复散落条件判断。
  */
 const getTabTitle = (tab: PermissionTabValue) =>
   tab === "people" ? "People" : "Groups";
 
 /**
- * 把权限请求错误转成适合 UI 直接展示的文案。
+ * 统一生成 item 权限对话框的空列表基线。
+ */
+const createEmptyPermissionEntries = (): IItemPermissionEntriesByTab => ({
+  people: [],
+  groups: [],
+});
+
+/**
+ * 把权限请求错误转换成适合 UI 展示的文案。
  */
 const getPermissionRequestErrorMessage = (
   error: unknown,
   fallbackMessage: string,
 ): string => {
-  if (error instanceof PermissionApiError) {
+  if (error instanceof ItemPermissionApiError) {
     if (error.code === "throttled" && error.retryAfterSeconds) {
       return `${error.message} Retry after ${error.retryAfterSeconds} seconds.`;
     }
@@ -100,30 +95,37 @@ const getPermissionRequestErrorMessage = (
 };
 
 /**
- * 创建一份空的权限分组结果。
- *
- * Dialog 打开前先以空列表初始化本地草稿，
- * 等后端返回真实容器权限后再整体替换进去。
+ * 把过长的 item 名称截断到指定长度，避免标题区被撑破。
  */
-const createEmptyPermissionEntries = (): IContainerPermissionEntriesByTab => ({
-  people: [],
-  groups: [],
-});
+const truncateItemName = (itemName: string, maxLength = 32) => {
+  if (itemName.length <= maxLength) {
+    return itemName;
+  }
+
+  return `${itemName.slice(0, Math.max(0, maxLength - 1))}…`;
+};
+
 /**
- * 容器权限管理弹窗。
- *
- * 当前步骤实现：
- * - 打开弹窗时读取真实容器权限
- * - 保持现有目录搜索 + 本地草稿交互
- * - Apply 时计算新增/更新/删除差异并写回后端
- * - 成功后用服务端最新权限刷新列表并清空脏状态
+ * 返回 inherited 图标对应的 Tooltip 文案。
  */
-export const ContainerPermissionDialog = ({
+
+/**
+ * item 权限管理对话框。
+ *
+ * 该组件严格沿用现有 container dialog 的交互骨架：
+ * - 继续使用 People / Groups tabs
+ * - 继续使用 Combobox 搜索与本地草稿列表
+ * - 继续通过现有 `itemPermissionApi` 和 `itemPermissionDiff` 读写
+ * - 继续复用统一的加载、错误和 Apply 状态区
+ */
+export const ItemPermissionDialog = ({
   open,
-  containerId,
-  containerName,
+  driveId,
+  itemId,
+  itemName,
   onClose,
-}: IContainerPermissionDialogProps) => {
+  onManageContainerPermission,
+}: IItemPermissionDialogProps) => {
   const styles = usePermissionsStyles();
   const initialEntriesByTab = createEmptyPermissionEntries();
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
@@ -133,8 +135,6 @@ export const ContainerPermissionDialog = ({
   const [applyFeedbackStatus, setApplyFeedbackStatus] =
     useState<ApplyFeedbackStatus>(null);
 
-  // 这里统一拿到弹窗所需的页签、草稿列表和关闭动作，
-  // 让组件层主要负责渲染、真实加载和真实写回。
   const {
     selectedTab,
     setSelectedTab,
@@ -150,14 +150,11 @@ export const ContainerPermissionDialog = ({
     replaceEntries,
     getVisibleEntries,
     isCandidateAdded,
-  } = useContainerPermissionDialogState(
+  } = useItemPermissionDialogState(
     initialEntriesByTab,
-    containerId ?? "__no-container__",
+    `${driveId ?? "__no-drive__"}:${itemId ?? "__no-item__"}`,
   );
 
-  // 搜索相关状态单独交给独立 Hook：
-  // - 继续保留最小输入长度、debounce、loading 和结果直接加入列表的行为
-  // - 不把真实权限加载/写回重新耦合进搜索链路
   const {
     query,
     results,
@@ -174,12 +171,17 @@ export const ContainerPermissionDialog = ({
     isCandidateAdded,
   });
 
-  // 当前页签下真正要显示在 access list 表格里的权限项。
   const visibleEntries = getVisibleEntries(selectedTab);
   const interactionDisabled =
-    isLoadingPermissions || isApplyingPermissions || !containerId;
+    isLoadingPermissions || isApplyingPermissions || !driveId || !itemId;
+  const totalVisibleEntriesCount =
+    draftEntriesByTab.people.length + draftEntriesByTab.groups.length;
+  const shouldShowEmptyVisibilityDisclaimer =
+    !isLoadingPermissions &&
+    !permissionRequestErrorMessage &&
+    totalVisibleEntriesCount === 0;
+  const truncatedItemName = itemName ? truncateItemName(itemName) : undefined;
 
-  // 统一把权限读写错误和搜索错误合并到同一错误区，避免在多个位置重复展示。
   const permissionStatusMessages = [
     permissionRequestErrorMessage
       ? `Api Error: ${permissionRequestErrorMessage}`
@@ -192,14 +194,22 @@ export const ContainerPermissionDialog = ({
       : null,
   ].filter((message): message is string => Boolean(message));
 
+  const emptyStateText = useMemo(() => {
+    if (shouldShowEmptyVisibilityDisclaimer) {
+      return "No permissions are currently visible in this dialog.";
+    }
+
+    return `No ${getTabTitle(selectedTab).toLowerCase()} permissions added yet.`;
+  }, [selectedTab, shouldShowEmptyVisibilityDisclaimer]);
+
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    if (!containerId) {
+    if (!driveId || !itemId) {
       replaceEntries(createEmptyPermissionEntries());
-      setPermissionRequestErrorMessage("No container selected.");
+      setPermissionRequestErrorMessage("No item selected.");
       setApplyFeedbackStatus(null);
       return;
     }
@@ -209,8 +219,8 @@ export const ContainerPermissionDialog = ({
     setPermissionRequestErrorMessage(null);
     setApplyFeedbackStatus(null);
 
-    void listContainerPermissions(containerId)
-      .then((entriesByTab) => {
+    void listItemPermissions(driveId, itemId)
+      .then(({ entriesByTab }) => {
         if (cancelled) {
           return;
         }
@@ -226,7 +236,7 @@ export const ContainerPermissionDialog = ({
         setPermissionRequestErrorMessage(
           getPermissionRequestErrorMessage(
             error,
-            "Unable to load current container permissions.",
+            "Unable to load current item permissions.",
           ),
         );
       })
@@ -239,7 +249,7 @@ export const ContainerPermissionDialog = ({
     return () => {
       cancelled = true;
     };
-  }, [open, containerId]);
+  }, [open, driveId, itemId]);
 
   /**
    * 处理 Combobox 输入变化。
@@ -251,9 +261,7 @@ export const ContainerPermissionDialog = ({
   };
 
   /**
-   * 处理用户从下拉结果里选中某个候选对象。
-   *
-   * 选中后会直接尝试加入 access list。
+   * 处理从目录搜索结果中选择候选对象。
    */
   const handleOptionSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
     _event,
@@ -263,17 +271,17 @@ export const ContainerPermissionDialog = ({
   };
 
   /**
-   * 把当前草稿差异提交到后端，并用服务端最新权限刷新本地基线。
+   * 提交当前 item 权限草稿差异，并用后端返回结果刷新本地基线。
    */
   const handleApply = async () => {
-    if (!containerId) {
+    if (!driveId || !itemId) {
       return;
     }
 
     let changes;
 
     try {
-      changes = computeContainerPermissionChanges(
+      changes = computeItemPermissionChanges(
         originalEntriesByTab,
         draftEntriesByTab,
       );
@@ -281,7 +289,7 @@ export const ContainerPermissionDialog = ({
       setPermissionRequestErrorMessage(
         getPermissionRequestErrorMessage(
           error,
-          "Unable to prepare container permission changes.",
+          "Unable to prepare item permission changes.",
         ),
       );
       setApplyFeedbackStatus("error");
@@ -301,24 +309,46 @@ export const ContainerPermissionDialog = ({
     setApplyFeedbackStatus(null);
 
     try {
-      const refreshedEntries = await applyContainerPermissionChanges(
-        containerId,
+      const { entriesByTab } = await applyItemPermissionChanges(
+        driveId,
+        itemId,
         changes,
       );
 
-      replaceEntries(refreshedEntries);
+      replaceEntries(entriesByTab);
       setApplyFeedbackStatus("success");
     } catch (error: unknown) {
       setPermissionRequestErrorMessage(
         getPermissionRequestErrorMessage(
           error,
-          "Unable to apply container permission changes.",
+          "Unable to apply item permission changes.",
         ),
       );
       setApplyFeedbackStatus("error");
     } finally {
       setIsApplyingPermissions(false);
     }
+  };
+
+  /**
+   * 从 item 权限跳转到容器权限。
+   *
+   * 如果当前存在未保存改动，先弹出放弃确认，再执行切换。
+   */
+  const handleManageContainerPermissionClick = () => {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm(
+        "You have unsaved changes. Discard them and manage container permissions instead?",
+      )
+    ) {
+      return;
+    }
+
+    discardDraftAndClose(() => {
+      onClose();
+      onManageContainerPermission();
+    });
   };
 
   return (
@@ -332,15 +362,34 @@ export const ContainerPermissionDialog = ({
     >
       <DialogSurface className={styles.surface}>
         <DialogBody className={styles.body}>
-          <DialogTitle>Manage Container Permission</DialogTitle>
+          <DialogTitle>Manage Item Permission</DialogTitle>
 
           <DialogContent className={styles.content}>
-            {/* 当前容器说明区：
-                先说明当前选中的容器，以及本步实现范围，帮助后续维护者快速定位边界。 */}
             <div className={styles.section}>
-              <Text weight="semibold">
-                {containerName ?? "<No container selected>"}
-              </Text>
+              <div className={styles.itemHeaderText}>
+                <Text
+                  weight="semibold"
+                  title={itemName}
+                  className={styles.itemSubtitle}
+                >
+                  {truncatedItemName ?? "<No item selected>"}
+                </Text>
+                <div className={styles.itemHeaderMetaRow}>
+                  <Text size={200} className={styles.searchStatusText}>
+                    Item-level permissions are additive to container
+                    permissions. Click to manage
+                    <Link
+                      as="button"
+                      className={styles.inlineLink}
+                      disabled={isApplyingPermissions}
+                      onClick={handleManageContainerPermissionClick}
+                    >
+                      Container Permission
+                    </Link>
+                  </Text>
+                </div>
+              </div>
+
               {permissionStatusMessages.length > 0 ? (
                 <div
                   role="status"
@@ -356,8 +405,6 @@ export const ContainerPermissionDialog = ({
               ) : null}
             </div>
 
-            {/* 权限页签：
-                把 People 和 Groups 分开编辑，避免不同 principal 类型混在同一视图里。 */}
             <div className={styles.section}>
               <TabList
                 selectedValue={selectedTab}
@@ -374,12 +421,10 @@ export const ContainerPermissionDialog = ({
               </TabList>
             </div>
 
-            {/* 搜索输入区：
-                Combobox 继续负责“输入关键字 + 展示目录搜索结果 + 直接选择加入列表”整条链路。 */}
             <div className={styles.section}>
               <div className={styles.principalInputWrapper}>
                 <Combobox
-                  id="permission-principal-input"
+                  id="item-permission-principal-input"
                   aria-label={`Add ${getTabTitle(selectedTab)}`}
                   className={styles.principalCombobox}
                   expandIcon={null}
@@ -420,8 +465,6 @@ export const ContainerPermissionDialog = ({
 
                   {status === "success"
                     ? results.map((candidate) => {
-                        // 已存在于当前 access list 的对象仍然保留在结果里，
-                        // 这样用户能看见“命中了谁”，同时获得明确的重复反馈。
                         const alreadyAdded = isCandidateAdded(
                           selectedTab,
                           candidate,
@@ -437,8 +480,6 @@ export const ContainerPermissionDialog = ({
                               className={styles.dropdownOption}
                               data-testid={`candidate-option-${candidate.id}`}
                             >
-                              {/* 这里只显示 initials，不在结果列表里额外请求头像，
-                                  这样既满足设计要求，也避免引入额外网络依赖。 */}
                               <Avatar
                                 name={candidate.name}
                                 initials={candidate.initials}
@@ -495,8 +536,33 @@ export const ContainerPermissionDialog = ({
               </Text>
             </div>
 
-            {/* access list：
-                这里展示的是本地草稿视图，但它的初始基线和 Apply 结果都来自真实后端权限。 */}
+            {shouldShowEmptyVisibilityDisclaimer ? (
+              <div
+                className={styles.disclaimerBox}
+                data-testid="item-permission-visibility-disclaimer"
+              >
+                <Text size={200}>
+                  This list may be empty even when item-level permissions exist.
+                  With only <strong>read access</strong> to this file, Microsoft
+                  Graph may not return them. Learn more at{" "}
+                  <Link
+                    href={ITEM_PERMISSION_READ_VISIBILITY_LEARN_MORE_URL}
+                    target="_blank"
+                  >
+                    here
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href={ITEM_PERMISSION_ROLE_BASED_SHARING_LEARN_MORE_URL}
+                    target="_blank"
+                  >
+                    here
+                  </Link>
+                  .
+                </Text>
+              </div>
+            ) : null}
+
             <div className={styles.accessListSection}>
               <div className={styles.tableWrapper}>
                 <Table
@@ -508,67 +574,120 @@ export const ContainerPermissionDialog = ({
                       <TableRow>
                         <TableCell colSpan={3}>
                           <TableCellLayout>
-                            <Spinner size="tiny" />
-                            <Text>
-                              Loading current container permissions...
-                            </Text>
+                            <Spinner size="small" label="Loading..." />
                           </TableCellLayout>
                         </TableCell>
                       </TableRow>
-                    ) : visibleEntries.length > 0 ? (
-                      visibleEntries.map((entry) => (
-                        <TableRow
-                          key={entry.id}
-                          data-testid={`permission-row-${entry.id}`}
-                        >
-                          <TableCell className={styles.principalColumn}>
-                            <TableCellLayout>
-                              {entry.principalName}
-                            </TableCellLayout>
-                          </TableCell>
-                          <TableCell className={styles.roleColumn}>
-                            <Select
-                              className={styles.roleSelect}
-                              aria-label={`${entry.principalName} role`}
-                              disabled={interactionDisabled}
-                              value={entry.role}
-                              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                                updateEntryRole(
-                                  selectedTab,
-                                  entry.id,
-                                  event.currentTarget
-                                    .value as ContainerPermissionRole,
-                                )
-                              }
+                    ) : null}
+
+                    {!isLoadingPermissions && visibleEntries.length > 0
+                      ? visibleEntries.map((entry) => {
+                          return (
+                            <TableRow
+                              key={entry.id}
+                              data-testid={`permission-row-${entry.id}`}
                             >
-                              {CONTAINER_PERMISSION_ROLES.map((role) => (
-                                <option key={role} value={role}>
-                                  {role}
-                                </option>
-                              ))}
-                            </Select>
-                          </TableCell>
-                          <TableCell className={styles.actionColumn}>
-                            <Button
-                              appearance="subtle"
-                              disabled={interactionDisabled}
-                              icon={<DeleteRegular />}
-                              aria-label={`Remove ${entry.principalName}`}
-                              onClick={() => removeEntry(selectedTab, entry.id)}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
+                              <TableCell className={styles.principalColumn}>
+                                <div>
+                                  <div className={styles.principalCellContent}>
+                                    <div className={styles.principalCellText}>
+                                      <Text weight="semibold">
+                                        {entry.principalName}
+                                      </Text>
+                                      <Text
+                                        size={200}
+                                        className={
+                                          styles.principalSecondaryText
+                                        }
+                                      >
+                                        {entry.description}
+                                      </Text>
+                                    </div>
+                                    {entry.isInherited ? (
+                                      <Tooltip
+                                        relationship="label"
+                                        positioning="above"
+                                        withArrow
+                                        content={{
+                                          className: styles.tooltipContent,
+                                          children: (
+                                            <Text size={100}>
+                                              {
+                                                ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT
+                                              }
+                                            </Text>
+                                          ),
+                                        }}
+                                      >
+                                        <span
+                                          className={
+                                            styles.inheritedIconWrapper
+                                          }
+                                          data-testid={`permission-inherited-icon-${entry.id}`}
+                                          tabIndex={0}
+                                        >
+                                          <ConvertRangeRegular
+                                            aria-label="Inherited permission"
+                                            className={styles.inheritedIcon}
+                                          />
+                                        </span>
+                                      </Tooltip>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className={styles.roleColumn}>
+                                <Select
+                                  className={styles.roleSelect}
+                                  aria-label={`${entry.principalName} role`}
+                                  disabled={
+                                    interactionDisabled || !entry.isEditable
+                                  }
+                                  value={entry.role}
+                                  onChange={(
+                                    event: ChangeEvent<HTMLSelectElement>,
+                                  ) =>
+                                    updateEntryRole(
+                                      selectedTab,
+                                      entry.id,
+                                      event.target.value as ItemPermissionRole,
+                                    )
+                                  }
+                                >
+                                  {ITEM_PERMISSION_ROLES.map((role) => (
+                                    <option key={role} value={role}>
+                                      {role}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </TableCell>
+                              <TableCell className={styles.actionColumn}>
+                                <Button
+                                  aria-label={`Remove ${entry.principalName}`}
+                                  appearance="subtle"
+                                  icon={<DeleteRegular />}
+                                  disabled={
+                                    interactionDisabled || !entry.isRemovable
+                                  }
+                                  onClick={() =>
+                                    removeEntry(selectedTab, entry.id)
+                                  }
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      : null}
+
+                    {!isLoadingPermissions && visibleEntries.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3}>
                           <TableCellLayout>
-                            No entries yet. Search above and pick someone to add
-                            them.
+                            <Text size={200}>{emptyStateText}</Text>
                           </TableCellLayout>
                         </TableCell>
                       </TableRow>
-                    )}
+                    ) : null}
                   </TableBody>
                 </Table>
               </div>
@@ -587,6 +706,7 @@ export const ContainerPermissionDialog = ({
                   <Text>Saving...</Text>
                 </div>
               ) : null}
+
               {!isApplyingPermissions && applyFeedbackStatus === "success" ? (
                 <div
                   className={styles.applySuccessFeedback}
@@ -597,6 +717,7 @@ export const ContainerPermissionDialog = ({
                   <Text>Successful!</Text>
                 </div>
               ) : null}
+
               {!isApplyingPermissions && applyFeedbackStatus === "error" ? (
                 <div
                   className={styles.applyErrorFeedback}
@@ -608,18 +729,18 @@ export const ContainerPermissionDialog = ({
                 </div>
               ) : null}
             </div>
+
             <div className={styles.footerButtons}>
-              {/* Close 会放弃当前未保存草稿，恢复到最近一次加载或成功写回后的状态。 */}
               <Button
                 appearance="secondary"
+                disabled={isApplyingPermissions}
                 onClick={() => discardDraftAndClose(onClose)}
               >
                 Close
               </Button>
-              {/* Apply 负责真实写回，并在成功后刷新当前列表与清空脏状态。 */}
               <Button
                 appearance="primary"
-                disabled={!hasUnsavedChanges || interactionDisabled}
+                disabled={interactionDisabled || !hasUnsavedChanges}
                 onClick={() => {
                   void handleApply();
                 }}

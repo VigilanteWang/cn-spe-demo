@@ -58,7 +58,6 @@ describe("mapGraphItemPermissionsToResponse", () => {
       isInherited: true,
       isEditable: false,
       isRemovable: false,
-      inheritanceSource: "parent",
     });
     expect(response.entries[1]).toMatchObject({
       permissionId: "perm-explicit",

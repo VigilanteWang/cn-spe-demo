@@ -124,7 +124,6 @@ describe("fetchMapItemPermissionsFromGraphToResponse", () => {
       isInherited: true,
       isEditable: false,
       isRemovable: false,
-      inheritanceSource: "parent",
     });
     expect(requestedPaths).toEqual([
       currentPermissionsPath,
