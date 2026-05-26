@@ -3,4 +3,4 @@ export { ItemPermissionDialog } from "./ItemPermissionDialog";
 export type {
   IContainerPermissionDialogProps,
   IItemPermissionDialogProps,
-} from "./permissionsTypes";
+} from "./components/permissionsTypes";

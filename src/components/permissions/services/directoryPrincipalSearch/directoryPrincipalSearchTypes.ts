@@ -1,4 +1,4 @@
-import type { PermissionTabValue } from "../../models/permissionModels";
+import type { PermissionTabValue } from "../../models/permissionSharedModels";
 
 /**
  * 目录搜索支持的 principal 类型。

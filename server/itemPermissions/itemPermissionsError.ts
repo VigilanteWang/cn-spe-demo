@@ -196,7 +196,8 @@ export const toItemPermissionsApiErrorResponseBody = (
   retryAfterSeconds: error.retryAfterSeconds,
   requestId: error.requestId,
   // 优先返回错误对象自带的状态码，没有时再按错误码兜底推导。
-  statusCode: error.statusCode ?? getItemPermissionsApiErrorResponseStatus(error),
+  statusCode:
+    error.statusCode ?? getItemPermissionsApiErrorResponseStatus(error),
   details: error.details,
 });
 

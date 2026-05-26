@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
-import type { IContainerPermissionEntry } from "./models/permissionModels";
+import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
 import {
   ContainerPermissionApiError,
   applyContainerPermissionChanges,

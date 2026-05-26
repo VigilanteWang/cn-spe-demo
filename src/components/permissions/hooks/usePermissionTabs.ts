@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PermissionTabValue } from "../models/permissionModels";
+import type { PermissionTabValue } from "../models/permissionSharedModels";
 
 /**
  * 管理权限 Dialog 的页签切换状态。

@@ -43,19 +43,19 @@
 src/components/permissions/
 ├─ index.ts
 ├─ ContainerPermissionDialog.tsx
-├─ permissionsTypes.ts
-├─ permissionsStyles.ts
-├─ models/
-│  └─ permissionModels.ts
+├─ ContainerPermissionDialog.test.tsx
+├─ ItemPermissionDialog.tsx
+├─ ItemPermissionDialog.test.tsx
 ├─ hooks/
-│  ├─ useContainerPermissionDialogState.ts
-│  ├─ usePermissionDraft.ts
-│  ├─ usePermissionPrincipalSearch.ts
-│  └─ usePermissionTabs.ts
-└─ services/
-   ├─ containerPermissionDiff.ts
-   ├─ permissionPrincipalCandidateMapper.ts
-   └─ directoryPrincipalSearch/
+├─ models/
+├─ services/
+└─ components/
+   ├─ permissionsTypes.ts
+   ├─ permissionsStyles.ts
+   ├─ PermissionDialogFrame.tsx
+   ├─ PermissionDialogFrame.test.tsx
+   ├─ PermissionAccessListTable.tsx
+   └─ PrincipalSearchComboBox.tsx
 ```
 
 另外，这个模块还直接依赖两个外部层：
@@ -111,7 +111,7 @@ src/components/permissions/
 - Access List 表格区
 - 底部操作区
 
-### `models/permissionModels.ts`
+### `models/containerPermissionModels.ts`
 
 这是前端模型补充层。
 
@@ -133,7 +133,7 @@ src/components/permissions/
 
 - `common/contracts`
   前后端都认的稳定协议
-- `models/permissionModels.ts`
+- `models/containerPermissionModels.ts`
   前端为了页面交互补出来的本地模型
 
 ---

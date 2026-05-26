@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { PermissionTabValue } from "../models/permissionModels";
 import type {
   IPermissionEntryBaseForUI,
   PermissionEntriesByTab,
+  PermissionTabValue,
 } from "../models/permissionSharedModels";
 
 /**

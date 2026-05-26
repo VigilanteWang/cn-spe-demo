@@ -15,43 +15,25 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
-  Avatar,
   Button,
-  Combobox,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  Option,
   Select,
   Spinner,
-  Tab,
-  TabList,
-  Table,
-  TableBody,
   TableCell,
   TableCellLayout,
   TableRow,
   Text,
 } from "@fluentui/react-components";
-import type { ComboboxProps } from "@fluentui/react-components";
-import {
-  CheckmarkCircleRegular,
-  DeleteRegular,
-  DismissCircleRegular,
-} from "@fluentui/react-icons";
+import { DeleteRegular } from "@fluentui/react-icons";
 import { readErrorMessage } from "../../common/errors.ts";
 import {
   ContainerPermissionRole,
   IContainerPermissionEntriesByTab,
-  PermissionTabValue,
-} from "./models/permissionModels";
+} from "./models/containerPermissionModels";
 import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
-import { IContainerPermissionDialogProps } from "./permissionsTypes";
-import { usePermissionsStyles } from "./permissionsStyles";
+import { IContainerPermissionDialogProps } from "./components/permissionsTypes";
+import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
+import { usePermissionsStyles } from "./components/permissionsStyles";
 import {
   applyContainerPermissionChanges,
   listContainerPermissions,
@@ -67,15 +49,6 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
 ];
 
 type ApplyFeedbackStatus = "success" | "error" | null;
-
-/**
- * 根据页签值返回当前界面要显示的标题文案。
- *
- * 这里集中维护 people / groups 的显示映射，
- * 避免组件内部重复散落条件判断。
- */
-const getTabTitle = (tab: PermissionTabValue) =>
-  tab === "people" ? "People" : "Groups";
 
 /**
  * 把权限请求错误转成适合 UI 直接展示的文案。
@@ -242,27 +215,6 @@ export const ContainerPermissionDialog = ({
   }, [open, containerId, replaceEntries]);
 
   /**
-   * 处理 Combobox 输入变化。
-   */
-  const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    handleQueryChange(event.target.value);
-  };
-
-  /**
-   * 处理用户从下拉结果里选中某个候选对象。
-   *
-   * 选中后会直接尝试加入 access list。
-   */
-  const handleOptionSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
-    _event,
-    data,
-  ) => {
-    handleCandidateSelect(data.optionValue);
-  };
-
-  /**
    * 把当前草稿差异提交到后端，并用服务端最新权限刷新本地基线。
    */
   const handleApply = async () => {
@@ -321,317 +273,92 @@ export const ContainerPermissionDialog = ({
     }
   };
 
+  const tableBodyContent = isLoadingPermissions ? (
+    <TableRow>
+      <TableCell colSpan={3}>
+        <TableCellLayout>
+          <Spinner size="tiny" />
+          <Text>Loading current container permissions...</Text>
+        </TableCellLayout>
+      </TableCell>
+    </TableRow>
+  ) : visibleEntries.length > 0 ? (
+    visibleEntries.map((entry) => (
+      <TableRow key={entry.id} data-testid={`permission-row-${entry.id}`}>
+        <TableCell className={styles.principalColumn}>
+          <TableCellLayout>{entry.principalName}</TableCellLayout>
+        </TableCell>
+        <TableCell className={styles.roleColumn}>
+          <Select
+            className={styles.roleSelect}
+            aria-label={`${entry.principalName} role`}
+            disabled={interactionDisabled}
+            value={entry.role}
+            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+              updateEntryRole(
+                selectedTab,
+                entry.id,
+                event.currentTarget.value as ContainerPermissionRole,
+              )
+            }
+          >
+            {CONTAINER_PERMISSION_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </Select>
+        </TableCell>
+        <TableCell className={styles.actionColumn}>
+          <Button
+            appearance="subtle"
+            disabled={interactionDisabled}
+            icon={<DeleteRegular />}
+            aria-label={`Remove ${entry.principalName}`}
+            onClick={() => removeEntry(selectedTab, entry.id)}
+          />
+        </TableCell>
+      </TableRow>
+    ))
+  ) : (
+    <TableRow>
+      <TableCell colSpan={3}>
+        <TableCellLayout>
+          No entries yet. Search above and pick someone to add them.
+        </TableCellLayout>
+      </TableCell>
+    </TableRow>
+  );
+
   return (
-    <Dialog
+    <PermissionDialogFrame
       open={open}
-      onOpenChange={(_event, data) => {
-        if (!data.open) {
-          discardDraftAndClose(onClose);
-        }
+      title="Manage Container Permission"
+      headerContent={
+        <Text weight="semibold">
+          {containerName ?? "<No container selected>"}
+        </Text>
+      }
+      permissionStatusMessages={permissionStatusMessages}
+      selectedTab={selectedTab}
+      interactionDisabled={interactionDisabled}
+      searchInputId="permission-principal-input"
+      query={query}
+      searchResults={results}
+      searchStatus={status}
+      isDropdownOpen={isDropdownOpen}
+      isApplyingPermissions={isApplyingPermissions}
+      applyFeedbackStatus={applyFeedbackStatus}
+      isApplyDisabled={!hasUnsavedChanges || interactionDisabled}
+      tableBodyContent={tableBodyContent}
+      onRequestClose={() => discardDraftAndClose(onClose)}
+      onSelectedTabChange={setSelectedTab}
+      onSearchQueryChange={handleQueryChange}
+      onSearchCandidateSelect={handleCandidateSelect}
+      isCandidateAdded={isCandidateAdded}
+      onApply={() => {
+        void handleApply();
       }}
-    >
-      <DialogSurface className={styles.surface}>
-        <DialogBody className={styles.body}>
-          <DialogTitle>Manage Container Permission</DialogTitle>
-
-          <DialogContent className={styles.content}>
-            {/* 当前容器说明区：
-                先说明当前选中的容器，以及本步实现范围，帮助后续维护者快速定位边界。 */}
-            <div className={styles.section}>
-              <Text weight="semibold">
-                {containerName ?? "<No container selected>"}
-              </Text>
-              {permissionStatusMessages.length > 0 ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={styles.errorStatusText}
-                >
-                  {permissionStatusMessages.map((message) => (
-                    <Text key={message} size={200}>
-                      {message}
-                    </Text>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            {/* 权限页签：
-                把 People 和 Groups 分开编辑，避免不同 principal 类型混在同一视图里。 */}
-            <div className={styles.section}>
-              <TabList
-                selectedValue={selectedTab}
-                onTabSelect={(_event, data) =>
-                  setSelectedTab(data.value as PermissionTabValue)
-                }
-              >
-                <Tab disabled={interactionDisabled} value="people">
-                  People
-                </Tab>
-                <Tab disabled={interactionDisabled} value="groups">
-                  Groups
-                </Tab>
-              </TabList>
-            </div>
-
-            {/* 搜索输入区：
-                Combobox 继续负责“输入关键字 + 展示目录搜索结果 + 直接选择加入列表”整条链路。 */}
-            <div className={styles.section}>
-              <div className={styles.principalInputWrapper}>
-                <Combobox
-                  id="permission-principal-input"
-                  aria-label={`Add ${getTabTitle(selectedTab)}`}
-                  className={styles.principalCombobox}
-                  expandIcon={null}
-                  placeholder={`Search for ${getTabTitle(selectedTab)} (type at least 3 characters)`}
-                  freeform
-                  disabled={interactionDisabled}
-                  selectedOptions={[]}
-                  value={query}
-                  open={isDropdownOpen && !interactionDisabled}
-                  onChange={handleComboboxChange}
-                  onOptionSelect={handleOptionSelect}
-                >
-                  {status === "waitingForMoreInput" ? (
-                    <Option disabled text="Need more input">
-                      <Text size={200}>
-                        Keep typing at least 3 characters to search.
-                      </Text>
-                    </Option>
-                  ) : null}
-
-                  {status === "debouncing" ? (
-                    <Option disabled text="Debouncing">
-                      <Text size={200}>Getting ready to search...</Text>
-                    </Option>
-                  ) : null}
-
-                  {status === "loading" ? (
-                    <Option disabled text="Searching">
-                      <div
-                        className={styles.loadingOption}
-                        data-testid="directory-search-loading"
-                      >
-                        <Spinner size="tiny" />
-                        <Text>Searching...</Text>
-                      </div>
-                    </Option>
-                  ) : null}
-
-                  {status === "success"
-                    ? results.map((candidate) => {
-                        // 已存在于当前 access list 的对象仍然保留在结果里，
-                        // 这样用户能看见“命中了谁”，同时获得明确的重复反馈。
-                        const alreadyAdded = isCandidateAdded(
-                          selectedTab,
-                          candidate,
-                        );
-
-                        return (
-                          <Option
-                            key={candidate.id}
-                            value={candidate.id}
-                            text={candidate.name}
-                          >
-                            <div
-                              className={styles.dropdownOption}
-                              data-testid={`candidate-option-${candidate.id}`}
-                            >
-                              {/* 这里只显示 initials，不在结果列表里额外请求头像，
-                                  这样既满足设计要求，也避免引入额外网络依赖。 */}
-                              <Avatar
-                                name={candidate.name}
-                                initials={candidate.initials}
-                                size={32}
-                              />
-                              <div className={styles.dropdownOptionText}>
-                                <Text weight="semibold">{candidate.name}</Text>
-                                <Text
-                                  size={200}
-                                  className={styles.dropdownOptionSecondary}
-                                >
-                                  {candidate.secondaryText}
-                                </Text>
-                              </div>
-                              {alreadyAdded ? (
-                                <Text
-                                  size={200}
-                                  className={styles.dropdownOptionMeta}
-                                >
-                                  Already added
-                                </Text>
-                              ) : null}
-                            </div>
-                          </Option>
-                        );
-                      })
-                    : null}
-
-                  {status === "empty" ? (
-                    <Option disabled text="No results">
-                      <Text
-                        size={200}
-                        data-testid="directory-search-empty-state"
-                      >
-                        No results found. Try a more complete name, email, or
-                        group name.
-                      </Text>
-                    </Option>
-                  ) : null}
-
-                  {status === "error" ? (
-                    <Option disabled text="Search failed">
-                      <Text size={200}>
-                        Please check the error message above.
-                      </Text>
-                    </Option>
-                  ) : null}
-                </Combobox>
-              </div>
-
-              <Text size={200} className={styles.searchStatusText}>
-                Select someone from the results to add them. Duplicates
-                won&apos;t be added twice.
-              </Text>
-            </div>
-
-            {/* access list：
-                这里展示的是本地草稿视图，但它的初始基线和 Apply 结果都来自真实后端权限。 */}
-            <div className={styles.accessListSection}>
-              <div className={styles.tableWrapper}>
-                <Table
-                  aria-label={`${getTabTitle(selectedTab)} access list`}
-                  className={styles.accessTable}
-                >
-                  <TableBody>
-                    {isLoadingPermissions ? (
-                      <TableRow>
-                        <TableCell colSpan={3}>
-                          <TableCellLayout>
-                            <Spinner size="tiny" />
-                            <Text>
-                              Loading current container permissions...
-                            </Text>
-                          </TableCellLayout>
-                        </TableCell>
-                      </TableRow>
-                    ) : visibleEntries.length > 0 ? (
-                      visibleEntries.map((entry) => (
-                        <TableRow
-                          key={entry.id}
-                          data-testid={`permission-row-${entry.id}`}
-                        >
-                          <TableCell className={styles.principalColumn}>
-                            <TableCellLayout>
-                              {entry.principalName}
-                            </TableCellLayout>
-                          </TableCell>
-                          <TableCell className={styles.roleColumn}>
-                            <Select
-                              className={styles.roleSelect}
-                              aria-label={`${entry.principalName} role`}
-                              disabled={interactionDisabled}
-                              value={entry.role}
-                              onChange={(
-                                event: ChangeEvent<HTMLSelectElement>,
-                              ) =>
-                                updateEntryRole(
-                                  selectedTab,
-                                  entry.id,
-                                  event.currentTarget
-                                    .value as ContainerPermissionRole,
-                                )
-                              }
-                            >
-                              {CONTAINER_PERMISSION_ROLES.map((role) => (
-                                <option key={role} value={role}>
-                                  {role}
-                                </option>
-                              ))}
-                            </Select>
-                          </TableCell>
-                          <TableCell className={styles.actionColumn}>
-                            <Button
-                              appearance="subtle"
-                              disabled={interactionDisabled}
-                              icon={<DeleteRegular />}
-                              aria-label={`Remove ${entry.principalName}`}
-                              onClick={() => removeEntry(selectedTab, entry.id)}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={3}>
-                          <TableCellLayout>
-                            No entries yet. Search above and pick someone to add
-                            them.
-                          </TableCellLayout>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </DialogContent>
-
-          <DialogActions className={styles.footerActions}>
-            <div className={styles.applyFeedbackWrapper}>
-              {isApplyingPermissions ? (
-                <div
-                  className={styles.applySavingFeedback}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Spinner size="tiny" />
-                  <Text>Saving...</Text>
-                </div>
-              ) : null}
-              {!isApplyingPermissions && applyFeedbackStatus === "success" ? (
-                <div
-                  className={styles.applySuccessFeedback}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <CheckmarkCircleRegular />
-                  <Text>Successful!</Text>
-                </div>
-              ) : null}
-              {!isApplyingPermissions && applyFeedbackStatus === "error" ? (
-                <div
-                  className={styles.applyErrorFeedback}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <DismissCircleRegular />
-                  <Text>Failed</Text>
-                </div>
-              ) : null}
-            </div>
-            <div className={styles.footerButtons}>
-              {/* Close 会放弃当前未保存草稿，恢复到最近一次加载或成功写回后的状态。 */}
-              <Button
-                appearance="secondary"
-                onClick={() => discardDraftAndClose(onClose)}
-              >
-                Close
-              </Button>
-              {/* Apply 负责真实写回，并在成功后刷新当前列表与清空脏状态。 */}
-              <Button
-                appearance="primary"
-                disabled={!hasUnsavedChanges || interactionDisabled}
-                onClick={() => {
-                  void handleApply();
-                }}
-              >
-                Apply
-              </Button>
-            </div>
-          </DialogActions>
-        </DialogBody>
-      </DialogSurface>
-    </Dialog>
+    />
   );
 };

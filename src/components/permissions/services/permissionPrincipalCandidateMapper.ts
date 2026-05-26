@@ -1,7 +1,7 @@
-import {
+import type {
   IPermissionPrincipalCandidate,
   PermissionTabValue,
-} from "../models/permissionModels";
+} from "../models/permissionSharedModels";
 import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/directoryPrincipalSearch";
 
 /**

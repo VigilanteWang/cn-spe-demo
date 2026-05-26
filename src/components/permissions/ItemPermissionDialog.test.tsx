@@ -75,7 +75,9 @@ vi.mock("./services/itemPermissionDiff", async () => {
 const searchDirectoryPrincipalsMock = vi.mocked(searchDirectoryPrincipals);
 const listItemPermissionsMock = vi.mocked(listItemPermissions);
 const applyItemPermissionChangesMock = vi.mocked(applyItemPermissionChanges);
-const computeItemPermissionChangesMock = vi.mocked(computeItemPermissionChanges);
+const computeItemPermissionChangesMock = vi.mocked(
+  computeItemPermissionChanges,
+);
 
 /**
  * 渲染一个最小可用的 item 权限弹窗。
@@ -223,9 +225,7 @@ describe("ItemPermissionDialog", () => {
     fireEvent.focus(inheritedIcon);
 
     expect(
-      await screen.findByText(
-        "Inherited from the parent folder",
-      ),
+      await screen.findByText("Inherited from the parent folder"),
     ).toBeInTheDocument();
   });
 
@@ -246,9 +246,12 @@ describe("ItemPermissionDialog", () => {
     renderDialog();
     await flushAsyncWork();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Adele Vance role" }), {
-      target: { value: "Reader" },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Adele Vance role" }),
+      {
+        target: { value: "Reader" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     await flushAsyncWork();
 
@@ -292,10 +295,15 @@ describe("ItemPermissionDialog", () => {
     });
     await flushAsyncWork();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Adele Vance role" }), {
-      target: { value: "Reader" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Container Permission" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Adele Vance role" }),
+      {
+        target: { value: "Reader" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Container Permission" }),
+    );
 
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -340,9 +348,7 @@ describe("ItemPermissionDialog", () => {
     });
     await flushAsyncWork();
 
-    expect(
-      screen.getByText("AddInsACSAssessmentReport"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("AddInsACSAssessmentReport")).toBeInTheDocument();
     expect(
       screen.queryByText(/^Item:\s*AddInsACSAssessmentReport$/),
     ).not.toBeInTheDocument();

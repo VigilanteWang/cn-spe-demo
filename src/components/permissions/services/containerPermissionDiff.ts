@@ -8,7 +8,7 @@ import type {
 import type {
   IContainerPermissionEntry,
   IContainerPermissionEntriesByTab,
-} from "../models/permissionModels";
+} from "../models/containerPermissionModels";
 
 export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
 

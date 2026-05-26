@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { IContainerPermissionEntry } from "../models/permissionModels";
+import type { IContainerPermissionEntry } from "../models/containerPermissionModels";
 import { computeContainerPermissionChanges } from "./containerPermissionDiff";
 
 const createPermissionEntry = (
