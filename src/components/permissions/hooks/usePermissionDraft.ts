@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PermissionTabValue } from "../models/permissionModels";
 import type {
   IPermissionEntryBaseForUI,
@@ -125,11 +125,14 @@ export const usePermissionDraft = <
    * 1. Dialog 初次打开后，用加载回来的真实容器权限同步状态；
    * 2. Apply 成功后，用后端最新结果覆盖本地草稿，清空脏状态。
    */
-  const replaceEntries = (entriesByTab: PermissionEntriesByTab<TEntry>) => {
-    const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
-    setOriginalEntriesByTab(nextOriginalEntriesByTab);
-    setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
-  };
+  const replaceEntries = useCallback(
+    (entriesByTab: PermissionEntriesByTab<TEntry>) => {
+      const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
+      setOriginalEntriesByTab(nextOriginalEntriesByTab);
+      setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
+    },
+    [],
+  );
 
   return {
     originalEntriesByTab,

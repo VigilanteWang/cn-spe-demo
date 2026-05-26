@@ -1,6 +1,4 @@
-import type {
-  IItemPermissionEntryForUI,
-} from "../../../../common/contracts/itemPermissionCommonContracts";
+import type { IItemPermissionEntryForUI } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type { PermissionEntriesByTab } from "./permissionSharedModels";
 
 export type {

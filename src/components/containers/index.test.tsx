@@ -152,10 +152,11 @@ describe("Containers", () => {
     fireEvent.click(await screen.findByText("Container A"));
     fireEvent.click(screen.getByRole("button", { name: "Manage Permission" }));
 
-    expect(
-      screen.getByRole("dialog", { name: "Manage Container Permission" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Container:/)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", {
+      name: "Manage Container Permission",
+    });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Container A")).toBeInTheDocument();
     expect(
       screen.getByRole("combobox", { name: "Add People" }),
     ).toBeInTheDocument();

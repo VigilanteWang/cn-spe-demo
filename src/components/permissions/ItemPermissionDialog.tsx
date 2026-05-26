@@ -249,7 +249,7 @@ export const ItemPermissionDialog = ({
     return () => {
       cancelled = true;
     };
-  }, [open, driveId, itemId]);
+  }, [open, driveId, itemId, replaceEntries]);
 
   /**
    * 处理 Combobox 输入变化。

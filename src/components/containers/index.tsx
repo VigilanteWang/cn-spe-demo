@@ -67,7 +67,8 @@ export const Containers = () => {
 
   // =============== 页面弹窗开关状态 ===============
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+  const [isContainerPermissionDialogOpen, setIsContainerPermissionDialogOpen] =
+    useState(false);
 
   // =============== 错误状态：容器加载失败或创建失败时展示 ===============
   const [containerError, setContainerError] = useState<string | null>(null);
@@ -139,7 +140,7 @@ export const Containers = () => {
             <Button
               appearance="primary"
               disabled={!selectedContainer}
-              onClick={() => setIsPermissionDialogOpen(true)}
+              onClick={() => setIsContainerPermissionDialogOpen(true)}
             >
               Manage Permission
             </Button>
@@ -168,10 +169,10 @@ export const Containers = () => {
 
       {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}
       <ContainerPermissionDialog
-        open={isPermissionDialogOpen}
+        open={isContainerPermissionDialogOpen}
         containerId={selectedContainer?.id}
         containerName={selectedContainer?.displayName}
-        onClose={() => setIsPermissionDialogOpen(false)}
+        onClose={() => setIsContainerPermissionDialogOpen(false)}
       />
 
       {/* 仅在用户选中容器后才渲染文件列表组件，传入选中的容器对象 */}
@@ -179,7 +180,9 @@ export const Containers = () => {
         {selectedContainer && (
           <Files
             container={selectedContainer}
-            onOpenContainerPermissions={() => setIsPermissionDialogOpen(true)}
+            onOpenContainerPermissions={() =>
+              setIsContainerPermissionDialogOpen(true)
+            }
           />
         )}
       </div>

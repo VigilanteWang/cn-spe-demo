@@ -239,7 +239,7 @@ export const ContainerPermissionDialog = ({
     return () => {
       cancelled = true;
     };
-  }, [open, containerId]);
+  }, [open, containerId, replaceEntries]);
 
   /**
    * 处理 Combobox 输入变化。
@@ -532,7 +532,9 @@ export const ContainerPermissionDialog = ({
                               aria-label={`${entry.principalName} role`}
                               disabled={interactionDisabled}
                               value={entry.role}
-                              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                              onChange={(
+                                event: ChangeEvent<HTMLSelectElement>,
+                              ) =>
                                 updateEntryRole(
                                   selectedTab,
                                   entry.id,

@@ -1,7 +1,7 @@
 import { makeStyles, tokens } from "@fluentui/react-components";
 
 /**
- * 容器权限模块样式。
+ * 权限模块样式。
  */
 export const usePermissionsStyles = makeStyles({
   surface: {

@@ -1,6 +1,4 @@
-import type {
-  IContainerPermissionEntryForUI,
-} from "../../../../common/contracts/containerPermissionCommonContracts";
+import type { IContainerPermissionEntryForUI } from "../../../../common/contracts/containerPermissionCommonContracts";
 import type { PermissionEntriesByTab } from "./permissionSharedModels";
 export type {
   IPermissionPrincipalCandidate,

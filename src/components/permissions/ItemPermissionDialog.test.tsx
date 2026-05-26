@@ -295,9 +295,7 @@ describe("ItemPermissionDialog", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Adele Vance role" }), {
       target: { value: "Reader" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Manage Container Permission" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Container Permission" }));
 
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -320,7 +318,7 @@ describe("ItemPermissionDialog", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /This list may appear empty even when item-level permissions exist\./,
+        /This list may be empty even when item-level permissions exist\./,
       ),
     ).toBeInTheDocument();
 
@@ -349,7 +347,7 @@ describe("ItemPermissionDialog", () => {
       screen.queryByText(/^Item:\s*AddInsACSAssessmentReport$/),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Manage Container Permission" }),
+      screen.getByRole("button", { name: "Container Permission" }),
     ).toBeInTheDocument();
   });
 });

@@ -25,7 +25,7 @@
  *   </Dialog>
  **/
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
   DialogSurface,
@@ -215,13 +215,6 @@ export const Preview: React.FC<IPreviewProps> = ({
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < allFiles.length - 1;
 
-  // 当文件变化或对话框打开时，重新加载预览 URL
-  useEffect(() => {
-    if (currentFile && isOpen) {
-      loadPreviewUrl();
-    }
-  }, [currentFile, isOpen]);
-
   /**
    * 加载文件预览 URL
    *
@@ -230,7 +223,7 @@ export const Preview: React.FC<IPreviewProps> = ({
    * 2. 成功时附加 &nb=true 参数（去除 SharePoint 顶部横幅）
    * 3. 失败时回退使用 webUrl
    **/
-  const loadPreviewUrl = async () => {
+  const loadPreviewUrl = useCallback(async () => {
     if (!currentFile) return;
 
     setIsLoading(true);
@@ -295,7 +288,14 @@ export const Preview: React.FC<IPreviewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [containerId, currentFile]);
+
+  // 当文件变化或对话框打开时，重新加载预览 URL
+  useEffect(() => {
+    if (currentFile && isOpen) {
+      void loadPreviewUrl();
+    }
+  }, [currentFile, isOpen, loadPreviewUrl]);
 
   /**
    * 导航到上一个文件
