@@ -1,45 +1,21 @@
-/**
- * 容器权限管理对话框模块。
- *
- * 本模块负责：
- * 1. 提供“容器级权限管理”弹窗外壳
- * 2. 展示当前容器名称
- * 3. 展示权限页签、搜索输入区和 access list
- * 4. 接入真实容器权限加载、差异计算与 Apply 写回
- *
- * 说明：
- * - 现有 `Combobox` 搜索交互、debounce、loading 和结果直加 access list 的行为保持不变
- * - 搜索 Hook 仍然只负责目录查找；真实权限加载/写回单独接入，避免把两条链路重新耦合
- * - Close 继续放弃未提交草稿；Apply 则提交差异并用服务端最新结果刷新本地基线
- */
-
-import { useEffect, useState, type ChangeEvent } from "react";
-import {
-  Button,
-  Select,
-  Spinner,
-  TableCell,
-  TableCellLayout,
-  TableRow,
-  Text,
-} from "@fluentui/react-components";
-import { DeleteRegular } from "@fluentui/react-icons";
-import { readErrorMessage } from "../../common/errors.ts";
-import {
+import { useCallback } from "react";
+import { Text } from "@fluentui/react-components";
+import type {
   ContainerPermissionRole,
   IContainerPermissionEntriesByTab,
+  IContainerPermissionEntry,
 } from "./models/containerPermissionModels";
 import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
+import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
 import { IContainerPermissionDialogProps } from "./components/permissionsTypes";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
-import { usePermissionsStyles } from "./components/permissionsStyles";
 import {
   applyContainerPermissionChanges,
   listContainerPermissions,
-  PermissionApiError,
 } from "../../services/containerPermissionApi";
 import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
+import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
 
 const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
   "Reader",
@@ -48,48 +24,15 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
   "Owner",
 ];
 
-type ApplyFeedbackStatus = "success" | "error" | null;
-
 /**
- * 把权限请求错误转成适合 UI 直接展示的文案。
- */
-const getPermissionRequestErrorMessage = (
-  error: unknown,
-  fallbackMessage: string,
-): string => {
-  if (error instanceof PermissionApiError) {
-    if (error.code === "throttled" && error.retryAfterSeconds) {
-      return `${error.message} Retry after ${error.retryAfterSeconds} seconds.`;
-    }
-
-    if (error.requestId) {
-      return `${error.message} Request ID: ${error.requestId}.`;
-    }
-
-    return error.message;
-  }
-
-  return readErrorMessage(error, fallbackMessage);
-};
-
-/**
- * 创建一份空的权限分组结果。
+ * 容器权限管理对话框。
  *
- * Dialog 打开前先以空列表初始化本地草稿，
- * 等后端返回真实容器权限后再整体替换进去。
- */
-const createEmptyPermissionEntries = (): IContainerPermissionEntriesByTab => ({
-  people: [],
-  groups: [],
-});
-/**
- * 容器权限管理弹窗。
+ * 当前版本把原来混在组件里的三类逻辑拆开了：
+ * 1. `useContainerPermissionDialogState` 管本地草稿和页签
+ * 2. `usePermissionPrincipalSearch` 管目录搜索
+ * 3. `usePermissionDialogApiRequestState` 管加载、Apply 和反馈状态
  *
- * 当前步骤实现：
- * - 打开弹窗时读取真实容器权限
- * - 保持现有目录搜索 + 本地草稿交互
- * - Apply 时计算新增/更新/删除差异并写回后端
- * - 成功后用服务端最新权限刷新列表并清空脏状态
+ * 组件层自己主要负责把三块状态组装成统一的界面骨架。
  */
 export const ContainerPermissionDialog = ({
   open,
@@ -97,17 +40,9 @@ export const ContainerPermissionDialog = ({
   containerName,
   onClose,
 }: IContainerPermissionDialogProps) => {
-  const styles = usePermissionsStyles();
-  const initialEntriesByTab = createEmptyPermissionEntries();
-  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
-  const [isApplyingPermissions, setIsApplyingPermissions] = useState(false);
-  const [permissionRequestErrorMessage, setPermissionRequestErrorMessage] =
-    useState<string | null>(null);
-  const [applyFeedbackStatus, setApplyFeedbackStatus] =
-    useState<ApplyFeedbackStatus>(null);
+  const initialEntriesByTab =
+    createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
 
-  // 这里统一拿到弹窗所需的页签、草稿列表和关闭动作，
-  // 让组件层主要负责渲染、真实加载和真实写回。
   const {
     selectedTab,
     setSelectedTab,
@@ -128,9 +63,6 @@ export const ContainerPermissionDialog = ({
     containerId ?? "__no-container__",
   );
 
-  // 搜索相关状态单独交给独立 Hook：
-  // - 继续保留最小输入长度、debounce、loading 和结果直接加入列表的行为
-  // - 不把真实权限加载/写回重新耦合进搜索链路
   const {
     query,
     results,
@@ -147,188 +79,57 @@ export const ContainerPermissionDialog = ({
     isCandidateAdded,
   });
 
-  // 当前页签下真正要显示在 access list 表格里的权限项。
+  /**
+   * 为 API 状态 Hook 提供“空结果工厂”，缺少容器时用它重置本地列表。
+   */
+  const createEmptyEntries = useCallback(() => {
+    return createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
+  }, []);
+
+  /**
+   * 加载当前容器的真实权限列表。
+   */
+  const loadPermissions = useCallback(async () => {
+    return listContainerPermissions(containerId!);
+  }, [containerId]);
+
+  /**
+   * 把草稿差异写回后端，并返回服务端最新权限快照。
+   */
+  const applyChanges = useCallback(
+    async (changes: ReturnType<typeof computeContainerPermissionChanges>) => {
+      return applyContainerPermissionChanges(containerId!, changes);
+    },
+    [containerId],
+  );
+
+  const {
+    isLoadingPermissions,
+    isApplyingPermissions,
+    applyFeedbackStatus,
+    permissionStatusMessages,
+    handleApply,
+  } = usePermissionDialogApiRequestState<
+    IContainerPermissionEntriesByTab,
+    ReturnType<typeof computeContainerPermissionChanges>
+  >({
+    open,
+    isTargetReady: Boolean(containerId),
+    searchError,
+    resourceLabel: "container",
+    createEmptyEntriesByTab: createEmptyEntries,
+    originalEntriesByTab,
+    draftEntriesByTab,
+    replaceEntries,
+    loadPermissions,
+    computeChanges: computeContainerPermissionChanges,
+    applyChanges,
+  });
+
+  // access list 始终展示当前选中页签那一组草稿数据。
   const visibleEntries = getVisibleEntries(selectedTab);
   const interactionDisabled =
     isLoadingPermissions || isApplyingPermissions || !containerId;
-
-  // 统一把权限读写错误和搜索错误合并到同一错误区，避免在多个位置重复展示。
-  const permissionStatusMessages = [
-    permissionRequestErrorMessage
-      ? `Api Error: ${permissionRequestErrorMessage}`
-      : null,
-    searchError
-      ? `Search Error: ${readErrorMessage(
-          searchError,
-          "Directory search failed. Please try again later.",
-        )}`
-      : null,
-  ].filter((message): message is string => Boolean(message));
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    if (!containerId) {
-      replaceEntries(createEmptyPermissionEntries());
-      setPermissionRequestErrorMessage("No container selected.");
-      setApplyFeedbackStatus(null);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoadingPermissions(true);
-    setPermissionRequestErrorMessage(null);
-    setApplyFeedbackStatus(null);
-
-    void listContainerPermissions(containerId)
-      .then((entriesByTab) => {
-        if (cancelled) {
-          return;
-        }
-
-        replaceEntries(entriesByTab);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) {
-          return;
-        }
-
-        replaceEntries(createEmptyPermissionEntries());
-        setPermissionRequestErrorMessage(
-          getPermissionRequestErrorMessage(
-            error,
-            "Unable to load current container permissions.",
-          ),
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingPermissions(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, containerId, replaceEntries]);
-
-  /**
-   * 把当前草稿差异提交到后端，并用服务端最新权限刷新本地基线。
-   */
-  const handleApply = async () => {
-    if (!containerId) {
-      return;
-    }
-
-    let changes;
-
-    try {
-      changes = computeContainerPermissionChanges(
-        originalEntriesByTab,
-        draftEntriesByTab,
-      );
-    } catch (error: unknown) {
-      setPermissionRequestErrorMessage(
-        getPermissionRequestErrorMessage(
-          error,
-          "Unable to prepare container permission changes.",
-        ),
-      );
-      setApplyFeedbackStatus("error");
-      return;
-    }
-
-    if (
-      changes.create.length === 0 &&
-      changes.update.length === 0 &&
-      changes.remove.length === 0
-    ) {
-      return;
-    }
-
-    setIsApplyingPermissions(true);
-    setPermissionRequestErrorMessage(null);
-    setApplyFeedbackStatus(null);
-
-    try {
-      const refreshedEntries = await applyContainerPermissionChanges(
-        containerId,
-        changes,
-      );
-
-      replaceEntries(refreshedEntries);
-      setApplyFeedbackStatus("success");
-    } catch (error: unknown) {
-      setPermissionRequestErrorMessage(
-        getPermissionRequestErrorMessage(
-          error,
-          "Unable to apply container permission changes.",
-        ),
-      );
-      setApplyFeedbackStatus("error");
-    } finally {
-      setIsApplyingPermissions(false);
-    }
-  };
-
-  const tableBodyContent = isLoadingPermissions ? (
-    <TableRow>
-      <TableCell colSpan={3}>
-        <TableCellLayout>
-          <Spinner size="tiny" />
-          <Text>Loading current container permissions...</Text>
-        </TableCellLayout>
-      </TableCell>
-    </TableRow>
-  ) : visibleEntries.length > 0 ? (
-    visibleEntries.map((entry) => (
-      <TableRow key={entry.id} data-testid={`permission-row-${entry.id}`}>
-        <TableCell className={styles.principalColumn}>
-          <TableCellLayout>{entry.principalName}</TableCellLayout>
-        </TableCell>
-        <TableCell className={styles.roleColumn}>
-          <Select
-            className={styles.roleSelect}
-            aria-label={`${entry.principalName} role`}
-            disabled={interactionDisabled}
-            value={entry.role}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              updateEntryRole(
-                selectedTab,
-                entry.id,
-                event.currentTarget.value as ContainerPermissionRole,
-              )
-            }
-          >
-            {CONTAINER_PERMISSION_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </Select>
-        </TableCell>
-        <TableCell className={styles.actionColumn}>
-          <Button
-            appearance="subtle"
-            disabled={interactionDisabled}
-            icon={<DeleteRegular />}
-            aria-label={`Remove ${entry.principalName}`}
-            onClick={() => removeEntry(selectedTab, entry.id)}
-          />
-        </TableCell>
-      </TableRow>
-    ))
-  ) : (
-    <TableRow>
-      <TableCell colSpan={3}>
-        <TableCellLayout>
-          No entries yet. Search above and pick someone to add them.
-        </TableCellLayout>
-      </TableCell>
-    </TableRow>
-  );
 
   return (
     <PermissionDialogFrame
@@ -350,7 +151,23 @@ export const ContainerPermissionDialog = ({
       isApplyingPermissions={isApplyingPermissions}
       applyFeedbackStatus={applyFeedbackStatus}
       isApplyDisabled={!hasUnsavedChanges || interactionDisabled}
-      tableBodyContent={tableBodyContent}
+      accessListProps={{
+        entries: visibleEntries,
+        isLoading: isLoadingPermissions,
+        loadingMessage: "Loading current container permissions...",
+        emptyStateText:
+          "No entries yet. Search above and pick someone to add them.",
+        roleOptions: CONTAINER_PERMISSION_ROLES,
+        isInteractionDisabled: interactionDisabled,
+        onRoleChange: (entry, role) => {
+          updateEntryRole(selectedTab, entry.id, role);
+        },
+        onRemove: (entry) => {
+          removeEntry(selectedTab, entry.id);
+        },
+        isRoleDisabled: (entry) => !entry.isEditable,
+        isRemoveDisabled: (entry) => !entry.isRemovable,
+      }}
       onRequestClose={() => discardDraftAndClose(onClose)}
       onSelectedTabChange={setSelectedTab}
       onSearchQueryChange={handleQueryChange}

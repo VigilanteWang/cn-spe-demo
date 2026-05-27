@@ -12,8 +12,12 @@ import type {
   IPermissionPrincipalCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
+import { getPermissionTabTitle } from "../utils/permissionDialogSharedUtils";
 import { usePermissionsStyles } from "./permissionsStyles";
 
+/**
+ * 主体搜索输入区的输入属性。
+ */
 interface IPrincipalSearchComboBoxProps {
   selectedTab: PermissionTabValue;
   interactionDisabled: boolean;
@@ -31,18 +35,12 @@ interface IPrincipalSearchComboBoxProps {
 }
 
 /**
- * 根据页签值返回当前界面要显示的标题文案。
- */
-const getTabTitle = (tab: PermissionTabValue) =>
-  tab === "people" ? "People" : "Groups";
-
-/**
- * 权限对话框里的 principal 搜索输入区。
+ * 权限弹窗里的主体搜索输入区。
  *
  * 它负责承载：
- * - Combobox 搜索框
- * - 搜索状态提示
- * - 搜索结果选项与重复提示
+ * 1. Combobox 输入行为
+ * 2. 搜索状态提示
+ * 3. 搜索结果项与重复提示
  */
 export const PrincipalSearchComboBox = ({
   selectedTab,
@@ -59,7 +57,7 @@ export const PrincipalSearchComboBox = ({
   const styles = usePermissionsStyles();
 
   /**
-   * 处理 Combobox 输入变化。
+   * 把 Combobox 输入变化同步回外层搜索 Hook。
    */
   const handleComboboxChange: NonNullable<ComboboxProps["onChange"]> = (
     event: ChangeEvent<HTMLInputElement>,
@@ -68,7 +66,7 @@ export const PrincipalSearchComboBox = ({
   };
 
   /**
-   * 处理用户从下拉结果中选择候选对象。
+   * 把用户选中的结果项 ID 回传给外层搜索 Hook。
    */
   const handleOptionSelect: NonNullable<ComboboxProps["onOptionSelect"]> = (
     _event,
@@ -82,10 +80,12 @@ export const PrincipalSearchComboBox = ({
       <div className={styles.principalInputWrapper}>
         <Combobox
           id={searchInputId}
-          aria-label={`Add ${getTabTitle(selectedTab)}`}
+          aria-label={`Add ${getPermissionTabTitle(selectedTab)}`}
           className={styles.principalCombobox}
           expandIcon={null}
-          placeholder={`Search for ${getTabTitle(selectedTab)} (type at least 3 characters)`}
+          placeholder={`Search for ${getPermissionTabTitle(
+            selectedTab,
+          )} (type at least 3 characters)`}
           freeform
           disabled={interactionDisabled}
           selectedOptions={[]}
@@ -122,6 +122,7 @@ export const PrincipalSearchComboBox = ({
 
           {searchStatus === "success"
             ? searchResults.map((candidate) => {
+                // 即使已存在于列表里，也保留结果项，方便用户确认命中对象。
                 const alreadyAdded = isCandidateAdded(selectedTab, candidate);
 
                 return (

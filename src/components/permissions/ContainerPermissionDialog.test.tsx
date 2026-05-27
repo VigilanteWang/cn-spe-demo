@@ -213,6 +213,9 @@ describe("ContainerPermissionDialog", () => {
     );
     expect(within(peopleRow).getByText("Adele Vance")).toBeInTheDocument();
     expect(
+      within(peopleRow).getByText("adele.vance@contoso.com"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("combobox", { name: "Adele Vance role" }),
     ).toHaveValue("Writer");
     expect(listContainerPermissionsMock).toHaveBeenCalledWith("container-a");

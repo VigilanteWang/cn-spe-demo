@@ -1,7 +1,10 @@
 import { makeStyles, tokens } from "@fluentui/react-components";
 
 /**
- * 权限模块样式。
+ * 权限模块共享样式。
+ *
+ * 这一层专门收口容器权限和 Item 权限弹窗共用的布局与视觉规则，
+ * 避免两个弹窗在重构后继续复制同一套样式定义。
  */
 export const usePermissionsStyles = makeStyles({
   surface: {

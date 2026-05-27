@@ -3,41 +3,32 @@ import type {
   IItemPermissionEntriesByTab,
   IItemPermissionEntry,
 } from "../models/itemPermissionModels";
-import { usePermissionDialogState } from "./usePermissionDialogState";
+import { createBasePermissionEntryFromCandidate } from "../utils/permissionDialogSharedUtils";
+import { usePermissionDialogUIState } from "./usePermissionDialogUIState";
 
 /**
- * 组合 item 权限对话框所需的草稿状态、页签状态和筛选输入。
+ * 组合 Item 权限弹窗所需的本地 UI 编辑状态。
  *
- * 当前文件只保留 item 适配职责：
- * - 把共享 `usePermissionDialogState` 接到 item entry 类型
- * - 维护 candidate -> item entry 的转换规则
+ * 这个 Hook 只保留 Item 场景自己的适配责任：
+ * 1. 把通用 UI 状态 Hook 套到 Item 权限条目类型上
+ * 2. 把目录搜索候选项转换成 Item 权限草稿行
  */
 export const useItemPermissionDialogState = (
   initialEntriesByTab: IItemPermissionEntriesByTab,
   resetKey: string,
 ) =>
-  usePermissionDialogState(
+  usePermissionDialogUIState(
     initialEntriesByTab,
     resetKey,
     createItemPermissionEntryFromCandidate,
   );
 
 /**
- * 把目录搜索候选项转换成一条新的 item 权限草稿记录。
+ * 把目录搜索候选项转换成一条新的 Item 权限草稿记录。
  */
 const createItemPermissionEntryFromCandidate = (
   candidate: IPermissionPrincipalCandidate,
 ): IItemPermissionEntry => ({
-  id: `${candidate.type}:${candidate.id}`,
-  principalId: candidate.id,
-  principalObjectId: candidate.objectId,
-  principalUserPrincipalName: candidate.userPrincipalName,
-  principalMail: candidate.mail,
-  principalName: candidate.name,
-  principalType: candidate.type,
-  description: candidate.secondaryText,
-  isInherited: false,
-  isEditable: true,
-  isRemovable: true,
+  ...createBasePermissionEntryFromCandidate(candidate),
   role: "Reader",
 });

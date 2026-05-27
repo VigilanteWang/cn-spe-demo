@@ -9,22 +9,22 @@ import { usePermissionDraft } from "./usePermissionDraft";
 import { usePermissionTabs } from "./usePermissionTabs";
 
 /**
- * 把目录搜索候选项转换为权限草稿记录的工厂函数。
+ * 把目录搜索候选项转换成权限草稿记录的工厂函数。
  *
- * container / item 都会把候选项先统一成共享 candidate，
- * 再在这里转成各自的表格行模型。
+ * container / item 都会先把候选项统一成共享 candidate，
+ * 再在这里转换成各自的表格行模型。
  */
 export type CreatePermissionEntryFromCandidateFn<
   TEntry extends IPermissionEntryBaseForUI & { role: string },
 > = (candidate: IPermissionPrincipalCandidate) => TEntry;
 
 /**
- * 组合权限对话框共享的页签、搜索词和草稿状态。
+ * 组合权限弹窗共用的页签、搜索词和草稿状态。
  *
- * 这个 Hook 不关心当前是 container 还是 item，
- * 只关心两类对话框都需要的“按 tab 编辑权限草稿”能力。
+ * 这个 Hook 不关心当前是容器权限还是 Item 权限，
+ * 只关心两类弹窗都需要的“按 tab 编辑权限草稿”能力。
  */
-export const usePermissionDialogState = <
+export const usePermissionDialogUIState = <
   TEntry extends IPermissionEntryBaseForUI & { role: string },
 >(
   initialEntriesByTab: PermissionEntriesByTab<TEntry>,
@@ -52,7 +52,7 @@ export const usePermissionDialogState = <
   });
 
   /**
-   * 更新指定 tab 的搜索输入。
+   * 更新指定页签的搜索输入值。
    */
   const setFilter = (tab: PermissionTabValue, value: string) => {
     setFilterByTab((currentFilters) => ({
@@ -62,7 +62,7 @@ export const usePermissionDialogState = <
   };
 
   /**
-   * 把目录搜索结果加入本地草稿列表。
+   * 把目录搜索结果加入当前草稿列表。
    */
   const addCandidate = (
     tab: PermissionTabValue,
@@ -72,7 +72,7 @@ export const usePermissionDialogState = <
   };
 
   /**
-   * 放弃本次编辑并关闭对话框。
+   * 放弃本次编辑并关闭弹窗。
    */
   const discardDraftAndClose = (onClose: () => void) => {
     resetDraft();
@@ -80,16 +80,16 @@ export const usePermissionDialogState = <
   };
 
   /**
-   * 当前 access list 直接显示对应 tab 的草稿列表。
+   * 返回当前 access list 应该展示的页签草稿列表。
    */
   const getVisibleEntries = (tab: PermissionTabValue): TEntry[] =>
     draftEntriesByTab[tab];
 
   /**
-   * 判断候选对象是否已经在当前 tab 中，避免重复添加。
+   * 判断候选对象是否已经存在于当前页签列表里，避免重复添加。
    *
-   * groups 直接按 principalId 判重；
-   * people 优先按规范化后的 UPN 判重，兼容大小写差异。
+   * groups 直接按 `principalId` 去重；
+   * people 优先按规范化后的 UPN 去重，以兼容大小写差异。
    */
   const isCandidateAdded = (
     tab: PermissionTabValue,

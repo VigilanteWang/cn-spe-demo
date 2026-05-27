@@ -203,6 +203,9 @@ describe("ItemPermissionDialog", () => {
       screen.getByRole("combobox", { name: "Inherited User role" }),
     ).toBeDisabled();
     expect(
+      within(inheritedRow).getByText("adele.vance@contoso.com"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("button", { name: "Remove Inherited User" }),
     ).toBeDisabled();
     expect(

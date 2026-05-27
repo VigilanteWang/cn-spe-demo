@@ -53,21 +53,21 @@ export const usePermissionDraft = <
   initialEntriesByTab: PermissionEntriesByTab<TEntry>,
   resetKey: string,
 ) => {
-  // 保存“本次编辑会话里最近一次确认后的基线快照”，Close / Reset 时需要回到这份数据。
+  // 保存最近一次确认后的基线快照，Close / Reset 都要回到这份数据。
   const [originalEntriesByTab, setOriginalEntriesByTab] = useState(
     cloneEntriesByTab(initialEntriesByTab),
   );
-  // 保存弹窗内当前正在编辑的草稿；表格里的增删改都只改这份数据。
+  // 保存弹窗内当前正在编辑的草稿，增删改都只改这份数据。
   const [draftEntriesByTab, setDraftEntriesByTab] = useState(
     cloneEntriesByTab(initialEntriesByTab),
   );
 
   useEffect(() => {
-    // `resetKey` 一般对应容器 ID。容器切换时，同时重建基线和草稿，避免不同容器串数据。
+    // `resetKey` 通常对应当前资源 ID，资源切换时要整体重建基线和草稿。
     const nextEntriesByTab = cloneEntriesByTab(initialEntriesByTab);
     setOriginalEntriesByTab(nextEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextEntriesByTab));
-  }, [resetKey]);
+  }, [initialEntriesByTab, resetKey]);
 
   /**
    * 向指定页签追加一条新的草稿权限记录。
@@ -109,14 +109,14 @@ export const usePermissionDraft = <
   };
 
   /**
-   * 放弃本次编辑，把草稿恢复到最近一次确认后的状态。
+   * 放弃本次编辑，把草稿恢复到最近一次确认后的基线。
    */
   const resetDraft = () => {
     setDraftEntriesByTab(cloneEntriesByTab(originalEntriesByTab));
   };
 
   /**
-   * 用一份新的权限数据同时更新 original 和 draft 快照，保持两者一致。
+   * 用一份新的权限数据同时更新 `original` 和 `draft`。
    *
    * 具体操作：接收权限列表，将其复制后分别赋值给 original 和 draft，
    * 以此清除任何本地未保存的编辑痕迹。

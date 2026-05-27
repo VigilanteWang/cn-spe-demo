@@ -16,7 +16,11 @@ import {
   CheckmarkCircleRegular,
   DismissCircleRegular,
 } from "@fluentui/react-icons";
-import { PermissionAccessListTable } from "./PermissionAccessListTable";
+import {
+  PermissionAccessListTable,
+  type IPermissionAccessListTableProps,
+  type PermissionAccessListEntryWithRole,
+} from "./PermissionAccessListTable";
 import { PrincipalSearchComboBox } from "./PrincipalSearchComboBox";
 import type { PermissionPrincipalSearchStatus } from "../hooks/usePermissionPrincipalSearch";
 import type {
@@ -24,10 +28,14 @@ import type {
   PermissionTabValue,
 } from "../models/permissionSharedModels";
 import { usePermissionsStyles } from "./permissionsStyles";
+import type { PermissionApplyFeedbackStatus } from "../utils/permissionDialogSharedUtils";
 
-type ApplyFeedbackStatus = "success" | "error" | null;
-
-interface IPermissionDialogFrameProps {
+/**
+ * 通用权限弹窗骨架的输入属性。
+ */
+export interface IPermissionDialogFrameProps<
+  TEntry extends PermissionAccessListEntryWithRole,
+> {
   open: boolean;
   title: string;
   headerContent: ReactNode;
@@ -40,11 +48,11 @@ interface IPermissionDialogFrameProps {
   searchStatus: PermissionPrincipalSearchStatus;
   isDropdownOpen: boolean;
   isApplyingPermissions: boolean;
-  applyFeedbackStatus: ApplyFeedbackStatus;
+  applyFeedbackStatus: PermissionApplyFeedbackStatus;
   isApplyDisabled: boolean;
   isCloseDisabled?: boolean;
-  tableBodyContent: ReactNode;
-  beforeTableContent?: ReactNode;
+  beforeAccessListContent?: ReactNode;
+  accessListProps: Omit<IPermissionAccessListTableProps<TEntry>, "selectedTab">;
   onRequestClose: () => void;
   onSelectedTabChange: (tab: PermissionTabValue) => void;
   onSearchQueryChange: (value: string) => void;
@@ -57,7 +65,7 @@ interface IPermissionDialogFrameProps {
 }
 
 /**
- * 共享的权限对话框骨架。
+ * 共享的权限弹窗骨架。
  *
  * 它只承载 container / item 都一致的 UI 结构：
  * - Dialog 外壳
@@ -69,7 +77,9 @@ interface IPermissionDialogFrameProps {
  *
  * 具体的 header 和表格行仍然交给调用方通过 slot 传入。
  */
-export const PermissionDialogFrame = ({
+export const PermissionDialogFrame = <
+  TEntry extends PermissionAccessListEntryWithRole,
+>({
   open,
   title,
   headerContent,
@@ -85,15 +95,15 @@ export const PermissionDialogFrame = ({
   applyFeedbackStatus,
   isApplyDisabled,
   isCloseDisabled = false,
-  tableBodyContent,
-  beforeTableContent,
+  beforeAccessListContent,
+  accessListProps,
   onRequestClose,
   onSelectedTabChange,
   onSearchQueryChange,
   onSearchCandidateSelect,
   isCandidateAdded,
   onApply,
-}: IPermissionDialogFrameProps) => {
+}: IPermissionDialogFrameProps<TEntry>) => {
   const styles = usePermissionsStyles();
 
   return (
@@ -156,11 +166,11 @@ export const PermissionDialogFrame = ({
               isCandidateAdded={isCandidateAdded}
             />
 
-            {beforeTableContent}
+            {beforeAccessListContent}
 
             <PermissionAccessListTable
               selectedTab={selectedTab}
-              tableBodyContent={tableBodyContent}
+              {...accessListProps}
             />
           </DialogContent>
 

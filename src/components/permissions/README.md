@@ -506,7 +506,9 @@ replaceEntries(refreshedEntries)
 它的核心文件是：
 
 - `hooks/usePermissionDraft.ts`
+- `hooks/usePermissionDialogUIState.ts`
 - `hooks/useContainerPermissionDialogState.ts`
+- `hooks/usePermissionDialogApiRequestState.ts`
 - `services/containerPermissionDiff.ts`
 - `src/services/containerPermissionApi.ts`
 
@@ -688,6 +690,7 @@ computeContainerPermissionChanges(...)
 - `hooks/usePermissionPrincipalSearch.ts`
 - `services/permissionPrincipalCandidateMapper.ts`
 - `services/directoryPrincipalSearch/*`
+- `utils/permissionDialogSharedUtils.ts`
 
 特别注意：
 
@@ -739,3 +742,22 @@ computeContainerPermissionChanges(...)
 当前 `Container Permission` 前端模块的本质是：
 
 > 用 `Combobox` 驱动目录搜索，用“双快照草稿模型”管理本地编辑，用“差异提交”驱动 Apply，并通过 `common/contracts` 和后端保持统一协议。
+---
+
+## 13. Shared dialog responsibilities
+
+`ContainerPermissionDialog.tsx` 和 `ItemPermissionDialog.tsx` 现在共用同一套权限对话框骨架，但仍然按层分工：
+
+- `components/PermissionDialogFrame.tsx`
+  负责 dialog 外壳、顶部状态区、tab、搜索区、access list 区块编排，以及底部 Close / Apply 和保存反馈。
+- `components/PermissionAccessListTable.tsx`
+  负责 access list 的 loading / empty / row 三种状态，以及统一的主体信息列、角色下拉框列、删除按钮列。
+- `hooks/usePermissionDialogApiRequestState.ts`
+  负责权限加载、Apply 前差异计算、Apply 后刷新，以及 `container / item` 默认请求文案的参数化。
+
+现在两个 dialog 自己保留的差异主要是：
+
+- header 文案
+- role options
+- item 专属的 inherited tooltip、visibility disclaimer、container permission 跳转入口
+- 各自对应的 API 调用函数

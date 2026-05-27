@@ -7,13 +7,13 @@ export type {
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 
 /**
- * item 权限列表按页签分组后的前端形状。
+ * Item 权限在前端按页签分组后的列表形状。
  */
 export type IItemPermissionEntriesByTab =
   PermissionEntriesByTab<IItemPermissionEntryForUI>;
 
 /**
- * item 权限 API 在前端的加载结果。
+ * Item 权限列表接口在前端消费时的加载结果。
  */
 export interface IItemPermissionEntriesLoadResult {
   entriesByTab: IItemPermissionEntriesByTab;
