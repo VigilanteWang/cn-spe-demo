@@ -16,7 +16,7 @@ export const getPermissionTabTitle = (tab: PermissionTabValue) =>
 /**
  * 创建一份空的 `people/groups` 权限分组结构。
  */
-export const createEmptyPermissionEntriesByTab = <TEntry,>() => ({
+export const createEmptyPermissionEntriesByTab = <TEntry>() => ({
   people: [] as TEntry[],
   groups: [] as TEntry[],
 });

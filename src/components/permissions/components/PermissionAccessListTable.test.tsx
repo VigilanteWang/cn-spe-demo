@@ -40,8 +40,6 @@ const renderTable = (
       selectedTab="people"
       entries={[createEntry()]}
       isLoading={false}
-      loadingMessage="Loading current permissions..."
-      emptyStateText="No entries yet."
       roleOptions={["Reader", "Writer"]}
       isInteractionDisabled={false}
       onRoleChange={onRoleChange}
@@ -111,8 +109,6 @@ describe("PermissionAccessListTable", () => {
         selectedTab="people"
         entries={[]}
         isLoading
-        loadingMessage="Loading current permissions..."
-        emptyStateText="No entries yet."
         roleOptions={["Reader", "Writer"]}
         isInteractionDisabled={false}
         onRoleChange={vi.fn()}
@@ -122,7 +118,7 @@ describe("PermissionAccessListTable", () => {
       />,
     );
 
-    expect(screen.getByText("Loading current permissions...")).toBeInTheDocument();
+    expect(screen.getByText("Loading current permissions")).toBeInTheDocument();
 
     rerender(
       <PermissionAccessListTable<ITestPermissionEntry>
@@ -135,8 +131,6 @@ describe("PermissionAccessListTable", () => {
           }),
         ]}
         isLoading={false}
-        loadingMessage="Loading current permissions..."
-        emptyStateText="No entries yet."
         roleOptions={["Reader", "Writer"]}
         isInteractionDisabled={false}
         onRoleChange={vi.fn()}
@@ -158,8 +152,6 @@ describe("PermissionAccessListTable", () => {
         selectedTab="people"
         entries={[]}
         isLoading={false}
-        loadingMessage="Loading current permissions..."
-        emptyStateText="No entries yet."
         roleOptions={["Reader", "Writer"]}
         isInteractionDisabled={false}
         onRoleChange={vi.fn()}
@@ -169,6 +161,6 @@ describe("PermissionAccessListTable", () => {
       />,
     );
 
-    expect(screen.getByText("No entries yet.")).toBeInTheDocument();
+    expect(screen.getByText("No permissions added yet.")).toBeInTheDocument();
   });
 });

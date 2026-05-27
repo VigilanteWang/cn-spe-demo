@@ -33,6 +33,8 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
  * 3. `usePermissionDialogApiRequestState` 管加载、Apply 和反馈状态
  *
  * 组件层自己主要负责把三块状态组装成统一的界面骨架。
+ *
+ * @returns 渲染后的容器权限管理对话框。
  */
 export const ContainerPermissionDialog = ({
   open,
@@ -40,6 +42,7 @@ export const ContainerPermissionDialog = ({
   containerName,
   onClose,
 }: IContainerPermissionDialogProps) => {
+  // 先准备一份空的按 tab 分组结构，供首次渲染和重置时复用。
   const initialEntriesByTab =
     createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
 
@@ -81,6 +84,8 @@ export const ContainerPermissionDialog = ({
 
   /**
    * 为 API 状态 Hook 提供“空结果工厂”，缺少容器时用它重置本地列表。
+   *
+   * @returns 空的 people/groups 权限分组结构。
    */
   const createEmptyEntries = useCallback(() => {
     return createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
@@ -88,6 +93,8 @@ export const ContainerPermissionDialog = ({
 
   /**
    * 加载当前容器的真实权限列表。
+   *
+   * @returns 后端返回的最新容器权限分组。
    */
   const loadPermissions = useCallback(async () => {
     return listContainerPermissions(containerId!);
@@ -95,6 +102,9 @@ export const ContainerPermissionDialog = ({
 
   /**
    * 把草稿差异写回后端，并返回服务端最新权限快照。
+   *
+   * @param changes 当前草稿相对原始数据的增删改集合。
+   * @returns 应用变更后的最新容器权限分组。
    */
   const applyChanges = useCallback(
     async (changes: ReturnType<typeof computeContainerPermissionChanges>) => {
@@ -128,6 +138,7 @@ export const ContainerPermissionDialog = ({
 
   // access list 始终展示当前选中页签那一组草稿数据。
   const visibleEntries = getVisibleEntries(selectedTab);
+  // 缺少目标容器、正在加载或正在保存时，都要统一禁用交互控件。
   const interactionDisabled =
     isLoadingPermissions || isApplyingPermissions || !containerId;
 
@@ -154,14 +165,13 @@ export const ContainerPermissionDialog = ({
       accessListProps={{
         entries: visibleEntries,
         isLoading: isLoadingPermissions,
-        loadingMessage: "Loading current container permissions...",
-        emptyStateText:
-          "No entries yet. Search above and pick someone to add them.",
         roleOptions: CONTAINER_PERMISSION_ROLES,
         isInteractionDisabled: interactionDisabled,
+        // 角色修改要带上当前 tab，才能精确更新对应分组里的那条草稿。
         onRoleChange: (entry, role) => {
           updateEntryRole(selectedTab, entry.id, role);
         },
+        // 删除同样基于当前 tab 执行，避免误删另一组草稿数据。
         onRemove: (entry) => {
           removeEntry(selectedTab, entry.id);
         },

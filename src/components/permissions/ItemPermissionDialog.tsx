@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Link, Text } from "@fluentui/react-components";
 import type {
   IItemPermissionEntriesByTab,
@@ -16,10 +16,7 @@ import {
   listItemPermissions,
 } from "../../services/itemPermissionApi";
 import { computeItemPermissionChanges } from "./services/itemPermissionDiff";
-import {
-  createEmptyPermissionEntriesByTab,
-  getPermissionTabTitle,
-} from "./utils/permissionDialogSharedUtils";
+import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
 
 const ITEM_PERMISSION_ROLES: ItemPermissionRole[] = ["Reader", "Writer"];
 const ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT =
@@ -31,6 +28,10 @@ const ITEM_PERMISSION_ROLE_BASED_SHARING_LEARN_MORE_URL =
 
 /**
  * 把过长的 item 名称截断到指定长度，避免标题区被撑破。
+ *
+ * @param itemName 当前 item 名称。
+ * @param maxLength 允许展示的最大字符数。
+ * @returns 适合放进弹窗标题区的短名称。
  */
 const truncateItemName = (itemName: string, maxLength = 32) => {
   if (itemName.length <= maxLength) {
@@ -46,6 +47,8 @@ const truncateItemName = (itemName: string, maxLength = 32) => {
  * 这个组件沿用容器权限弹窗的交互骨架，但保留了 Item 特有的两部分文案：
  * 1. “权限可见性”免责声明
  * 2. 跳转到容器权限的入口
+ *
+ * @returns 渲染后的 Item 权限管理对话框。
  */
 export const ItemPermissionDialog = ({
   open,
@@ -56,6 +59,7 @@ export const ItemPermissionDialog = ({
   onManageContainerPermission,
 }: IItemPermissionDialogProps) => {
   const styles = usePermissionsStyles();
+  // 先准备一份空的按 tab 分组结构，供首次渲染和重置时复用。
   const initialEntriesByTab =
     createEmptyPermissionEntriesByTab<IItemPermissionEntry>();
 
@@ -97,6 +101,8 @@ export const ItemPermissionDialog = ({
 
   /**
    * 为 API 状态 Hook 提供“空结果工厂”，缺少 item 时用它重置本地列表。
+   *
+   * @returns 空的 people/groups 权限分组结构。
    */
   const createEmptyEntries = useCallback(() => {
     return createEmptyPermissionEntriesByTab<IItemPermissionEntry>();
@@ -104,6 +110,8 @@ export const ItemPermissionDialog = ({
 
   /**
    * 加载当前 item 的真实权限列表。
+   *
+   * @returns 后端返回的最新 item 权限分组。
    */
   const loadPermissions = useCallback(async () => {
     const { entriesByTab } = await listItemPermissions(driveId!, itemId!);
@@ -112,6 +120,9 @@ export const ItemPermissionDialog = ({
 
   /**
    * 把草稿差异写回后端，并返回服务端最新权限快照。
+   *
+   * @param changes 当前草稿相对原始数据的增删改集合。
+   * @returns 应用变更后的最新 item 权限分组。
    */
   const applyChanges = useCallback(
     async (changes: ReturnType<typeof computeItemPermissionChanges>) => {
@@ -149,26 +160,21 @@ export const ItemPermissionDialog = ({
     applyChanges,
   });
 
+  // access list 只渲染当前 tab 对应的那一组草稿权限。
   const visibleEntries = getVisibleEntries(selectedTab);
+  // 缺少目标 item、正在加载或正在保存时，都要统一禁用交互控件。
   const interactionDisabled =
     isLoadingPermissions || isApplyingPermissions || !driveId || !itemId;
+  // 用全部草稿条目数量判断是否要显示“权限可能不可见”的免责声明。
   const totalVisibleEntriesCount =
     draftEntriesByTab.people.length + draftEntriesByTab.groups.length;
+  // 只有加载完成、没有请求错误且列表确实为空时，才提示“Graph 可能没有返回权限”。
   const shouldShowEmptyVisibilityDisclaimer =
     !isLoadingPermissions &&
     !permissionRequestErrorMessage &&
     totalVisibleEntriesCount === 0;
+  // 标题里优先展示截断后的名称，避免长文件名把布局撑乱。
   const truncatedItemName = itemName ? truncateItemName(itemName) : undefined;
-
-  const emptyStateText = useMemo(() => {
-    if (shouldShowEmptyVisibilityDisclaimer) {
-      return "No permissions are currently visible in this dialog.";
-    }
-
-    return `No ${getPermissionTabTitle(
-      selectedTab,
-    ).toLowerCase()} permissions added yet.`;
-  }, [selectedTab, shouldShowEmptyVisibilityDisclaimer]);
 
   /**
    * 从 Item 权限切换到容器权限。
@@ -185,12 +191,14 @@ export const ItemPermissionDialog = ({
       return;
     }
 
+    // 先丢弃本地草稿并关闭当前弹窗，再切到容器权限弹窗。
     discardDraftAndClose(() => {
       onClose();
       onManageContainerPermission();
     });
   };
 
+  // 只有“列表为空且当前没有请求错误”时，才展示 item 权限可见性免责声明。
   const beforeAccessListContent = shouldShowEmptyVisibilityDisclaimer ? (
     <div
       className={styles.disclaimerBox}
@@ -198,7 +206,8 @@ export const ItemPermissionDialog = ({
     >
       <Text size={200}>
         This list may be empty even when item-level permissions exist. With only{" "}
-        <strong>read access</strong> to this file, Microsoft Graph may not
+        <strong>read access</strong> to this file, Microsoft Graph{" "}
+        <strong>may not</strong>
         return them. Learn more at{" "}
         <Link
           href={ITEM_PERMISSION_READ_VISIBILITY_LEARN_MORE_URL}
@@ -263,14 +272,14 @@ export const ItemPermissionDialog = ({
       accessListProps={{
         entries: visibleEntries,
         isLoading: isLoadingPermissions,
-        loadingMessage: "Loading current item permissions...",
-        emptyStateText,
         roleOptions: ITEM_PERMISSION_ROLES,
         isInteractionDisabled: interactionDisabled,
         inheritedTooltipText: ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT,
+        // 角色修改要带上当前 tab，才能精确更新对应分组里的那条草稿。
         onRoleChange: (entry, role) => {
           updateEntryRole(selectedTab, entry.id, role);
         },
+        // 删除同样基于当前 tab 执行，避免误删另一组草稿数据。
         onRemove: (entry) => {
           removeEntry(selectedTab, entry.id);
         },

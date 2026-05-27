@@ -74,8 +74,6 @@ const renderFrame = (
       accessListProps={{
         entries: [createEntry()],
         isLoading: false,
-        loadingMessage: "Loading...",
-        emptyStateText: "No entries yet.",
         roleOptions: ["Reader", "Writer"],
         isInteractionDisabled: false,
         onRoleChange,
@@ -151,8 +149,6 @@ describe("PermissionDialogFrame", () => {
       accessListProps: {
         entries: [createEntry({ role: "Writer" })],
         isLoading: false,
-        loadingMessage: "Loading...",
-        emptyStateText: "No entries yet.",
         roleOptions: ["Reader", "Writer"],
         isInteractionDisabled: false,
         onRoleChange,

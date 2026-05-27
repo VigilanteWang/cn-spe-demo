@@ -1,4 +1,4 @@
-import { type ChangeEvent, type ReactNode } from "react";
+import { type ChangeEvent } from "react";
 import {
   Button,
   Select,
@@ -30,8 +30,6 @@ export interface IPermissionAccessListTableProps<
   selectedTab: PermissionTabValue;
   entries: readonly TEntry[];
   isLoading: boolean;
-  loadingMessage: ReactNode;
-  emptyStateText: ReactNode;
   roleOptions: readonly TEntry["role"][];
   isInteractionDisabled: boolean;
   inheritedTooltipText?: string;
@@ -55,8 +53,6 @@ export const PermissionAccessListTable = <
   selectedTab,
   entries,
   isLoading,
-  loadingMessage,
-  emptyStateText,
   roleOptions,
   isInteractionDisabled,
   inheritedTooltipText,
@@ -72,7 +68,7 @@ export const PermissionAccessListTable = <
       <TableCell colSpan={3}>
         <TableCellLayout>
           <Spinner size="tiny" />
-          <Text>{loadingMessage}</Text>
+          <Text>Loading current permissions</Text>
         </TableCellLayout>
       </TableCell>
     </TableRow>
@@ -148,7 +144,7 @@ export const PermissionAccessListTable = <
     <TableRow>
       <TableCell colSpan={3}>
         <TableCellLayout>
-          <Text size={200}>{emptyStateText}</Text>
+          <Text size={200}>No permissions added yet.</Text>
         </TableCellLayout>
       </TableCell>
     </TableRow>
