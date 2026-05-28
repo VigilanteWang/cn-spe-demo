@@ -541,10 +541,14 @@ export const toBackendGraphError = (
   }
 
   // 其他情况统一按一般性 Graph 失败处理，默认回退为 502。
-  return new BackendGraphError("graphFailure", options?.failureMessage ?? message, {
-    statusCode: statusCode ?? 502,
-    requestId,
-    retryAfterSeconds,
-    cause: error,
-  });
+  return new BackendGraphError(
+    "graphFailure",
+    options?.failureMessage ?? message,
+    {
+      statusCode: statusCode ?? 502,
+      requestId,
+      retryAfterSeconds,
+      cause: error,
+    },
+  );
 };
