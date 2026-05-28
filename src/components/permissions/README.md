@@ -185,7 +185,10 @@ src/components/permissions/
 
 > “权限弹窗里的本地编辑会话状态机”
 
-### 3.3 `useContainerPermissionDialogState.ts`
+### 3.3 `usePermissionDialogUIState.ts`
+
+`ContainerPermissionDialog.tsx` 和 `ItemPermissionDialog.tsx` 会各自把
+`candidate -> permission entry` 的场景适配函数传给这个共享 Hook。
 
 这个 Hook 负责把“页签 + 草稿 + 每个 tab 的输入框”组合起来。
 
@@ -398,7 +401,7 @@ IPermissionPrincipalCandidate
 3. 如果没加过，就调用 `addCandidate(...)`
 4. 清空当前 query 和当前 tab 的结果列表
 
-`useContainerPermissionDialogState.ts` 里会把候选项转换成新的草稿权限条目：
+`ContainerPermissionDialog.tsx` 里会把候选项转换成新的草稿权限条目：
 
 ```ts
 {
@@ -507,7 +510,6 @@ replaceEntries(refreshedEntries)
 
 - `hooks/usePermissionDraft.ts`
 - `hooks/usePermissionDialogUIState.ts`
-- `hooks/useContainerPermissionDialogState.ts`
 - `hooks/usePermissionDialogApiRequestState.ts`
 - `services/containerPermissionDiff.ts`
 - `src/services/containerPermissionApi.ts`
@@ -624,7 +626,7 @@ ContainerPermissionApiError
 如果你第一次接触这个模块，建议按这个顺序读：
 
 1. `src/components/permissions/ContainerPermissionDialog.tsx`
-2. `src/components/permissions/hooks/useContainerPermissionDialogState.ts`
+2. `src/components/permissions/hooks/usePermissionDialogUIState.ts`
 3. `src/components/permissions/hooks/usePermissionDraft.ts`
 4. `src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
 5. `src/components/permissions/services/containerPermissionDiff.ts`
@@ -704,7 +706,7 @@ computeContainerPermissionChanges(...)
 优先看：
 
 - `hooks/usePermissionDraft.ts`
-- `hooks/useContainerPermissionDialogState.ts`
+- `hooks/usePermissionDialogUIState.ts`
 
 特别注意：
 

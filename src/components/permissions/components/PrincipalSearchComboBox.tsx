@@ -78,6 +78,7 @@ export const PrincipalSearchComboBox = ({
   return (
     <div className={styles.section}>
       <div className={styles.principalInputWrapper}>
+        {/* 搜索输入框：用户在这里输入 People / Groups 的名称，输入内容会驱动下拉结果刷新。 */}
         <Combobox
           id={searchInputId}
           aria-label={`Add ${getPermissionTabTitle(selectedTab)}`}
@@ -94,6 +95,7 @@ export const PrincipalSearchComboBox = ({
           onChange={handleComboboxChange}
           onOptionSelect={handleOptionSelect}
         >
+          {/* 输入不足时的提示项：告诉用户至少输入 3 个字符后才会开始搜索。 */}
           {searchStatus === "waitingForMoreInput" ? (
             <Option disabled text="Need more input">
               <Text size={200}>
@@ -102,12 +104,14 @@ export const PrincipalSearchComboBox = ({
             </Option>
           ) : null}
 
+          {/* 防抖中的提示项：表示正在等待输入稳定后再发起搜索。 */}
           {searchStatus === "debouncing" ? (
             <Option disabled text="Debouncing">
               <Text size={200}>Getting ready to search...</Text>
             </Option>
           ) : null}
 
+          {/* 搜索中的提示项：显示加载中的转圈和 Searching 文案。 */}
           {searchStatus === "loading" ? (
             <Option disabled text="Searching">
               <div
@@ -120,6 +124,7 @@ export const PrincipalSearchComboBox = ({
             </Option>
           ) : null}
 
+          {/* 搜索成功时的结果列表：每一项都展示头像、名称、次要信息和是否已添加标记。 */}
           {searchStatus === "success"
             ? searchResults.map((candidate) => {
                 // 即使已存在于列表里，也保留结果项，方便用户确认命中对象。
@@ -160,6 +165,7 @@ export const PrincipalSearchComboBox = ({
               })
             : null}
 
+          {/* 没有结果时的提示项：告诉用户当前搜索不到匹配对象。 */}
           {searchStatus === "empty" ? (
             <Option disabled text="No results">
               <Text size={200} data-testid="directory-search-empty-state">
@@ -169,6 +175,7 @@ export const PrincipalSearchComboBox = ({
             </Option>
           ) : null}
 
+          {/* 搜索失败时的提示项：引导用户查看上方的错误消息。 */}
           {searchStatus === "error" ? (
             <Option disabled text="Search failed">
               <Text size={200}>Please check the error message above.</Text>
@@ -177,6 +184,7 @@ export const PrincipalSearchComboBox = ({
         </Combobox>
       </div>
 
+      {/* 底部说明文案：提示用户从结果里选择一个对象加入，并说明重复项不会被重复添加。 */}
       <Text size={200} className={styles.searchStatusText}>
         Select someone from the results to add them. Duplicates won&apos;t be
         added twice.

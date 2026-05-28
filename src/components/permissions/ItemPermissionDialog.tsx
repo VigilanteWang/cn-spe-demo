@@ -5,8 +5,9 @@ import type {
   IItemPermissionEntry,
   ItemPermissionRole,
 } from "./models/itemPermissionModels";
-import { useItemPermissionDialogState } from "./hooks/useItemPermissionDialogState";
+import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
 import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
+import { usePermissionDialogUIState } from "./hooks/usePermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
 import { usePermissionsStyles } from "./components/permissionsStyles";
@@ -16,7 +17,10 @@ import {
   listItemPermissions,
 } from "../../services/itemPermissionApi";
 import { computeItemPermissionChanges } from "./services/itemPermissionDiff";
-import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
+import {
+  createBasePermissionEntryFromCandidate,
+  createEmptyPermissionEntriesByTab,
+} from "./utils/permissionDialogSharedUtils";
 
 const ITEM_PERMISSION_ROLES: ItemPermissionRole[] = ["Reader", "Writer"];
 const ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT =
@@ -25,6 +29,21 @@ const ITEM_PERMISSION_READ_VISIBILITY_LEARN_MORE_URL =
   "https://learn.microsoft.com/en-us/graph/api/driveitem-list-permissions?view=graph-rest-1.0&tabs=http#access-to-sharing-permissions";
 const ITEM_PERMISSION_ROLE_BASED_SHARING_LEARN_MORE_URL =
   "https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/sharing-and-perm#role-based-sharing-setting";
+
+/**
+ * 把目录搜索候选项转换成一条新的 Item 权限草稿记录。
+ *
+ * 这里先复用共享的基础字段映射，再补上 Item 场景默认的 Reader 角色。
+ *
+ * @param candidate 目录搜索返回的 user/group 候选项。
+ * @returns 一条可直接加入 Item 权限草稿列表的新记录。
+ */
+const createItemPermissionEntryFromCandidate = (
+  candidate: IPermissionPrincipalCandidate,
+): IItemPermissionEntry => ({
+  ...createBasePermissionEntryFromCandidate(candidate),
+  role: "Reader",
+});
 
 /**
  * 把过长的 item 名称截断到指定长度，避免标题区被撑破。
@@ -47,6 +66,9 @@ const truncateItemName = (itemName: string, maxLength = 32) => {
  * 这个组件沿用容器权限弹窗的交互骨架，但保留了 Item 特有的两部分文案：
  * 1. “权限可见性”免责声明
  * 2. 跳转到容器权限的入口
+ *
+ * 组件层自己负责把共享的 `usePermissionDialogUIState` 具体化成
+ * Item 权限条目，再与目录搜索和请求状态拼成完整交互。
  *
  * @returns 渲染后的 Item 权限管理对话框。
  */
@@ -78,9 +100,10 @@ export const ItemPermissionDialog = ({
     replaceEntries,
     getVisibleEntries,
     isCandidateAdded,
-  } = useItemPermissionDialogState(
+  } = usePermissionDialogUIState(
     initialEntriesByTab,
     `${driveId ?? "__no-drive__"}:${itemId ?? "__no-item__"}`,
+    createItemPermissionEntryFromCandidate,
   );
 
   const {

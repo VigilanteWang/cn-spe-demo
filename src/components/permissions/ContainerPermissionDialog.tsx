@@ -5,8 +5,9 @@ import type {
   IContainerPermissionEntriesByTab,
   IContainerPermissionEntry,
 } from "./models/containerPermissionModels";
-import { useContainerPermissionDialogState } from "./hooks/useContainerPermissionDialogState";
+import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
 import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
+import { usePermissionDialogUIState } from "./hooks/usePermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
 import { IContainerPermissionDialogProps } from "./components/permissionsTypes";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
@@ -15,7 +16,10 @@ import {
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
 import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
-import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
+import {
+  createBasePermissionEntryFromCandidate,
+  createEmptyPermissionEntriesByTab,
+} from "./utils/permissionDialogSharedUtils";
 
 const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
   "Reader",
@@ -25,14 +29,30 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
 ];
 
 /**
+ * 把目录搜索候选项转换成一条新的容器权限草稿记录。
+ *
+ * 这里先复用共享的基础字段映射，再补上容器场景默认的 Reader 角色。
+ *
+ * @param candidate 目录搜索返回的 user/group 候选项。
+ * @returns 一条可直接加入容器权限草稿列表的新记录。
+ */
+const createContainerPermissionEntryFromCandidate = (
+  candidate: IPermissionPrincipalCandidate,
+): IContainerPermissionEntry => ({
+  ...createBasePermissionEntryFromCandidate(candidate),
+  role: "Reader",
+});
+
+/**
  * 容器权限管理对话框。
  *
  * 当前版本把原来混在组件里的三类逻辑拆开了：
- * 1. `useContainerPermissionDialogState` 管本地草稿和页签
+ * 1. `usePermissionDialogUIState` 管共享的 tab / draft / filter / 去重逻辑
  * 2. `usePermissionPrincipalSearch` 管目录搜索
  * 3. `usePermissionDialogApiRequestState` 管加载、Apply 和反馈状态
  *
- * 组件层自己主要负责把三块状态组装成统一的界面骨架。
+ * 组件层自己主要负责把共享状态 Hook 具体化成容器权限场景，
+ * 再把三块状态组装成统一的界面骨架。
  *
  * @returns 渲染后的容器权限管理对话框。
  */
@@ -61,9 +81,10 @@ export const ContainerPermissionDialog = ({
     replaceEntries,
     getVisibleEntries,
     isCandidateAdded,
-  } = useContainerPermissionDialogState(
+  } = usePermissionDialogUIState(
     initialEntriesByTab,
     containerId ?? "__no-container__",
+    createContainerPermissionEntryFromCandidate,
   );
 
   const {
