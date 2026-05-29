@@ -5,6 +5,12 @@ import {
   type PermissionApplyFeedbackStatus,
 } from "../utils/permissionDialogSharedUtils";
 
+/**
+ * 共享权限弹窗差异结果需要满足的最小结构。
+ *
+ * 这个 Hook 只关心“是否有 create / update / remove 三类变更”，
+ * 不关心每条变更项内部的具体字段。
+ */
 interface IPermissionDialogChangeSetShape {
   create: unknown[];
   update: unknown[];
@@ -13,24 +19,38 @@ interface IPermissionDialogChangeSetShape {
 
 /**
  * 通用权限请求状态 Hook 的输入参数。
+ *
+ * @typeParam TEntriesByTab 按 tab 分组后的权限数据结构。
+ * @typeParam TChanges 计算得到的权限变更结构，至少要包含 create/update/remove 三类集合。
  */
 interface IUsePermissionDialogApiRequestStateOptions<
   TEntriesByTab,
   TChanges extends IPermissionDialogChangeSetShape,
 > {
+  /** 弹窗是否打开。 */
   open: boolean;
+  /** 当前是否已经具备加载/提交权限所需的目标资源标识。 */
   isTargetReady: boolean;
+  /** 来自主体搜索区的错误对象，用于合并成统一状态消息。 */
   searchError: unknown;
+  /** 当前操作的是 container 还是 item，用来拼接用户可读提示文案。 */
   resourceLabel: "container" | "item";
+  /** 返回一份空的按 tab 分组权限结构，用于缺少目标或加载失败时重置本地状态。 */
   createEmptyEntriesByTab: () => TEntriesByTab;
+  /** 当前已确认的后端权限基线。 */
   originalEntriesByTab: TEntriesByTab;
+  /** 用户正在编辑的本地权限草稿。 */
   draftEntriesByTab: TEntriesByTab;
+  /** 同时替换基线和草稿，保证两份状态重新对齐。 */
   replaceEntries: (entriesByTab: TEntriesByTab) => void;
+  /** 从后端读取最新权限快照。 */
   loadPermissions: () => Promise<TEntriesByTab>;
+  /** 基于基线和草稿计算本次 Apply 需要提交的变更。 */
   computeChanges: (
     originalEntriesByTab: TEntriesByTab,
     draftEntriesByTab: TEntriesByTab,
   ) => TChanges;
+  /** 把差异写回后端，并返回应用后的最新权限快照。 */
   applyChanges: (changes: TChanges) => Promise<TEntriesByTab>;
 }
 
@@ -41,7 +61,12 @@ interface IUsePermissionDialogApiRequestStateOptions<
  * 1. 弹窗打开后的权限加载
  * 2. Apply 前的差异计算
  * 3. Apply 过程中的成功/失败反馈
- * 4. container / item 两类弹窗共用的状态消息拼装
+ * 4. container / item 共用的状态消息拼装
+ *
+ * @typeParam TEntriesByTab 按 tab 分组后的权限数据结构。
+ * @typeParam TChanges 计算得到的权限变更结构。
+ * @param options Hook 运行所需的外层状态与请求能力。
+ * @returns 供弹窗界面使用的加载状态、反馈消息和 Apply 处理函数。
  */
 export const usePermissionDialogApiRequestState = <
   TEntriesByTab,
@@ -66,6 +91,7 @@ export const usePermissionDialogApiRequestState = <
   const [applyFeedbackStatus, setApplyFeedbackStatus] =
     useState<PermissionApplyFeedbackStatus>(null);
 
+  // 把和资源类型相关的文案集中收口，避免 container / item 两套分支重复维护。
   const requestMessages = useMemo(
     () => ({
       missingTarget: `No ${resourceLabel} selected.`,
@@ -76,6 +102,7 @@ export const usePermissionDialogApiRequestState = <
     [resourceLabel],
   );
 
+  // 顶部状态区需要把请求错误和搜索错误合并成统一的展示消息列表。
   const permissionStatusMessages = useMemo(
     () =>
       buildPermissionStatusMessages(permissionRequestErrorMessage, searchError),
@@ -91,6 +118,8 @@ export const usePermissionDialogApiRequestState = <
 
   /**
    * 计算当前草稿相对最近一次已确认基线的差异。
+   *
+   * @returns 可提交给后端的权限差异对象。
    */
   const prepareChanges = useCallback(() => {
     return computeChanges(originalEntriesByTab, draftEntriesByTab);
@@ -98,6 +127,9 @@ export const usePermissionDialogApiRequestState = <
 
   /**
    * 判断这次 Apply 是否真的存在可提交的变化。
+   *
+   * @param changes 当前准备提交的差异对象。
+   * @returns 只要三类变更中任意一类非空，就说明需要调用后端 apply。
    */
   const hasChanges = useCallback((changes: TChanges) => {
     return (
@@ -113,6 +145,7 @@ export const usePermissionDialogApiRequestState = <
     }
 
     if (!isTargetReady) {
+      // 没有选中 container / item 时，直接回到空状态，并给出明确提示。
       setIsLoadingPermissions(false);
       setIsApplyingPermissions(false);
       resetToEmptyEntries();
@@ -132,7 +165,7 @@ export const usePermissionDialogApiRequestState = <
           return;
         }
 
-        // 成功后直接用服务端最新结果同时刷新 original 与 draft。
+        // 成功后直接用服务端最新结果同时刷新 original 与 draft，避免沿用过期草稿。
         replaceEntries(entriesByTab);
       })
       .catch((error: unknown) => {
@@ -140,6 +173,7 @@ export const usePermissionDialogApiRequestState = <
           return;
         }
 
+        // 读取失败时把本地权限清空，避免界面继续显示旧资源或旧请求留下的数据。
         resetToEmptyEntries();
         setPermissionRequestErrorMessage(
           formatPermissionRequestErrorMessage(
@@ -155,6 +189,7 @@ export const usePermissionDialogApiRequestState = <
       });
 
     return () => {
+      // 弹窗关闭或依赖变化后，阻止过期请求再回写状态。
       cancelled = true;
     };
   }, [
@@ -175,6 +210,7 @@ export const usePermissionDialogApiRequestState = <
     try {
       changes = prepareChanges();
     } catch (error: unknown) {
+      // 差异计算阶段出错时，不进入真正的保存流程，直接给出 prepare 阶段反馈。
       setPermissionRequestErrorMessage(
         formatPermissionRequestErrorMessage(
           error,

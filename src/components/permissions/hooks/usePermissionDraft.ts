@@ -67,7 +67,7 @@ export const usePermissionDraft = <
     const nextEntriesByTab = cloneEntriesByTab(initialEntriesByTab);
     setOriginalEntriesByTab(nextEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextEntriesByTab));
-  }, [initialEntriesByTab, resetKey]);
+  }, [resetKey]);
 
   /**
    * 向指定页签追加一条新的草稿权限记录。
