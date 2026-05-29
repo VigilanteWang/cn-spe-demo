@@ -60,7 +60,7 @@ const renderFrame = (
       open
       title="Manage Permission"
       headerContent={<div>Header</div>}
-      permissionStatusMessages={[]}
+      permissionErrorMessages={[]}
       selectedTab="people"
       interactionDisabled={false}
       searchInputId="permission-search"

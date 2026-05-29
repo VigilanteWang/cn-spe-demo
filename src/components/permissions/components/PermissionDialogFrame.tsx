@@ -48,7 +48,7 @@ export interface IPermissionDialogFrameProps<
   /** 标题下方的业务头部内容，例如当前 container 或 item 名称。 */
   headerContent: ReactNode;
   /** 顶部状态区要展示的提示或错误消息。 */
-  permissionStatusMessages: string[];
+  permissionErrorMessages: string[];
   /** 当前激活的权限 tab。 */
   selectedTab: PermissionTabValue;
   /** 是否需要统一禁用 tab、搜索和列表等交互。 */
@@ -114,7 +114,7 @@ export const PermissionDialogFrame = <
   open,
   title,
   headerContent,
-  permissionStatusMessages,
+  permissionErrorMessages,
   selectedTab,
   interactionDisabled,
   searchInputId,
@@ -159,14 +159,14 @@ export const PermissionDialogFrame = <
             <div className={styles.section}>
               {/* 头部业务信息：展示当前对象的标识、说明或其他上下文。 */}
               {headerContent}
-              {permissionStatusMessages.length > 0 ? (
+              {permissionErrorMessages.length > 0 ? (
                 <div
                   role="status"
                   aria-live="polite"
                   className={styles.errorStatusText}
                 >
                   {/* 顶部状态区集中展示加载、校验或提交后的错误信息 */}
-                  {permissionStatusMessages.map((message) => (
+                  {permissionErrorMessages.map((message) => (
                     <Text key={message} size={200}>
                       {message}
                     </Text>

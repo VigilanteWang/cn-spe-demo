@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  buildPermissionStatusMessages,
-  formatPermissionRequestErrorMessage,
+  buildPermissionErrorMessages,
   type PermissionApplyFeedbackStatus,
 } from "../utils/permissionDialogSharedUtils";
+import {
+  formatStandardErrorMessageForUI,
+  FrontendValidationError,
+} from "../../../common/errors.ts";
 
 /**
  * 共享权限弹窗差异结果需要满足的最小结构。
@@ -91,10 +94,20 @@ export const usePermissionDialogApiRequestState = <
   const [applyFeedbackStatus, setApplyFeedbackStatus] =
     useState<PermissionApplyFeedbackStatus>(null);
 
-  // 把和资源类型相关的文案集中收口，避免 container / item 两套分支重复维护。
-  const requestMessages = useMemo(
+  // 把缺少目标资源建模成稳定的前端验证错误，避免组件层继续依赖裸字符串判断。
+  const missingTargetError = useMemo(
     () => ({
-      missingTarget: `No ${resourceLabel} selected.`,
+      missingTarget: new FrontendValidationError(
+        "missingTarget",
+        `No ${resourceLabel} selected.`,
+      ),
+    }),
+    [resourceLabel],
+  );
+
+  // load / prepare / apply 三类兜底文案继续单独保留，专门用于请求阶段无法拿到结构化错误时的降级展示。
+  const requestFallbackErrorMessages = useMemo(
+    () => ({
       loadErrorFallback: `Unable to load current ${resourceLabel} permissions.`,
       prepareErrorFallback: `Unable to prepare ${resourceLabel} permission changes.`,
       applyErrorFallback: `Unable to apply ${resourceLabel} permission changes.`,
@@ -103,9 +116,9 @@ export const usePermissionDialogApiRequestState = <
   );
 
   // 顶部状态区需要把请求错误和搜索错误合并成统一的展示消息列表。
-  const permissionStatusMessages = useMemo(
+  const permissionErrorMessages = useMemo(
     () =>
-      buildPermissionStatusMessages(permissionRequestErrorMessage, searchError),
+      buildPermissionErrorMessages(permissionRequestErrorMessage, searchError),
     [permissionRequestErrorMessage, searchError],
   );
 
@@ -149,7 +162,12 @@ export const usePermissionDialogApiRequestState = <
       setIsLoadingPermissions(false);
       setIsApplyingPermissions(false);
       resetToEmptyEntries();
-      setPermissionRequestErrorMessage(requestMessages.missingTarget);
+      setPermissionRequestErrorMessage(
+        formatStandardErrorMessageForUI(
+          missingTargetError.missingTarget,
+          missingTargetError.missingTarget.message,
+        ),
+      );
       setApplyFeedbackStatus(null);
       return;
     }
@@ -176,9 +194,9 @@ export const usePermissionDialogApiRequestState = <
         // 读取失败时把本地权限清空，避免界面继续显示旧资源或旧请求留下的数据。
         resetToEmptyEntries();
         setPermissionRequestErrorMessage(
-          formatPermissionRequestErrorMessage(
+          formatStandardErrorMessageForUI(
             error,
-            requestMessages.loadErrorFallback,
+            requestFallbackErrorMessages.loadErrorFallback,
           ),
         );
       })
@@ -195,7 +213,8 @@ export const usePermissionDialogApiRequestState = <
   }, [
     open,
     isTargetReady,
-    requestMessages,
+    missingTargetError,
+    requestFallbackErrorMessages,
     resetToEmptyEntries,
     replaceEntries,
     loadPermissions,
@@ -212,9 +231,9 @@ export const usePermissionDialogApiRequestState = <
     } catch (error: unknown) {
       // 差异计算阶段出错时，不进入真正的保存流程，直接给出 prepare 阶段反馈。
       setPermissionRequestErrorMessage(
-        formatPermissionRequestErrorMessage(
+        formatStandardErrorMessageForUI(
           error,
-          requestMessages.prepareErrorFallback,
+          requestFallbackErrorMessages.prepareErrorFallback,
         ),
       );
       setApplyFeedbackStatus("error");
@@ -236,9 +255,9 @@ export const usePermissionDialogApiRequestState = <
       setApplyFeedbackStatus("success");
     } catch (error: unknown) {
       setPermissionRequestErrorMessage(
-        formatPermissionRequestErrorMessage(
+        formatStandardErrorMessageForUI(
           error,
-          requestMessages.applyErrorFallback,
+          requestFallbackErrorMessages.applyErrorFallback,
         ),
       );
       setApplyFeedbackStatus("error");
@@ -252,7 +271,7 @@ export const usePermissionDialogApiRequestState = <
     isApplyingPermissions,
     permissionRequestErrorMessage,
     applyFeedbackStatus,
-    permissionStatusMessages,
+    permissionErrorMessages,
     handleApply,
   };
 };

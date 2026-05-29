@@ -15,6 +15,7 @@
 import { FrontendApiError } from "../common/errors.ts";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
+import { readApiErrorResponseSummary } from "./apiErrorResponse";
 
 /**
  * 后端 API 请求失败时抛出的稳定错误类型。
@@ -23,11 +24,27 @@ import { IContainer } from "../common/types";
  * 便于调用方通过 instanceof 和 code 区分不同失败场景。
  */
 export class BackendRequestError extends FrontendApiError {
-  constructor(code: string, message: string, statusCode: number) {
+  readonly requestId?: string;
+
+  readonly retryAfterSeconds?: number;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      statusCode: number;
+      requestId?: string;
+      retryAfterSeconds?: number;
+      details?: Record<string, unknown>;
+    },
+  ) {
     super(code, message, {
       name: "BackendRequestError",
-      statusCode,
+      statusCode: options.statusCode,
+      details: options.details,
     });
+    this.requestId = options.requestId;
+    this.retryAfterSeconds = options.retryAfterSeconds;
   }
 }
 
@@ -44,16 +61,23 @@ export interface IDeleteItemsResult {
 /**
  * 根据响应构造容器 API 请求错误。
  */
-const buildBackendRequestError = (
+const buildBackendRequestError = async (
   code: string,
   operation: string,
   response: Response,
-): BackendRequestError =>
-  new BackendRequestError(
-    code,
-    `${operation} failed: ${response.status}`,
-    response.status,
-  );
+): Promise<BackendRequestError> => {
+  const summary = await readApiErrorResponseSummary(response, {
+    fallbackCode: code,
+    operationLabel: operation,
+  });
+
+  return new BackendRequestError(summary.code, summary.message, {
+    statusCode: summary.statusCode,
+    requestId: summary.requestId,
+    retryAfterSeconds: summary.retryAfterSeconds,
+    details: summary.details,
+  });
+};
 
 /**
  * 列出当前用户可访问的所有容器。
@@ -77,7 +101,7 @@ export async function listContainers(): Promise<IContainer[]> {
     // Graph API 把集合包在 value 数组里返回；空集合时返回空数组而非 undefined
     return (body.value as IContainer[]) ?? [];
   }
-  throw buildBackendRequestError(
+  throw await buildBackendRequestError(
     "listContainersFailed",
     "listContainers",
     response,
@@ -113,7 +137,7 @@ export async function createContainer(
   if (response.ok) {
     return (await response.json()) as IContainer;
   }
-  throw buildBackendRequestError(
+  throw await buildBackendRequestError(
     "createContainerFailed",
     "createContainer",
     response,
@@ -143,5 +167,9 @@ export async function deleteItems(
   if (response.ok) {
     return (await response.json()) as IDeleteItemsResult;
   }
-  throw buildBackendRequestError("deleteItemsFailed", "deleteItems", response);
+  throw await buildBackendRequestError(
+    "deleteItemsFailed",
+    "deleteItems",
+    response,
+  );
 }

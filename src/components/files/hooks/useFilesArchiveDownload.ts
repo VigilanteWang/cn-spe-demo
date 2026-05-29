@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
-import { readErrorMessage } from "../../../common/errors.ts";
+import { formatStandardErrorMessageForUI } from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
   DownloadSaveTargetSelectionCancelledError,
@@ -151,9 +151,10 @@ export const useFilesArchiveDownload = ({
         setDownloadProgress(
           createDownloadProgressState({
             phase: "failed",
-            errorMessage: `Failed to start download: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+            errorMessage: formatStandardErrorMessageForUI(
+              error,
+              "Failed to start download.",
+            ),
           }),
         );
         if (downloadAbortControllerRef.current === runController) {
@@ -314,9 +315,10 @@ export const useFilesArchiveDownload = ({
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
-                errorMessage: `Download failed: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
+                errorMessage: formatStandardErrorMessageForUI(
+                  error,
+                  "Download failed.",
+                ),
               }),
             );
           }
@@ -376,10 +378,10 @@ export const useFilesArchiveDownload = ({
           errorMessage:
             error instanceof DownloadSaveTargetSelectionCancelledError
               ? "Download cancelled."
-              : `Failed to open save dialog: ${readErrorMessage(
+              : formatStandardErrorMessageForUI(
                   error,
-                  "Unknown error.",
-                )}`,
+                  "Failed to open save dialog.",
+                ),
         }),
       );
     }

@@ -138,7 +138,7 @@ export const ContainerPermissionDialog = ({
     isLoadingPermissions,
     isApplyingPermissions,
     applyFeedbackStatus,
-    permissionStatusMessages,
+    permissionErrorMessages,
     handleApply,
   } = usePermissionDialogApiRequestState<
     IContainerPermissionEntriesByTab,
@@ -172,7 +172,7 @@ export const ContainerPermissionDialog = ({
           {containerName ?? "<No container selected>"}
         </Text>
       }
-      permissionStatusMessages={permissionStatusMessages}
+      permissionErrorMessages={permissionErrorMessages}
       selectedTab={selectedTab}
       interactionDisabled={interactionDisabled}
       searchInputId="permission-principal-input"

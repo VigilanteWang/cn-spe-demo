@@ -1,4 +1,4 @@
-import { readErrorMessage } from "../../../common/errors.ts";
+import { formatStandardErrorMessageForUI } from "../../../common/errors.ts";
 import type { IPermissionEntryBaseForUI } from "../../../../common/contracts/permissionCommonContracts";
 import type {
   IPermissionPrincipalCandidate,
@@ -21,54 +21,10 @@ export const createEmptyPermissionEntriesByTab = <TEntry>() => ({
   groups: [] as TEntry[],
 });
 
-interface IPermissionRequestErrorShape {
-  message: string;
-  code?: string;
-  retryAfterSeconds?: number;
-  requestId?: string;
-}
-
-/**
- * 判断错误对象是否已经具备权限请求错误的关键字段。
- */
-const isPermissionRequestError = (
-  error: unknown,
-): error is IPermissionRequestErrorShape => {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string" &&
-    ("code" in error || "requestId" in error || "retryAfterSeconds" in error)
-  );
-};
-
-/**
- * 把权限请求错误转换成适合 UI 直接展示的文案。
- */
-export const formatPermissionRequestErrorMessage = (
-  error: unknown,
-  fallbackMessage: string,
-): string => {
-  if (isPermissionRequestError(error)) {
-    if (error.code === "throttled" && error.retryAfterSeconds) {
-      return `${error.message} Retry after ${error.retryAfterSeconds} seconds.`;
-    }
-
-    if (error.requestId) {
-      return `${error.message} Request ID: ${error.requestId}.`;
-    }
-
-    return error.message;
-  }
-
-  return readErrorMessage(error, fallbackMessage);
-};
-
 /**
  * 统一构造顶部状态区展示的错误消息数组。
  */
-export const buildPermissionStatusMessages = (
+export const buildPermissionErrorMessages = (
   permissionRequestErrorMessage: string | null,
   searchError: unknown,
 ) =>
@@ -77,7 +33,7 @@ export const buildPermissionStatusMessages = (
       ? `Api Error: ${permissionRequestErrorMessage}`
       : null,
     searchError
-      ? `Search Error: ${readErrorMessage(
+      ? `Search Error: ${formatStandardErrorMessageForUI(
           searchError,
           "Directory search failed. Please try again later.",
         )}`

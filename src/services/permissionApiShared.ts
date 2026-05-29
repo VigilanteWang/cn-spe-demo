@@ -1,9 +1,7 @@
 import { FrontendApiError } from "../common/errors.ts";
-import type {
-  IPermissionApiErrorBody,
-  IPermissionEntryBaseForUI,
-} from "../../common/contracts/permissionCommonContracts";
+import type { IPermissionEntryBaseForUI } from "../../common/contracts/permissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
+import { readApiErrorResponseSummary } from "./apiErrorResponse";
 
 /**
  * 表示权限相关后端 API 失败时的统一前端错误类型。
@@ -82,33 +80,14 @@ export const buildPermissionApiError = async (
   response: Response,
   operationLabel: string,
 ): Promise<PermissionApiError> => {
-  const payload = await tryReadErrorPayload(response);
-  // 后端没有返回标准错误体时，统一回退到共享默认错误码，避免上层分支过碎。
-  const code = payload?.code ?? "graphFailure";
-  // 兜底消息至少保留操作名和 HTTP 状态，方便前端日志与人工排查。
-  const message =
-    payload?.message ?? `${operationLabel} failed: ${response.status}`;
-
-  return new PermissionApiError(code, message, {
-    retryAfterSeconds: payload?.retryAfterSeconds,
-    requestId: payload?.requestId,
-    statusCode: payload?.statusCode ?? response.status,
+  const summary = await readApiErrorResponseSummary(response, {
+    fallbackCode: "graphFailure",
+    operationLabel,
   });
-};
 
-/**
- * 尝试把失败响应解析成权限接口约定的错误体。
- *
- * @param response 需要读取响应体的失败响应对象。
- * @returns 解析成功时返回错误体；如果响应不是合法 JSON，则返回 `null`。
- */
-const tryReadErrorPayload = async (
-  response: Response,
-): Promise<IPermissionApiErrorBody | null> => {
-  try {
-    // 有些失败响应可能只有纯文本或空体，这里捕获解析异常，交给上层走兜底逻辑。
-    return (await response.json()) as IPermissionApiErrorBody;
-  } catch {
-    return null;
-  }
+  return new PermissionApiError(summary.code, summary.message, {
+    retryAfterSeconds: summary.retryAfterSeconds,
+    requestId: summary.requestId,
+    statusCode: summary.statusCode,
+  });
 };

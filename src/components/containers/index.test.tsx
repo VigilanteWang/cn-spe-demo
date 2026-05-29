@@ -161,4 +161,24 @@ describe("Containers", () => {
       screen.getByRole("combobox", { name: "Add People" }),
     ).toBeInTheDocument();
   });
+
+  it("should surface structured backend request details when loading containers fails", async () => {
+    const error = Object.assign(
+      new Error("Container list request was throttled."),
+      {
+        code: "throttled",
+        retryAfterSeconds: 8,
+        requestId: "req-containers-429",
+      },
+    );
+    listContainersMock.mockRejectedValue(error);
+
+    render(<Containers />);
+
+    expect(
+      await screen.findByText(
+        "Container list request was throttled. Retry after 8 seconds.",
+      ),
+    ).toBeInTheDocument();
+  });
 });

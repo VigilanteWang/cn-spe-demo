@@ -164,7 +164,7 @@ export const ItemPermissionDialog = ({
     isApplyingPermissions,
     permissionRequestErrorMessage,
     applyFeedbackStatus,
-    permissionStatusMessages,
+    permissionErrorMessages,
     handleApply,
   } = usePermissionDialogApiRequestState<
     IItemPermissionEntriesByTab,
@@ -279,7 +279,7 @@ export const ItemPermissionDialog = ({
           </div>
         </div>
       }
-      permissionStatusMessages={permissionStatusMessages}
+      permissionErrorMessages={permissionErrorMessages}
       selectedTab={selectedTab}
       interactionDisabled={interactionDisabled}
       searchInputId="item-permission-principal-input"

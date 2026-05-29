@@ -21,6 +21,7 @@ import {
   IArchiveSaveTarget,
   IShowSaveFilePickerWindow,
 } from "../common/types";
+import { readApiErrorResponseSummary } from "./apiErrorResponse";
 
 /**
  * ZIP 归档任务的进度信息。
@@ -60,6 +61,34 @@ export class DownloadSaveTargetSelectionCancelledError extends FrontendUserActio
 }
 
 /**
+ * 归档下载相关后端请求失败时抛出的稳定错误类型。
+ */
+export class ArchiveRequestError extends FrontendApiError {
+  readonly requestId?: string;
+
+  readonly retryAfterSeconds?: number;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      statusCode: number;
+      requestId?: string;
+      retryAfterSeconds?: number;
+      details?: Record<string, unknown>;
+    },
+  ) {
+    super(code, message, {
+      name: "ArchiveRequestError",
+      statusCode: options.statusCode,
+      details: options.details,
+    });
+    this.requestId = options.requestId;
+    this.retryAfterSeconds = options.retryAfterSeconds;
+  }
+}
+
+/**
  * 根据后端响应构造归档 API 请求错误。
  *
  * @param code 前端稳定错误码。
@@ -67,15 +96,23 @@ export class DownloadSaveTargetSelectionCancelledError extends FrontendUserActio
  * @param response 原始 HTTP 响应对象。
  * @returns 统一的前端 API 错误对象。
  */
-const buildArchiveRequestError = (
+const buildArchiveRequestError = async (
   code: string,
   operation: string,
   response: Response,
-): FrontendApiError =>
-  new FrontendApiError(code, `${operation} failed: ${response.status}`, {
-    name: "ArchiveApiError",
-    statusCode: response.status,
+): Promise<ArchiveRequestError> => {
+  const summary = await readApiErrorResponseSummary(response, {
+    fallbackCode: code,
+    operationLabel: operation,
   });
+
+  return new ArchiveRequestError(summary.code, summary.message, {
+    statusCode: summary.statusCode,
+    requestId: summary.requestId,
+    retryAfterSeconds: summary.retryAfterSeconds,
+    details: summary.details,
+  });
+};
 
 /**
  * 启动下载准备任务。
@@ -110,7 +147,7 @@ export async function startDownload(
     const data = await response.json();
     return data.jobId as string;
   }
-  throw buildArchiveRequestError(
+  throw await buildArchiveRequestError(
     "startArchivePreparationFailed",
     "startDownload",
     response,
@@ -139,7 +176,7 @@ export async function getDownloadProgress(
     // 这里直接把后端 JSON 映射成强类型进度对象，供页面驱动进度条和状态文案。
     return (await response.json()) as IJobProgress;
   }
-  throw buildArchiveRequestError(
+  throw await buildArchiveRequestError(
     "archivePreparationProgressFailed",
     "getDownloadProgress",
     response,
@@ -168,7 +205,7 @@ export async function getDownloadManifest(
     // manifest 是前端流式下载和压缩 ZIP 的最小输入，不需要再额外拼接 Graph 数据。
     return (await response.json()) as IArchiveManifest;
   }
-  throw buildArchiveRequestError(
+  throw await buildArchiveRequestError(
     "downloadManifestFailed",
     "getDownloadManifest",
     response,

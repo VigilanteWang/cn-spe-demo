@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { FrontendValidationError } from "../../../common/errors.ts";
 import { usePermissionDialogApiRequestState } from "./usePermissionDialogApiRequestState";
 
 interface ITestEntriesByTab {
@@ -81,7 +82,7 @@ describe("usePermissionDialogApiRequestState", () => {
       expect(options.replaceEntries).toHaveBeenCalledWith(createEntriesByTab());
     });
 
-    expect(result.current.permissionStatusMessages).toEqual([
+    expect(result.current.permissionErrorMessages).toEqual([
       "Api Error: No container selected.",
     ]);
   });
@@ -104,7 +105,7 @@ describe("usePermissionDialogApiRequestState", () => {
     });
 
     expect(result.current.isLoadingPermissions).toBe(false);
-    expect(result.current.permissionStatusMessages).toEqual([]);
+    expect(result.current.permissionErrorMessages).toEqual([]);
   });
 
   it("should surface a load error and reset to empty entries when loading fails", async () => {
@@ -117,7 +118,7 @@ describe("usePermissionDialogApiRequestState", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.permissionStatusMessages).toEqual([
+      expect(result.current.permissionErrorMessages).toEqual([
         "Api Error: load failed",
       ]);
     });
@@ -201,8 +202,30 @@ describe("usePermissionDialogApiRequestState", () => {
 
     expect(options.replaceEntries).not.toHaveBeenCalled();
     expect(result.current.applyFeedbackStatus).toBe("error");
-    expect(result.current.permissionStatusMessages).toEqual([
+    expect(result.current.permissionErrorMessages).toEqual([
       "Api Error: apply failed",
+    ]);
+  });
+
+  it("should expose missing target through the shared validation-error path", async () => {
+    const options = createOptions({
+      isTargetReady: false,
+      resourceLabel: "item",
+    });
+
+    const { result } = renderHook(() =>
+      usePermissionDialogApiRequestState(options),
+    );
+
+    await waitFor(() => {
+      expect(options.replaceEntries).toHaveBeenCalledWith(createEntriesByTab());
+    });
+
+    expect(result.current.permissionRequestErrorMessage).toBe(
+      new FrontendValidationError("missingTarget", "No item selected.").message,
+    );
+    expect(result.current.permissionErrorMessages).toEqual([
+      "Api Error: No item selected.",
     ]);
   });
 });
