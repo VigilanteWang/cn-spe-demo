@@ -21,7 +21,7 @@ import {
   IArchiveSaveTarget,
   IShowSaveFilePickerWindow,
 } from "../common/types";
-import { readApiErrorResponseSummary } from "./apiErrorResponse";
+import { readApiErrorResponseSummary } from "./apiErrorMapper";
 
 /**
  * ZIP 归档任务的进度信息。

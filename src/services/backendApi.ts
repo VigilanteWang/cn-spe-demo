@@ -15,7 +15,7 @@
 import { FrontendApiError } from "../common/errors.ts";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
-import { readApiErrorResponseSummary } from "./apiErrorResponse";
+import { readApiErrorResponseSummary } from "./apiErrorMapper";
 
 /**
  * 后端 API 请求失败时抛出的稳定错误类型。
@@ -60,17 +60,24 @@ export interface IDeleteItemsResult {
 
 /**
  * 根据响应构造容器 API 请求错误。
+ *
+ * @param code 后端错误无法解析时使用的兜底错误码。
+ * @param operation 调用场景名称，用于生成兜底错误文案。
+ * @param response 后端返回的失败响应。
+ * @returns 统一的后端请求错误实例。
  */
 const buildBackendRequestError = async (
   code: string,
   operation: string,
   response: Response,
 ): Promise<BackendRequestError> => {
+  // 先尝试读取后端标准化错误体，尽量保留服务端返回的上下文信息。
   const summary = await readApiErrorResponseSummary(response, {
     fallbackCode: code,
     operationLabel: operation,
   });
 
+  // 将摘要转换为前端稳定抛出的错误类型，便于上层统一处理。
   return new BackendRequestError(summary.code, summary.message, {
     statusCode: summary.statusCode,
     requestId: summary.requestId,

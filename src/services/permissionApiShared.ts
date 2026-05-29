@@ -1,7 +1,7 @@
 import { FrontendApiError } from "../common/errors.ts";
 import type { IPermissionEntryBaseForUI } from "../../common/contracts/permissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
-import { readApiErrorResponseSummary } from "./apiErrorResponse";
+import { readApiErrorResponseSummary } from "./apiErrorMapper";
 
 /**
  * 表示权限相关后端 API 失败时的统一前端错误类型。
