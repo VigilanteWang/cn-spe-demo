@@ -2,104 +2,104 @@
 
 ## Summary
 
-- `usePermissionDialogApiRequestState.ts` 里的 `missingTarget` 应收口为标准错误，而不是继续作为裸字符串消息存在。
-- `load / prepare / apply` 这三类请求失败文案应保留为 fallback message，用于兜底展示，而不是和标准错误语义混在同一个 `requestMessages` 对象里。
-- 当前 `src/` 前端 error management 还没有完全标准化。`permissions` 模块最接近目标态，但 `backendApi.ts`、`downloadApi.ts`、`containers`，以及一部分 `files` 主流程仍主要停留在“读 `message` / 打日志”的层级。
-- 新一轮排查后，可以把剩余问题拆成两类：
-  1. 已经直接影响用户可见 UI，但还没有先经过标准化错误语义的路径。
-  2. 还停留在 `console`、计数或静默失败层，尚未形成稳定 UI 错误消费闭环的路径。
-- 为避免范围失控，本次改为按“三步走”推进：
-  1. 先收口 `permissions` 全链路，并补齐 `backend/download` 的共享错误归一化和直接消费者。
-  2. 再处理仍然直接影响用户可见 UI 的剩余错误路径。
-  3. 最后处理 `files` 里仍停留在日志、计数或静默失败层的主流程错误路径。
+- Step 1 已完成，当前代码里已经落地了 `permissions` 模板化收口、`src/services/apiErrorMapper.ts`、`backendApi.ts`、`downloadApi.ts`，以及它们的直接消费者改造。
+- 在 Step 2 开始前，Preview 模块又先完成了目录化重组；`src/components/preview.tsx` 已删除，当前公开入口是 `src/components/preview/index.tsx`。
+- 因此，这份计划不再把 Preview 的“结构重组”当作 Step 2 内容，而是只处理 Preview 模块剩余的 error standardization 缺口。
+- 结合最新代码，剩余工作现在更准确地分成两类：
+  1. 已经直接进入用户可见 UI，但仍以裸字符串或后端原始字符串数组收口的路径。
+  2. 还停留在 `console`、计数或静默失败层，尚未形成稳定 UI 错误消费闭环的主流程。
+- 为避免范围失控，后续继续按“三步走”推进，但当前状态应理解为：
+  1. Step 1：已完成。
+  2. Step 2：处理 Preview 模块和 archive download 中剩余的用户可见错误收口。
+  3. Step 3：处理 `files` 主流程里日志型、计数型和静默型未收口路径。
 
-## Key Changes
+## Current Status
 
-### 1. Step 1：先把 permissions 链路做成模板
+### 1. Step 1：已完成的模板层
 
-- 在 `src/components/permissions/hooks/usePermissionDialogApiRequestState.ts` 中拆分当前 `requestMessages`：
-  - `missingTarget` 改为标准错误对象，默认使用 `FrontendValidationError("missingTarget", "...")`。
-  - `loadErrorFallback`、`prepareErrorFallback`、`applyErrorFallback` 改为单独的 `requestFallbackErrorMessages`。
-- 保留 `formatPermissionRequestErrorMessage` 作为 permissions 侧统一展示格式化入口，但让 `missingTarget` 也通过标准错误路径进入，而不是直接写裸字符串。
-- 按命名统一要求，把消息链整体改成 `*ErrorMessages`：
-  - `buildPermissionStatusMessages` -> `buildPermissionErrorMessages`
-  - `permissionStatusMessages` -> `permissionErrorMessages`
-- 同步更新以下边界，保持命名一致：
-  - `usePermissionDialogApiRequestState.ts`
-  - `permissionDialogSharedUtils.ts`
-  - `ContainerPermissionDialog.tsx`
-  - `ItemPermissionDialog.tsx`
-  - `PermissionDialogFrame.tsx`
-  - 相关测试
-
-### 2. Step 1：补齐 backend/download 的共享错误归一化
-
-- 在 `src/services/` 新增共享 API error response helper，统一解析后端结构化错误体 `IApiErrorResponseBody`。
-- 共享 helper 至少保留以下稳定字段：
+- `permissions` 链路已经完成模板化收口：
+  - `missingTarget` 已改为标准错误语义。
+  - `load / prepare / apply` fallback message 已从标准错误语义里分离出来。
+  - `*StatusMessages` 已统一为 `*ErrorMessages`。
+- `src/services/apiErrorMapper.ts` 已存在，并已统一解析后端结构化错误体 `IApiErrorResponseBody`。
+- `src/services/backendApi.ts` 已改为复用共享 helper，并保留：
   - `code`
   - `statusCode`
   - `requestId`
   - `retryAfterSeconds`
   - `details`
-  - 以及 `{operation} failed: {status}` fallback
-- 重做 `src/services/backendApi.ts` 的失败收口：
-  - `BackendRequestError` 增加 `requestId` 和 `retryAfterSeconds`
-  - `listContainers` / `createContainer` / `deleteItems` 不再只返回基于状态码的轻量 message
-- 重做 `src/services/downloadApi.ts` 的失败收口：
-  - `startDownload`
-  - `getDownloadProgress`
-  - `getDownloadManifest`
-  - 统一复用共享 helper
-- `DownloadSaveTargetSelectionCancelledError` 保持不变，因为它代表的是用户主动取消，不应与 API 失败合并。
+- `src/services/downloadApi.ts` 已完成同类收口，`DownloadSaveTargetSelectionCancelledError` 仍保持“用户主动取消”语义，不与 API 失败合并。
+- 直接消费者里，以下路径已经接上标准化错误格式：
+  - `src/components/containers/index.tsx`
+  - `src/components/files/hooks/useFilesArchiveDownload.ts`
+- 当前代码里也已经有针对 Step 1 的 focused tests：
+  - `src/services/backendApi.test.ts`
+  - `src/services/downloadApi.test.ts`
+  - `src/components/files/hooks/useFilesArchiveDownload.test.tsx`
 
-### 3. Step 1：更新直接消费者
+### 2. Step 2：处理仍直接进入用户可见 UI 的剩余错误路径
 
-- `src/components/containers/index.tsx` 改为消费标准化后的错误对象，而不再只用 `readErrorMessage(...)`。
-- `src/components/files/hooks/useFilesArchiveDownload.ts` 改为基于标准化 archive error 生成失败文案，而不是直接拼 `error.message`。
-- 目标不是一次性重做整个 `files` 模块，而是先让已经依赖 `backendApi.ts` / `downloadApi.ts` 的主流程 UI 和共享错误模型对齐。
+- Preview 的结构重组已完成，不再是这一步的目标。
+- 当前 Step 2 最明确的目标，已经从旧的 `src/components/preview.tsx` 收敛为以下真实代码边界：
+  - `src/components/preview/hooks/usePreviewUrl.ts`
+  - `src/components/preview/models/previewTypes.ts`
+  - `src/components/preview/components/PreviewContent.tsx`
+  - `src/components/preview/index.tsx`（如需只做轻量透传调整）
+  - `src/components/files/hooks/useFilesArchiveDownload.ts`
+- 这一步要解决的不是 Preview 的目录结构，而是它内部仍存在的“错误先变成字符串，再直接渲染”的路径：
+  - `usePreviewUrl.ts` 当前仍用 `useState<string>("")` 持有 `error`
+  - 缺少 `driveId` / `fileId` 时仍直接写入裸文案
+  - 预览不可用、预览加载失败时仍直接写入裸文案
+  - `PreviewContent.tsx` 当前仍直接渲染 `Error: {error}`
+- archive download 这边，`startDownload` 失败、保存对话框失败、轮询 catch 分支已经部分接入标准错误格式，但仍有一个明显残留：
+  - `progress.status === "failed"` 时仍直接用 `progress.errors.join("; ")` 或 `"Archive job failed."` 生成最终 UI 文案
+- 对这一步的要求应更新为：
+  - Preview 内部错误先进入稳定错误语义，再在渲染边界统一格式化。
+  - Preview 目录结构保持现状，不再做第二轮重组。
+  - archive download 的后端失败进度分支也先进入标准错误语义，再格式化成 UI 文案。
+  - 继续把错误显示在原有展示面：
+    - Preview 错误留在预览弹窗内部。
+    - 下载相关错误留在现有 `FilesProgress` 区域。
 
-### 4. Step 2：处理仍直接进入用户可见 UI 的剩余错误路径
+### 3. Step 3：处理 files 主流程里日志型和静默型未收口路径
 
-- 当前最明确命中的“仅文字修改后直接到 UI、没有先标准化错误”的路径是：
-  - `src/components/preview.tsx`
-- 此外，`src/components/files/hooks/useFilesArchiveDownload.ts` 虽然已经部分接入统一格式化，但 `progress.status === "failed"` 时仍直接用 `progress.errors.join("; ")` 或 `"Archive job failed."` 生成 UI 文案，也应在这一步一起收口。
-- 对这一步的要求是：
-  - `Preview` 内部错误不再只存 `string`，而是先进入标准化错误语义，再在渲染边界统一格式化。
-  - 缺少 `driveId` / `fileId` 的场景默认归类为 `FrontendValidationError`。
-  - 预览不可用、预览加载失败默认归类为 `FrontendApiError`，不为了这一批改动额外引入新的错误 subclass。
-  - `useFilesArchiveDownload.ts` 里所有写入 `errorMessage` 的失败路径，都应先走标准化错误语义，再格式化成最终展示字符串。
-  - 下载相关错误继续显示在现有 `FilesProgress` 区域；`Preview` 相关错误继续显示在预览对话框内部，不新增展示位置。
-
-### 5. Step 3：处理 files 里日志型和静默型未收口路径
-
-- 这一步专门处理以下当前还没有形成稳定 UI 错误消费闭环的主流程：
+- 这一步仍然专门处理当前没有形成稳定 UI 错误消费闭环的主流程：
   - `src/components/files/hooks/useFilesData.tsx`
   - `src/components/files/hooks/useFilesUpload.ts`
   - `src/components/files/index.tsx`
-- 对这一步的要求是：
-  - 主页面上的错误集中显示在现有进度条区域。
-  - 所有弹出对话框内的错误，各自留在对话框内部显示。
-  - `containers` 页面按钮旁边的错误提示保持原位，不因为这一步改位置。
-  - `useFilesData.tsx` 的列表主加载失败，应从单纯 `console.error` 升级为页面可消费的标准化错误。
-  - `useFilesUpload.ts` 的上传主流程失败，应形成标准化错误语义，并进入页面级错误消费链路。
-  - `files/index.tsx` 里的建文件夹失败、删除失败、预览内删除失败，应根据对应交互入口分别显示在各自对话框中，而不是继续只打日志。
-- 允许继续保留 warning-only 的增强失败：
-  - `photo` enrichment
-  - `presence` enrichment
+- 结合最新代码，当前明确残留包括：
+  - `useFilesData.tsx`
+    - `loadItems` 主加载失败仍只 `console.error`
+    - `photo` / `presence` enrichment 失败仍是 warning-only，且这两条允许继续保留
+  - `useFilesUpload.ts`
+    - 创建中间文件夹失败会抛 `FilesUploadError`，但上传主流程最终仍主要表现为计数 + 日志
+    - 单文件上传失败仍未进入页面级稳定错误消费链路
+  - `files/index.tsx`
+    - 批量删除失败仍只 `console.error`
+    - 预览内删除失败仍只 `console.error`
+    - 创建文件夹失败当前没有稳定的对话框内错误展示
+- 这一步的目标保持不变：
+  - 页面主区域上的错误，集中显示在现有进度条区域。
+  - 所有弹出对话框内的错误，各自留在各自对话框内部显示。
+  - `containers` 页面按钮旁边的错误提示保持原位，不在这一步调整。
 
 ## Test Plan
 
-- Step 1 至少更新并运行：
-  - `src/components/permissions/utils/permissionDialogSharedUtils.test.ts`
-  - `src/components/permissions/hooks/usePermissionDialogApiRequestState.test.tsx`
-  - `src/components/containers/index.test.tsx`
-- 如果新增共享 API error helper，补一个对应的 targeted test file。
-- Step 1 完成后运行：
-  - `npm run lint`
-- Step 2 至少补跑：
-  - `preview` 相关测试
+- Step 1 当前代码里已经有以下 focused tests，可作为回归入口：
+  - `src/services/backendApi.test.ts`
+  - `src/services/downloadApi.test.ts`
   - `src/components/files/hooks/useFilesArchiveDownload.test.tsx`
-- 如果 Step 2 改到了展示组件，再补对应 `FilesProgress` 相关测试。
+- 如果要在继续做 Step 2 前回归确认 Step 1，至少运行：
+  - 上述 focused tests
+  - `npm run lint`
+- Step 2 至少补齐或扩展：
+  - `src/components/preview/hooks/usePreviewUrl.test.tsx`
+  - `src/components/preview/components/PreviewContent.test.tsx`，或等价的 `src/components/preview/index.tsx` focused test
+  - `src/components/files/hooks/useFilesArchiveDownload.test.tsx`
+- Step 2 仍可继续保留并复用当前 Preview 重构期已有的回归测试，但要明确它们主要覆盖结构与行为，不覆盖新的错误标准化语义：
+  - `src/components/preview/services/previewUrl.test.ts`
+  - `src/components/preview/hooks/usePreviewNavigation.test.tsx`
+  - `src/components/preview/components/PreviewDialogFrame.test.tsx`
 - Step 2 完成后运行：
   - `npm run lint`
 - Step 3 至少补跑：
@@ -111,78 +111,72 @@
 
 ## Step Prompts
 
-### Step 1 Prompt
+### Step 1 Prompt（已完成，保留作回归参考）
 
-目标：先把 permissions 链路和 backend/download 的直接消费者做成当前前端 error management 的标准模板，不扩大到 files 内部所有 Graph 路径。
-```text
-请在当前 `cn-spe-demo` 仓库实现前端 error standardization 的第一步，严格控制范围，不顺手扩大改动。
-目标：1. 把 `src/components/permissions/hooks/usePermissionDialogApiRequestState.ts` 中的 `missingTarget` 改成标准错误。2. 把 `load / prepare / apply` 三类 message 保留为 fallback error messages。3. 把 permissions 共享命名从 `*StatusMessages` 统一改为 `*ErrorMessages`。4. 补齐 `src/services/backendApi.ts` 和 `src/services/downloadApi.ts` 的结构化错误解析能力。5. 只更新这两个 service 的直接消费者：`src/components/containers/index.tsx` 和 `src/components/files/hooks/useFilesArchiveDownload.ts`。
-具体要求：
-- 先阅读：
-  - `src/common/errors.ts`
-  - `src/components/permissions/hooks/usePermissionDialogApiRequestState.ts`
-  - `src/components/permissions/utils/permissionDialogSharedUtils.ts`
-  - `src/services/permissionApiShared.ts`
-  - `src/services/backendApi.ts`
-  - `src/services/downloadApi.ts`
-  - `temp/frontend-error-handling-findings-2026-05-29.md`
-- `missingTarget` 默认建模为 `FrontendValidationError("missingTarget", "...")`，不要新建多余 subclass。
-- `buildPermissionStatusMessages` 改名为 `buildPermissionErrorMessages`。
-- `permissionStatusMessages` 改名为 `permissionErrorMessages`，并同步更新：
-  - `ContainerPermissionDialog.tsx`
-  - `ItemPermissionDialog.tsx`
-  - `PermissionDialogFrame.tsx`
-  - 相关测试
-- 新增一个共享 API error response helper，统一解析 `common/contracts/apiErrorContracts.ts` 的结构化错误体。
-- `backendApi.ts` 和 `downloadApi.ts` 的失败分支都复用这个 helper，不再只拼 `${operation} failed: ${response.status}`。
-- `DownloadSaveTargetSelectionCancelledError` 保持现状，不要改语义。
-- `containers/index.tsx` 与 `useFilesArchiveDownload.ts` 改为消费标准化后的错误，而不是直接读 `error.message`。
-- 所有新增注释和 JSDoc 用简体中文。
-- 保持最小改动，不重做 files 模块其余流程。
-验证要求：
-- 更新并运行相关 targeted tests。
-- 运行 `npm run lint`。
-最后输出：
-- 改了哪些错误边界
-- 哪些地方已经标准化
-- 哪些 files 路径明确留到 Step 2
-- 测试与 lint 结果
-```
+状态：这一步已经在当前代码里完成，不再作为下一批改动目标。
+
+如需回看范围或做回归确认，优先检查：
+
+- `src/components/permissions/hooks/usePermissionDialogApiRequestState.ts`
+- `src/components/permissions/utils/permissionDialogSharedUtils.ts`
+- `src/services/apiErrorMapper.ts`
+- `src/services/backendApi.ts`
+- `src/services/downloadApi.ts`
+- `src/components/containers/index.tsx`
+- `src/components/files/hooks/useFilesArchiveDownload.ts`
+- `src/services/backendApi.test.ts`
+- `src/services/downloadApi.test.ts`
+- `src/components/files/hooks/useFilesArchiveDownload.test.tsx`
+
+回归验证要求：
+
+- 运行相关 focused tests
+- 运行 `npm run lint`
 
 ### Step 2 Prompt
 
-目标：在 Step 1 已完成的前提下，继续收口仍然直接进入用户可见 UI、但还没有先经过标准化错误语义的路径，不重做整体架构。
+目标：在 Step 1 已完成、且 Preview 目录重组已完成的前提下，继续收口仍然直接进入用户可见 UI、但还没有先经过标准化错误语义的路径，不重做整体架构。
+
 ```text
-请在当前 `cn-spe-demo` 仓库实现前端 error standardization 的第二步，前提是假设 Step 1 已完成。
-目标：1. 继续收口仍然直接进入用户可见 UI、但还没有先经过标准化错误语义的路径。2. 让用户可见错误尽量基于共享错误 helper 和稳定语义，而不是继续散落在组件里各自拼接字符串。3. 不重做全局状态，不引入新的错误架构层，不顺手扩大到无关模块。
+请在当前 `cn-spe-demo` 仓库实现前端 error standardization 的第二步，前提是假设 Step 1 已完成，且 Preview 模块的目录重组已经完成。
+目标：1. 让 Preview 模块内部错误不再直接以裸字符串状态进入 UI。2. 继续收口 archive download 中仍然直接把后端字符串数组拼成 UI 文案的失败路径。3. 保持 Preview 当前目录结构，不重做模块拆分，不顺手扩大到无关模块。
 
 重点检查并处理：
-- `src/components/preview.tsx`
+- `src/components/preview/hooks/usePreviewUrl.ts`
+- `src/components/preview/models/previewTypes.ts`
+- `src/components/preview/components/PreviewContent.tsx`
+- `src/components/preview/index.tsx`（仅在需要透传新错误状态时调整）
 - `src/components/files/hooks/useFilesArchiveDownload.ts`
 
 具体要求：
 - 先阅读：
   - `src/common/errors.ts`
-  - Step 1 引入或更新的共享 API error helper
+  - `src/services/apiErrorMapper.ts`
   - `temp/frontend-error-handling-findings-2026-05-29.md`
-- `Preview` 组件内部错误不要再只用 `string` 状态直接渲染到 UI；要先进入标准化错误语义，再在渲染边界统一格式化。
+  - `temp/preview-module-refactor-change-report-2026-05-30.md`
+- `usePreviewUrl.ts` 内部错误不要再只用 `string` 状态直接渲染到 UI；要先进入标准化错误语义，再在渲染边界统一格式化。
+- `IPreviewContentState` 应同步表达新的错误状态，不要继续把 Preview 错误建模成裸字符串。
 - 缺少 `driveId` / `fileId` 的场景默认使用 `FrontendValidationError("missingPreviewTarget", "...")` 或等价稳定 code；不新建无必要 subclass。
-- 预览不可用、预览加载失败默认归为 `FrontendApiError` 或现有稳定错误模型，不为这一步引入新的错误架构层。
-- `useFilesArchiveDownload.ts` 中所有写入 `errorMessage` 的失败路径都要先走标准化错误语义，再生成最终文案；尤其不要继续直接用 `progress.errors.join("; ")` 作为唯一错误收口。
-- `Preview` 错误继续显示在预览对话框内部；下载相关错误继续显示在现有 `FilesProgress` 区域，不新增新的错误展示面。
-- 不要顺手重做整个 files 架构，也不要扩大到 `useFilesData.tsx`、`useFilesUpload.ts`、`files/index.tsx` 这类日志型或静默型路径。
+- 预览 API 失败但 `webUrl` 可用时，继续保持当前 fallback 行为，不要把这条路径升级成阻断式错误 UI。
+- 预览不可用、预览加载失败时，默认归为 `FrontendApiError` 或现有稳定错误模型，不为这一步引入新的错误架构层。
+- `PreviewContent.tsx` 负责最终展示格式化后的错误文案；错误继续显示在预览弹窗内部，不新增展示位置。
+- `useFilesArchiveDownload.ts` 中 `progress.status === "failed"` 的路径，不要继续直接用 `progress.errors.join("; ")` 作为唯一错误收口；要先走标准化错误语义，再生成最终文案。
+- `DownloadSaveTargetSelectionCancelledError` 保持现状，不改语义。
+- 下载相关错误继续显示在现有 `FilesProgress` 区域。
+- 不要顺手扩大到 `useFilesData.tsx`、`useFilesUpload.ts`、`files/index.tsx` 这类日志型或静默型路径。
 - 保持中文注释和 JSDoc 风格一致。
 
 验证要求：
 - 补齐最相关 targeted tests：
-  - `preview` 相关 tests
+  - `src/components/preview/hooks/usePreviewUrl.test.tsx`
+  - `src/components/preview/components/PreviewContent.test.tsx`，或等价 focused test
   - `src/components/files/hooks/useFilesArchiveDownload.test.tsx`
-- 如果改动触达 `FilesProgress`，补对应 tests。
 - 至少跑：
   - `npm run lint`
 
 最后输出：
-- 哪些用户可见错误路径已完成标准化
+- Preview 模块哪些用户可见错误路径已完成标准化
+- archive download 哪个残留分支已被收口
 - 哪些路径被明确留到 Step 3
 - 测试与 lint 结果
 ```
@@ -190,6 +184,7 @@
 ### Step 3 Prompt
 
 目标：在 Step 2 已完成的前提下，处理 `files` 里还停留在日志、计数或静默失败层的主流程错误路径，并明确它们各自的 UI 展示面。
+
 ```text
 请在当前 `cn-spe-demo` 仓库实现前端 error standardization 的第三步，前提是假设 Step 1 和 Step 2 已完成。
 目标：1. 处理 `files` 模块里还停留在 `console`、计数或静默失败层的主流程错误路径。2. 让这些错误进入稳定的前端错误语义与 UI 消费闭环。3. 不重做整个 files 架构，不引入新的全局错误状态层。
@@ -202,8 +197,9 @@
 具体要求：
 - 先阅读：
   - `src/common/errors.ts`
-  - Step 1 引入或更新的共享 API error helper
+  - `src/services/apiErrorMapper.ts`
   - `temp/frontend-error-handling-findings-2026-05-29.md`
+  - `temp/preview-module-refactor-change-report-2026-05-30.md`
 - 页面主区域上的错误，统一集中显示在现有进度条区域。
 - 所有弹出对话框内的错误，各自显示在自己的对话框内部。
 - `containers` 页面按钮旁边的错误保持原位，不在这一步调整。
@@ -235,12 +231,13 @@
 ## Assumptions
 
 - 本计划默认沿用仓库当前目录名 `docs/plannedChange`，不新建近似的 `docs/plannedchange` 目录。
-- `missingTarget` 被视为本地前置条件/校验错误，因此归类为 `FrontendValidationError`，不是 API error。
-- 这次命名调整只覆盖 permissions 的消息链，不顺手扩大到无关状态名，例如 `applyFeedbackStatus`。
-- `src/components/preview.tsx` 是当前已确认的“裸文案直接进入 UI”的明确命中路径，优先放进 Step 2。
+- Step 1 已在当前代码中完成，因此后续计划默认从 Step 2 开始推进。
+- Preview 模块的目录重组已经完成，当前公开入口是 `src/components/preview/index.tsx`；Step 2 不再处理 Preview 的结构整理，只处理其剩余错误路径。
+- `src/components/preview/hooks/usePreviewUrl.ts` 是当前已确认的 Preview 错误标准化主入口。
+- `src/components/files/hooks/useFilesArchiveDownload.ts` 当前已经部分完成标准化；`progress.status === "failed"` 这一支仍是 Step 2 的明确残留。
 - `src/components/files/hooks/useFilesData.tsx`、`src/components/files/hooks/useFilesUpload.ts`、`src/components/files/index.tsx` 当前主要属于“日志型/静默型未收口路径”，默认放进 Step 3。
 - `files` 错误展示面的默认分配是：
   - 主页面上的错误集中在现有进度条区域
   - 弹出对话框内的错误，各自留在自己的对话框内
 - `containers` 页面按钮旁边的错误保持原位。
-- Step 1 是当前优先实现目标；Step 2、Step 3 作为独立后续步骤，不默认并入同一批改动。
+- Step 2 和 Step 3 仍作为独立后续步骤，不默认并入同一批改动。
