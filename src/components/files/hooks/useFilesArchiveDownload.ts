@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
-import { formatStandardErrorMessageForUI } from "../../../common/errors.ts";
+import {
+  formatStandardErrorMessageForUI,
+  FrontendApiError,
+} from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
   DownloadSaveTargetSelectionCancelledError,
   getDownloadManifest,
   getDownloadProgress,
+  type IJobProgress,
   selectDownloadSaveTarget,
   startDownload,
 } from "../../../services/downloadApi";
@@ -28,6 +32,35 @@ interface IUseFilesArchiveDownloadOptions {
   /** 单文件直链下载函数。 */
   onDirectDownload: (downloadUrl: string) => void;
 }
+
+/**
+ * 将归档准备失败的后端进度，转换成前端可直接展示和追踪的统一错误对象。
+ *
+ * 这个函数会保留后端返回的原始错误列表，方便排查问题；
+ * 同时把错误文案收敛为稳定的 UI 消息，避免页面直接依赖后端原始结构。
+ *
+ * @param progress 后端返回的归档任务失败进度与错误信息。
+ * @returns 统一封装后的前端错误对象。
+ */
+const buildArchivePreparationError = (
+  progress: Pick<IDownloadProgress, "backendProgress">["backendProgress"] &
+    Pick<IJobProgress, "errors">,
+) => {
+  // 只保留真正有内容的错误消息，避免空字符串污染最终展示文案。
+  const rawErrors = progress.errors.filter((errorMessage) =>
+    errorMessage.trim(),
+  );
+  // 如果后端没有给出可读错误，就使用一个兜底文案，保证 UI 总能显示内容。
+  const message =
+    rawErrors.length > 0 ? rawErrors.join("; ") : "Archive job failed.";
+
+  // 把后端错误转换为统一的前端错误类型，并把原始错误放进 details 供后续排查。
+  return new FrontendApiError("archivePreparationFailed", message, {
+    details: {
+      errors: rawErrors,
+    },
+  });
+};
 
 /**
  * 管理 ZIP 归档下载逻辑。
@@ -285,15 +318,15 @@ export const useFilesArchiveDownload = ({
             // 后端准备出错，停止轮询并将错误信息展示给用户。
             clearInterval(downloadPollRef.current!);
             downloadPollRef.current = null;
+            const standardizedError = buildArchivePreparationError(progress);
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
                 backendProgress: progress,
-                // 如果后端返回了具体错误列表，将其拼接展示；否则显示通用提示。
-                errorMessage:
-                  progress.errors.length > 0
-                    ? progress.errors.join("; ")
-                    : "Archive job failed.",
+                errorMessage: formatStandardErrorMessageForUI(
+                  standardizedError,
+                  "Archive job failed.",
+                ),
               }),
             );
             downloadSessionAbortRef.current = null;

@@ -3,6 +3,11 @@ import { Providers } from "@microsoft/mgt-element";
 import type { IPreviewContentState } from "../models/previewTypes";
 import type { IDriveItemExtended } from "../../../common/types";
 import {
+  createMissingPreviewTargetError,
+  createPreviewLoadFailedError,
+  createPreviewUnavailableError,
+} from "../services/previewErrors";
+import {
   appendNoBannerParam,
   resolvePreviewFallbackUrl,
   resolvePreviewRequestTarget,
@@ -35,14 +40,14 @@ export const usePreviewUrl = ({
 }: IUsePreviewUrlOptions): IPreviewContentState => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<IPreviewContentState["error"]>(null);
 
   useEffect(() => {
     if (!isOpen || !currentFile) {
       // 窗口关闭或文件切换时，立即清理旧预览 URL 和错误状态，避免下次打开时残留。
       setPreviewUrl("");
       setIsLoading(false);
-      setError("");
+      setError(null);
       return;
     }
 
@@ -52,7 +57,7 @@ export const usePreviewUrl = ({
     const loadPreviewUrl = async () => {
       setPreviewUrl("");
       setIsLoading(true);
-      setError("");
+      setError(null);
 
       const requestTarget = resolvePreviewRequestTarget(
         currentFile,
@@ -61,7 +66,7 @@ export const usePreviewUrl = ({
       if (!requestTarget) {
         // 无法从文件对象解析出 driveId 和 fileId，说明数据不完整，无法继续调用预览 API。
         if (!isCancelled) {
-          setError("Unable to get drive or file information");
+          setError(createMissingPreviewTargetError());
           setIsLoading(false);
         }
         return;
@@ -92,7 +97,7 @@ export const usePreviewUrl = ({
             if (fallbackUrl) {
               setPreviewUrl(fallbackUrl);
             } else {
-              setError("Preview not available for this file");
+              setError(createPreviewUnavailableError());
             }
           }
         } catch (previewError) {
@@ -107,7 +112,7 @@ export const usePreviewUrl = ({
             if (fallbackUrl) {
               setPreviewUrl(fallbackUrl);
             } else {
-              setError("Preview not available for this file");
+              setError(createPreviewUnavailableError());
             }
           }
         }
@@ -115,7 +120,7 @@ export const usePreviewUrl = ({
         // Graph 客户端初始化或其他未预期的错误。
         console.error("Error loading preview:", loadError);
         if (!isCancelled) {
-          setError("Failed to load preview");
+          setError(createPreviewLoadFailedError());
         }
       } finally {
         // 清理加载态（除非此次加载已被后续变更取消）。

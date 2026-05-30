@@ -2,6 +2,7 @@
 import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { FrontendApiError } from "../../../common/errors.ts";
 import { PreviewDialogFrame } from "./PreviewDialogFrame";
 
 const renderFrame = (
@@ -21,7 +22,7 @@ const renderFrame = (
       previewState={{
         previewUrl: "",
         isLoading: false,
-        error: "",
+        error: null,
       }}
       navigationState={{
         hasPrevious: true,
@@ -56,7 +57,7 @@ describe("PreviewDialogFrame", () => {
       previewState: {
         previewUrl: "",
         isLoading: true,
-        error: "",
+        error: null,
       },
     });
 
@@ -68,13 +69,14 @@ describe("PreviewDialogFrame", () => {
       previewState: {
         previewUrl: "",
         isLoading: false,
-        error: "Failed to load preview",
+        error: new FrontendApiError(
+          "previewLoadFailed",
+          "Failed to load preview.",
+        ),
       },
     });
 
-    expect(
-      screen.getByText("Error: Failed to load preview"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load preview.")).toBeInTheDocument();
   });
 
   it("should render the preview iframe when a preview URL exists", () => {
@@ -82,7 +84,7 @@ describe("PreviewDialogFrame", () => {
       previewState: {
         previewUrl: "https://preview.contoso.com/report",
         isLoading: false,
-        error: "",
+        error: null,
       },
     });
 
@@ -109,9 +111,13 @@ describe("PreviewDialogFrame", () => {
       isOpenInNewTabDisabled: true,
     });
 
-    expect(screen.getByRole("button", { name: "Previous file" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Previous file" }),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next file" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Download file" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Download file" }),
+    ).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Open in new tab" }),
     ).toBeDisabled();

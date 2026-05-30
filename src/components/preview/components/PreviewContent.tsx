@@ -1,4 +1,5 @@
 import { Spinner } from "@fluentui/react-components";
+import { formatStandardErrorMessageForUI } from "../../../common/errors.ts";
 import { usePreviewStyles } from "./previewStyles";
 import type { IPreviewContentState } from "../models/previewTypes";
 
@@ -38,7 +39,9 @@ export const PreviewContent = ({
   if (error) {
     return (
       <div className={styles.loadingContainer}>
-        <div>Error: {error}</div>
+        <div>
+          {formatStandardErrorMessageForUI(error, "Failed to load preview.")}
+        </div>
       </div>
     );
   }

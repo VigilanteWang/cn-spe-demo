@@ -1,4 +1,5 @@
 import type { IDriveItemExtended } from "../../../common/types";
+import type { FrontendBusinessError } from "../../../common/errors.ts";
 
 /**
  * Preview 模块对页面层暴露的属性接口。
@@ -35,8 +36,8 @@ export interface IPreviewContentState {
   previewUrl: string;
   /** 是否正在请求预览地址。 */
   isLoading: boolean;
-  /** 当前预览加载阶段的错误信息。 */
-  error: string;
+  /** 当前预览加载阶段的标准化错误对象。 */
+  error: FrontendBusinessError | null;
 }
 
 /**
