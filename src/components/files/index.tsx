@@ -13,6 +13,8 @@ import {
   InputProps,
   Label,
   Spinner,
+  Text,
+  tokens,
 } from "@fluentui/react-components";
 import Preview from "../preview";
 import { IDriveItemExtended } from "../../common/types";
@@ -30,6 +32,14 @@ import { useFilesUpload } from "./hooks/useFilesUpload";
 import { useFilesArchiveDownload } from "./hooks/useFilesArchiveDownload";
 import { Providers } from "@microsoft/mgt-element";
 import { ItemPermissionDialog } from "../permissions";
+import {
+  formatStandardErrorMessageForUI,
+  type FrontendBusinessError,
+} from "../../common/errors.ts";
+import {
+  buildDeletePartialFailureError,
+  normalizeFilesOperationError,
+} from "./services/filesErrors";
 
 /**
  * 文件管理组件模块。
@@ -90,6 +100,12 @@ export const Files = ({
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [newFolderError, setNewFolderError] =
+    useState<FrontendBusinessError | null>(null);
+  const [deleteDialogError, setDeleteDialogError] =
+    useState<FrontendBusinessError | null>(null);
+  const [previewActionError, setPreviewActionError] =
+    useState<FrontendBusinessError | null>(null);
   const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
     useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =
@@ -101,6 +117,7 @@ export const Files = ({
     driveItems,
     selectedRows,
     currentFolderId,
+    loadError,
     loadItems,
     onSelectionChange,
     clearSelection,
@@ -121,7 +138,7 @@ export const Files = ({
   });
 
   const reloadCurrentFolder = useCallback(async () => {
-    await loadItems(folderId || "root");
+    return loadItems(folderId || "root");
   }, [folderId, loadItems]);
 
   const {
@@ -176,6 +193,7 @@ export const Files = ({
       return;
     }
 
+    setDeleteDialogError(null);
     setDeleteDialogOpen(true);
   }, [selectedRows.size]);
 
@@ -201,22 +219,31 @@ export const Files = ({
       const result = await deleteItems(container.id, selectedIds);
 
       if (result.failed.length > 0) {
-        console.warn(
-          "Some items failed to delete:",
-          result.failed.map((item) => `${item.id}: ${item.reason}`).join(", "),
+        const partialDeleteError = buildDeletePartialFailureError(
+          result.failed,
         );
+        console.warn("Some items failed to delete:", partialDeleteError);
+        setDeleteDialogError(partialDeleteError);
+        updateSelectedRows(new Set(result.failed.map((item) => item.id)));
+        await loadItems(folderIdSnapshot);
+        return;
       }
-    } catch (error: unknown) {
-      console.error(
-        "Delete failed:",
-        error instanceof Error ? error.message : String(error),
-      );
-    }
 
-    await loadItems(folderIdSnapshot);
-    setDeleteDialogOpen(false);
-    // 新引用来更新 State，确保组件重新 render。
-    updateSelectedRows(new Set());
+      await loadItems(folderIdSnapshot);
+      setDeleteDialogOpen(false);
+      setDeleteDialogError(null);
+      // 新引用来更新 State，确保组件重新 render。
+      updateSelectedRows(new Set());
+    } catch (error: unknown) {
+      const deleteError = normalizeFilesOperationError(error, {
+        code: "deleteItemsFailed",
+        fallbackMessage: "Failed to delete selected items.",
+        name: "FilesDeleteError",
+        details: { itemIds: selectedIds },
+      });
+      console.error("Delete failed:", deleteError);
+      setDeleteDialogError(deleteError);
+    }
   }, [container.id, folderId, loadItems, selectedRows, updateSelectedRows]);
 
   /**
@@ -225,6 +252,7 @@ export const Files = ({
    */
   const onFolderCreateClick = useCallback(async () => {
     setCreatingFolder(true);
+    setNewFolderError(null);
 
     try {
       const graphClient = Providers.globalProvider.graph.client;
@@ -239,6 +267,15 @@ export const Files = ({
       await loadItems(folderId);
       setFolderName("");
       setNewFolderDialogOpen(false);
+    } catch (error: unknown) {
+      const createFolderError = normalizeFilesOperationError(error, {
+        code: "createFolderFailed",
+        fallbackMessage: "Failed to create folder.",
+        name: "FilesCreateFolderError",
+        details: { folderId, folderName },
+      });
+      console.error("Create folder failed:", createFolderError);
+      setNewFolderError(createFolderError);
     } finally {
       setCreatingFolder(false);
     }
@@ -251,9 +288,12 @@ export const Files = ({
    */
   const onHandleFolderNameChange: InputProps["onChange"] = useCallback(
     (_event: ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
+      if (newFolderError) {
+        setNewFolderError(null);
+      }
       setFolderName(data.value);
     },
-    [],
+    [newFolderError],
   );
 
   /**
@@ -261,6 +301,7 @@ export const Files = ({
    * @param file 目标文件。
    */
   const handlePreviewNavigate = useCallback((file: IDriveItemExtended) => {
+    setPreviewActionError(null);
     setCurrentPreviewFile(file);
   }, []);
 
@@ -288,16 +329,30 @@ export const Files = ({
     const folderIdSnapshot = folderId || "root";
 
     try {
-      await deleteItems(container.id, [currentPreviewFile.id as string]);
-    } catch (error: unknown) {
-      console.error(
-        "Preview delete failed:",
-        error instanceof Error ? error.message : String(error),
-      );
-    }
+      const result = await deleteItems(container.id, [currentPreviewFile.id]);
 
-    await loadItems(folderIdSnapshot);
-    setPreviewOpen(false);
+      if (result.failed.length > 0) {
+        const previewDeleteError = buildDeletePartialFailureError(
+          result.failed,
+        );
+        console.warn("Preview delete failed:", previewDeleteError);
+        setPreviewActionError(previewDeleteError);
+        return;
+      }
+
+      await loadItems(folderIdSnapshot);
+      setPreviewActionError(null);
+      setPreviewOpen(false);
+    } catch (error: unknown) {
+      const previewDeleteError = normalizeFilesOperationError(error, {
+        code: "previewDeleteFailed",
+        fallbackMessage: "Failed to delete the current file.",
+        name: "FilesPreviewDeleteError",
+        details: { itemId: currentPreviewFile.id },
+      });
+      console.error("Preview delete failed:", previewDeleteError);
+      setPreviewActionError(previewDeleteError);
+    }
   }, [container.id, currentPreviewFile?.id, folderId, loadItems]);
 
   /**
@@ -305,6 +360,7 @@ export const Files = ({
    * @param file 目标文件。
    */
   const handlePreviewOpen = useCallback((file: IDriveItemExtended) => {
+    setPreviewActionError(null);
     setCurrentPreviewFile(file);
     setPreviewOpen(true);
   }, []);
@@ -392,7 +448,10 @@ export const Files = ({
           hasSelection={selectedRows.size > 0}
           isDownloadActive={downloadProgress.isActive}
           onBack={navigateToParentFolder}
-          onCreateFolder={() => setNewFolderDialogOpen(true)}
+          onCreateFolder={() => {
+            setNewFolderError(null);
+            setNewFolderDialogOpen(true);
+          }}
           onUploadFile={onUploadFileClick}
           onUploadFolder={onUploadFolderClick}
           onDownload={onToolbarDownloadClick}
@@ -407,6 +466,7 @@ export const Files = ({
       */}
       <FilesProgress
         uploadProgress={uploadProgress}
+        pageError={loadError}
         downloadProgress={downloadProgress}
         progressContainerClassName={styles.progressContainer}
         progressBarClassName={styles.progressBar}
@@ -452,12 +512,26 @@ export const Files = ({
                   labelPosition="after"
                 />
               )}
+              {newFolderError && (
+                <Text
+                  role="alert"
+                  style={{ color: tokens.colorPaletteRedForeground1 }}
+                >
+                  {formatStandardErrorMessageForUI(
+                    newFolderError,
+                    "Failed to create folder.",
+                  )}
+                </Text>
+              )}
             </DialogContent>
             <DialogActions>
               <DialogTrigger disableButtonEnhancement>
                 <Button
                   appearance="secondary"
-                  onClick={() => setNewFolderDialogOpen(false)}
+                  onClick={() => {
+                    setNewFolderDialogOpen(false);
+                    setNewFolderError(null);
+                  }}
                   disabled={creatingFolder}
                 >
                   Cancel
@@ -484,7 +558,10 @@ export const Files = ({
       <Dialog
         open={deleteDialogOpen}
         modalType="modal"
-        onOpenChange={() => setDeleteDialogOpen(false)}
+        onOpenChange={() => {
+          setDeleteDialogOpen(false);
+          setDeleteDialogError(null);
+        }}
       >
         <DialogSurface>
           <DialogBody>
@@ -501,12 +578,26 @@ export const Files = ({
                   : "this item"}
                 ?
               </p>
+              {deleteDialogError && (
+                <Text
+                  role="alert"
+                  style={{ color: tokens.colorPaletteRedForeground1 }}
+                >
+                  {formatStandardErrorMessageForUI(
+                    deleteDialogError,
+                    "Failed to delete selected items.",
+                  )}
+                </Text>
+              )}
             </DialogContent>
             <DialogActions>
               <DialogTrigger>
                 <Button
                   appearance="secondary"
-                  onClick={() => setDeleteDialogOpen(false)}
+                  onClick={() => {
+                    setDeleteDialogOpen(false);
+                    setDeleteDialogError(null);
+                  }}
                 >
                   Cancel
                 </Button>
@@ -559,13 +650,17 @@ export const Files = ({
       */}
       <Preview
         isOpen={previewOpen}
-        onDismiss={() => setPreviewOpen(false)}
+        onDismiss={() => {
+          setPreviewActionError(null);
+          setPreviewOpen(false);
+        }}
         currentFile={currentPreviewFile}
         allFiles={previewableFiles}
         onNavigate={handlePreviewNavigate}
         onDownload={handlePreviewDownload}
         onDelete={() => void handlePreviewDelete()}
         containerId={container.id}
+        actionError={previewActionError}
       />
     </div>
   );

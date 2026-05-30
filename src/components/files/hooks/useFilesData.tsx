@@ -13,6 +13,7 @@ import {
   fetchUserPhotoUrlMap,
   fetchUserPresenceMap,
 } from "../services/peopleEnrichment";
+import { normalizeFilesOperationError } from "../services/filesErrors";
 
 interface IUseFilesDataOptions {
   /** 当前容器 ID。 */
@@ -37,6 +38,10 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
   const loadRequestSequenceRef = useRef(0);
   // userId -> object URL 缓存，减少重复请求头像并降低 Graph 压力。
   const photoCacheRef = useRef(new Map<string, string>());
+  // 列表主加载失败会暴露给页面层，在进度区域统一展示。
+  const [loadError, setLoadError] = useState<ReturnType<
+    typeof normalizeFilesOperationError
+  > | null>(null);
 
   /**
    * 释放当前 hook 生命周期内缓存的头像 object URL。
@@ -65,19 +70,23 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
    * 4. 更新 driveItems 状态和当前 folderId
    */
   const loadItems = useCallback(
-    async (itemId = "root") => {
+    async (itemId = "root"): Promise<boolean> => {
+      // 每次新请求开始时先清掉旧错误，避免成功重试后还残留旧提示。
+      setLoadError(null);
+
+      // 复用 MGT Provider 中已登录态的 Graph client，避免重复初始化客户端。
+      const graphClient = Providers.globalProvider.graph.client;
+      // 为本次请求分配序号；仅允许最新一次请求落盘。
+      const requestSequence = ++loadRequestSequenceRef.current;
+
       try {
-        // 复用 MGT Provider 中已登录态的 Graph client，避免重复初始化客户端。
-        const graphClient = Providers.globalProvider.graph.client;
-        // 为本次请求分配序号；仅允许最新一次请求落盘。
-        const requestSequence = ++loadRequestSequenceRef.current;
         const graphResponse = await graphClient
           .api(`/drives/${containerId}/items/${itemId}/children`)
           .get();
 
         // 如果当前请求不是最新请求，直接丢弃结果，避免覆盖新目录状态。
         if (requestSequence !== loadRequestSequenceRef.current) {
-          return;
+          return false;
         }
 
         // 将 Graph 原始 DriveItem 扩展为 UI 直接可用的数据结构（图标、下载链接、展示名称等）。
@@ -183,10 +192,22 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
             );
           }
         })();
+        return true;
       } catch (error: unknown) {
-        console.error(
-          `Failed to load items: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        // 过期请求失败时不再覆盖较新的成功或错误状态。
+        if (requestSequence !== loadRequestSequenceRef.current) {
+          return false;
+        }
+
+        const loadItemsError = normalizeFilesOperationError(error, {
+          code: "loadItemsFailed",
+          fallbackMessage: "Failed to load items.",
+          name: "FilesLoadError",
+          details: { itemId },
+        });
+        console.error("Failed to load items:", loadItemsError);
+        setLoadError(loadItemsError);
+        return false;
       }
     },
     [containerId],
@@ -231,6 +252,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
     driveItems,
     selectedRows,
     currentFolderId,
+    loadError,
     loadItems,
     onSelectionChange,
     clearSelection,

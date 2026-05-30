@@ -12,6 +12,7 @@ import { usePreviewStyles } from "./previewStyles";
 import type {
   IPreviewContentState,
   IPreviewNavigationState,
+  IPreviewProps,
 } from "../models/previewTypes";
 
 /**
@@ -24,6 +25,8 @@ interface IPreviewDialogFrameProps {
   fileName: string;
   /** 预览内容的加载/错误/URL 状态。 */
   previewState: IPreviewContentState;
+  /** 预览内操作失败时的标准化错误。 */
+  actionError: IPreviewProps["actionError"];
   /** 上一页/下一页导航能力和回调。 */
   navigationState: Pick<
     IPreviewNavigationState,
@@ -60,6 +63,7 @@ export const PreviewDialogFrame = ({
   open,
   fileName,
   previewState,
+  actionError,
   navigationState,
   isDownloadDisabled,
   isOpenInNewTabDisabled,
@@ -96,7 +100,11 @@ export const PreviewDialogFrame = ({
 
           {/* 预览内容区域：根据加载态、错误态和 URL 展示对应的界面状态。 */}
           <div className={styles.previewContainer}>
-            <PreviewContent fileName={fileName} {...previewState} />
+            <PreviewContent
+              fileName={fileName}
+              actionError={actionError}
+              {...previewState}
+            />
           </div>
 
           {/* 底部操作栏：导航按钮、下载、新标签页打开、删除等功能。 */}

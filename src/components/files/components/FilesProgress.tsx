@@ -1,9 +1,15 @@
 import { Link, ProgressBar, Text, tokens } from "@fluentui/react-components";
+import {
+  formatStandardErrorMessageForUI,
+  type FrontendBusinessError,
+} from "../../../common/errors.ts";
 import { IDownloadProgress, IUploadProgress } from "../filesTypes";
 
 interface IFilesProgressProps {
   /** 上传进度。 */
   uploadProgress: IUploadProgress;
+  /** 页面主区域的标准化错误。 */
+  pageError: FrontendBusinessError | null;
   /** 下载进度。 */
   downloadProgress: IDownloadProgress;
   /** 进度条容器样式类名。 */
@@ -46,6 +52,7 @@ interface IFilesProgressProps {
  */
 export const FilesProgress = ({
   uploadProgress,
+  pageError,
   downloadProgress,
   progressContainerClassName,
   progressBarClassName,
@@ -64,7 +71,9 @@ export const FilesProgress = ({
 }: IFilesProgressProps) => {
   return (
     <>
-      {(uploadProgress.isUploading || uploadProgress.isCompleted) && (
+      {(uploadProgress.isUploading ||
+        uploadProgress.isCompleted ||
+        uploadProgress.error) && (
         <div className={progressContainerClassName}>
           <ProgressBar
             className={progressBarClassName}
@@ -91,14 +100,41 @@ export const FilesProgress = ({
                 : ""}
             </Text>
           ) : (
-            <Text className={progressCompletedClassName}>
-              Upload completed: {uploadProgress.successfulFiles}/
-              {uploadProgress.totalFiles} succeeded
-              {uploadProgress.failedFiles > 0
-                ? `, ${uploadProgress.failedFiles} failed`
-                : ""}
-            </Text>
+            <>
+              <Text className={progressCompletedClassName}>
+                Upload completed: {uploadProgress.successfulFiles}/
+                {uploadProgress.totalFiles} succeeded
+                {uploadProgress.failedFiles > 0
+                  ? `, ${uploadProgress.failedFiles} failed`
+                  : ""}
+              </Text>
+              {uploadProgress.error && (
+                <Text
+                  className={progressStatusTextClassName}
+                  style={{ color: tokens.colorPaletteRedForeground1 }}
+                >
+                  {formatStandardErrorMessageForUI(
+                    uploadProgress.error,
+                    "Upload failed.",
+                  )}
+                </Text>
+              )}
+            </>
           )}
+        </div>
+      )}
+
+      {pageError && (
+        <div className={progressContainerClassName}>
+          <Text
+            className={progressStatusTextClassName}
+            style={{ color: tokens.colorPaletteRedForeground1 }}
+          >
+            {formatStandardErrorMessageForUI(
+              pageError,
+              "Failed to load items.",
+            )}
+          </Text>
         </div>
       )}
 

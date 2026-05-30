@@ -42,6 +42,7 @@ export const Preview = ({
   onDownload,
   onDelete,
   containerId,
+  actionError = null,
 }: IPreviewProps) => {
   // 统一管理当前文件的预览地址、加载态和错误态。
   const previewState = usePreviewUrl({
@@ -103,6 +104,7 @@ export const Preview = ({
       open={isOpen}
       fileName={currentFile.name || ""}
       previewState={previewState}
+      actionError={actionError}
       navigationState={navigationState}
       // 下载依赖 Graph 返回的 downloadUrl，缺失时禁用按钮。
       isDownloadDisabled={!currentFile.downloadUrl}

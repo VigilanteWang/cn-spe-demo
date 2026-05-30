@@ -24,6 +24,7 @@ const renderFrame = (
         isLoading: false,
         error: null,
       }}
+      actionError={null}
       navigationState={{
         hasPrevious: true,
         hasNext: true,
@@ -97,6 +98,27 @@ describe("PreviewDialogFrame", () => {
     renderFrame();
 
     expect(screen.getByText("No preview available")).toBeInTheDocument();
+  });
+
+  it("should replace preview content with the action error message", () => {
+    renderFrame({
+      previewState: {
+        previewUrl: "https://preview.contoso.com/report",
+        isLoading: false,
+        error: null,
+      },
+      actionError: new FrontendApiError(
+        "previewDeleteFailed",
+        "Failed to delete the current file.",
+      ),
+    });
+
+    expect(
+      screen.getByText("Failed to delete the current file."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTitle("Preview of Quarterly Report.pdf"),
+    ).not.toBeInTheDocument();
   });
 
   it("should disable footer actions according to the provided state", () => {

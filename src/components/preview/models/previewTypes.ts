@@ -23,6 +23,8 @@ export interface IPreviewProps {
   onDelete: () => void;
   /** 当前容器 ID，可作为 driveId 的优先来源。 */
   containerId?: string;
+  /** 预览弹窗内操作失败时的标准化错误对象。 */
+  actionError?: FrontendBusinessError | null;
 }
 
 /**

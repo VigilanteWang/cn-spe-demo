@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { FrontendApiError, readErrorMessage } from "../../../common/errors.ts";
+import {
+  FrontendApiError,
+  FrontendBusinessError,
+  readErrorMessage,
+} from "../../../common/errors.ts";
 import {
   IFileWithRelativePath,
   IFilesUploadItem,
@@ -9,15 +13,16 @@ import {
   IUploadProgress,
 } from "../filesTypes";
 import { formatFileSize } from "../filesUtils";
+import { buildUploadFailureSummaryError } from "../services/filesErrors";
 
 /**
  * 文件上传链路里的稳定 Graph/服务错误。
  */
 class FilesUploadError extends FrontendApiError {
-  constructor(code: string, message: string, folderName: string) {
+  constructor(code: string, message: string, details: Record<string, unknown>) {
     super(code, message, {
       name: "FilesUploadError",
-      details: { folderName },
+      details,
     });
   }
 }
@@ -28,7 +33,7 @@ interface IUseFilesUploadOptions {
   /** 当前目录 ID。 */
   currentFolderId: string;
   /** 上传完成后刷新当前目录。 */
-  reloadCurrentFolder: () => Promise<void>;
+  reloadCurrentFolder: () => Promise<boolean>;
 }
 
 const initialUploadProgress: IUploadProgress = {
@@ -40,6 +45,7 @@ const initialUploadProgress: IUploadProgress = {
   totalFiles: 0,
   fileSize: "",
   isCompleted: false,
+  error: null,
 };
 
 /**
@@ -56,6 +62,31 @@ export const useFilesUpload = ({
   const uploadFolderRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState<IUploadProgress>(
     initialUploadProgress,
+  );
+
+  /**
+   * 将一次上传链路中的未知失败，转换成稳定的上传错误对象。
+   *
+   * @param error 原始失败对象。
+   * @param relativePath 失败文件或目录的相对路径。
+   * @returns 标准化后的上传错误。
+   */
+  const normalizeUploadError = useCallback(
+    (error: unknown, relativePath: string): FrontendBusinessError => {
+      if (error instanceof FrontendBusinessError) {
+        return error;
+      }
+
+      return new FilesUploadError(
+        "uploadFileFailed",
+        `Failed to upload file ${relativePath}: ${readErrorMessage(
+          error,
+          "Unknown upload error.",
+        )}`,
+        { relativePath },
+      );
+    },
+    [],
   );
 
   /* 示例：
@@ -136,12 +167,13 @@ export const useFilesUpload = ({
         return newFolder.id as string;
       } catch (error: unknown) {
         const message = readErrorMessage(error, "Unknown upload error.");
-        console.error(`Failed to create folder ${folderName}: ${message}`);
-        throw new FilesUploadError(
+        const createFolderError = new FilesUploadError(
           "createFolderFailed",
           `Failed to create folder ${folderName}: ${message}`,
-          folderName,
+          { folderName },
         );
+        console.error("Failed to create folder:", createFolderError);
+        throw createFolderError;
       }
     },
     [containerId],
@@ -163,6 +195,10 @@ export const useFilesUpload = ({
       const fileStructure = getFolderStructure(files);
       const totalFiles = fileStructure.length;
       const folderIdSnapshot = currentFolderId || "root";
+      const failedUploads: Array<{
+        relativePath: string;
+        error: FrontendBusinessError;
+      }> = [];
 
       setUploadProgress({
         ...initialUploadProgress,
@@ -212,32 +248,36 @@ export const useFilesUpload = ({
             successfulFiles: previousState.successfulFiles + 1,
           }));
         } catch (error: unknown) {
+          const uploadError = normalizeUploadError(error, relativePath);
+          failedUploads.push({ relativePath, error: uploadError });
+
           setUploadProgress((previousState) => ({
             ...previousState,
             failedFiles: previousState.failedFiles + 1,
+            error: buildUploadFailureSummaryError(failedUploads),
           }));
-          console.error(
-            `Failed to upload file ${relativePath}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
+          console.error("Failed to upload file:", uploadError);
         }
       }
 
+      const uploadError = buildUploadFailureSummaryError(failedUploads);
       // 展示上传完成状态。
       setUploadProgress((previousState) => ({
         ...previousState,
         isUploading: false,
         isCompleted: true,
+        error: uploadError,
       }));
 
-      // 3 秒后隐藏完成提示。
-      setTimeout(() => {
-        setUploadProgress((previousState) => ({
-          ...previousState,
-          isCompleted: false,
-        }));
-      }, 3000);
+      // 仅在整批上传成功时自动隐藏完成态；有失败时保留状态条，方便用户查看错误。
+      if (!uploadError) {
+        setTimeout(() => {
+          setUploadProgress((previousState) => ({
+            ...previousState,
+            isCompleted: false,
+          }));
+        }, 3000);
+      }
 
       // 刷新文件列表。
       await reloadCurrentFolder();
@@ -247,6 +287,7 @@ export const useFilesUpload = ({
       createFolderIfNotExists,
       currentFolderId,
       getFolderStructure,
+      normalizeUploadError,
       reloadCurrentFolder,
     ],
   );
