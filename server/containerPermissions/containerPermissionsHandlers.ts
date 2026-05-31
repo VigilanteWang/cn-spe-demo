@@ -240,6 +240,9 @@ const sendContainerPermissionMappedGraphError = (
   error: unknown,
 ) => {
   const mappedError = mapContainerPermissionsGraphError(error);
+  if (mappedError.retryAfterSeconds !== undefined) {
+    res.header("Retry-After", String(mappedError.retryAfterSeconds));
+  }
   res.send(
     getContainerPermissionsApiErrorResponseStatus(mappedError),
     toContainerPermissionsApiErrorResponseBody(mappedError),

@@ -12,6 +12,12 @@
  * - POST /api/deleteItems      - 批量删除文件/文件夹
  */
 
+import type {
+  ErrorCategory,
+  ErrorSource,
+  IErrorDetail,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
 import { FrontendApiError } from "../common/errors.ts";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
@@ -24,27 +30,31 @@ import { readApiErrorResponseSummary } from "./apiErrorMapper";
  * 便于调用方通过 instanceof 和 code 区分不同失败场景。
  */
 export class BackendRequestError extends FrontendApiError {
-  readonly requestId?: string;
-
-  readonly retryAfterSeconds?: number;
-
   constructor(
     code: string,
     message: string,
     options: {
       statusCode: number;
+      category: ErrorCategory;
+      source: ErrorSource;
       requestId?: string;
       retryAfterSeconds?: number;
-      details?: Record<string, unknown>;
+      details?: IErrorDetail[];
+      context?: Record<string, unknown>;
+      originError?: IOriginErrorInfo;
     },
   ) {
     super(code, message, {
       name: "BackendRequestError",
+      category: options.category,
+      source: options.source,
       statusCode: options.statusCode,
+      requestId: options.requestId,
+      retryAfterSeconds: options.retryAfterSeconds,
       details: options.details,
+      context: options.context,
+      originError: options.originError,
     });
-    this.requestId = options.requestId;
-    this.retryAfterSeconds = options.retryAfterSeconds;
   }
 }
 
@@ -80,9 +90,13 @@ const buildBackendRequestError = async (
   // 将摘要转换为前端稳定抛出的错误类型，便于上层统一处理。
   return new BackendRequestError(summary.code, summary.message, {
     statusCode: summary.statusCode,
+    category: summary.category,
+    source: summary.source,
     requestId: summary.requestId,
     retryAfterSeconds: summary.retryAfterSeconds,
     details: summary.details,
+    context: summary.context,
+    originError: summary.originError,
   });
 };
 

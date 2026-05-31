@@ -24,17 +24,22 @@ describe("createContainer error handling", () => {
     });
 
     const req = { body: {} } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(createContainer)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(400, {
-      code: "invalidRequest",
-      message: "displayName is required.",
-      statusCode: 400,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "invalidRequest",
+        message: "displayName is required.",
+        statusCode: 400,
+        category: "validation",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 });

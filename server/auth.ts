@@ -43,7 +43,7 @@ import {
 import jwksClient from "jwks-rsa";
 import { Request } from "restify";
 // Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
-import type { IApiErrorResponseBody } from "../common/contracts/apiErrorContracts";
+import type { IErrorResponseBody } from "../common/contracts/errorContracts";
 import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
@@ -95,7 +95,7 @@ type AuthorizationSuccess = {
 type AuthorizationFailure = {
   ok: false;
   status: number;
-  body: IApiErrorResponseBody;
+  body: IErrorResponseBody;
 };
 
 /**
@@ -558,15 +558,16 @@ export const requireContainerManageRequest = async (
   }
 
   throw new BackendAuthError(
-    authorizationResult.body.code === "forbidden"
+    authorizationResult.body.error.code === "forbidden"
       ? "forbidden"
       : "unauthorized",
-    authorizationResult.body.message,
+    authorizationResult.body.error.message,
     {
       statusCode: authorizationResult.status,
-      details: authorizationResult.body.details,
-      requestId: authorizationResult.body.requestId,
-      retryAfterSeconds: authorizationResult.body.retryAfterSeconds,
+      details: authorizationResult.body.error.details,
+      context: authorizationResult.body.error.context,
+      requestId: authorizationResult.body.error.requestId,
+      originError: authorizationResult.body.error.originError,
     },
   );
 };
@@ -626,7 +627,7 @@ export const getGraphOBOToken = async (token: string): Promise<string> => {
       "Unable to generate Microsoft Graph OBO token.",
       {
         statusCode: 502,
-        details: { upstreamMessage: message },
+        context: { upstreamMessage: message },
         cause: error,
       },
     );

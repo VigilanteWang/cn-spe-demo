@@ -1,20 +1,23 @@
 import type { Request, Response } from "restify";
 import type {
-  ApiErrorCode,
-  IApiErrorResponseBody,
-} from "../../common/contracts/apiErrorContracts";
+  ErrorCode,
+  IErrorResponseBody,
+} from "../../common/contracts/errorContracts";
 import {
   BackendAuthError,
   BackendError,
   BackendInternalError,
+  readCategoryFromStatusCode,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
+  readErrorUpstream,
+  readSourceFromUnknownError,
 } from "./errors";
 
 // 这里维护“HTTP 状态码 -> 前端稳定错误码”的映射，
 // 让上游错误即使来源不同，也能在 API 层收口成统一语义。
-const statusToCodeMap: Record<number, ApiErrorCode> = {
+const statusToCodeMap: Record<number, ErrorCode> = {
   400: "invalidRequest",
   401: "unauthorized",
   403: "forbidden",
@@ -74,14 +77,19 @@ const readFallbackMessage = (
  */
 export const toApiErrorResponseBody = (
   error: BackendError,
-): IApiErrorResponseBody => ({
-  code: error.code,
-  message: error.message,
-  // 某些内部错误未显式指定状态码时，统一回退为 500。
-  statusCode: error.statusCode ?? 500,
-  details: error.details,
-  requestId: error.requestId,
-  retryAfterSeconds: error.retryAfterSeconds,
+): IErrorResponseBody => ({
+  error: {
+    code: error.code,
+    message: error.message,
+    // 某些内部错误未显式指定状态码时，统一回退为 500。
+    statusCode: error.statusCode ?? 500,
+    category: error.category,
+    source: error.source,
+    details: error.details,
+    context: error.context,
+    requestId: error.requestId,
+    originError: error.originError,
+  },
 });
 
 /**
@@ -101,6 +109,7 @@ export const normalizeError = (error: unknown): BackendError => {
   const statusCode = readErrorStatusCode(error);
   const requestId = readErrorRequestId(error);
   const retryAfterSeconds = readErrorRetryAfterSeconds(error);
+  const originError = readErrorUpstream(error);
 
   // 只有识别出已知状态码时，才按映射规则进一步归类成 auth / validation / graph / business。
   if (statusCode && statusToCodeMap[statusCode]) {
@@ -109,6 +118,8 @@ export const normalizeError = (error: unknown): BackendError => {
       error,
       statusToDefaultMessageMap[statusCode],
     );
+    const category = readCategoryFromStatusCode(statusCode);
+    const source = readSourceFromUnknownError(error, category);
 
     // 401 和 403 走专门的鉴权错误类型，便于上层明确区分“未认证”和“无权限”。
     if (normalizedCode === "unauthorized" || normalizedCode === "forbidden") {
@@ -117,6 +128,7 @@ export const normalizeError = (error: unknown): BackendError => {
         requestId,
         retryAfterSeconds,
         cause: error,
+        originError,
       });
     }
 
@@ -124,18 +136,14 @@ export const normalizeError = (error: unknown): BackendError => {
       name: "NormalizedBackendError",
       code: normalizedCode,
       // 这里按稳定错误码继续推导大类，避免每个调用点重复写同样的分类逻辑。
-      category:
-        normalizedCode === "invalidRequest"
-          ? "validation"
-          : normalizedCode === "throttled" ||
-              normalizedCode === "serviceUnavailable"
-            ? "graph"
-            : "business",
+      category,
+      source,
       message,
       statusCode,
       requestId,
       retryAfterSeconds,
       cause: error,
+      originError,
     });
   }
 
@@ -145,6 +153,8 @@ export const normalizeError = (error: unknown): BackendError => {
     cause: error,
     requestId,
     retryAfterSeconds,
+    source: error instanceof Error ? "node" : "unknown",
+    originError,
   });
 };
 
@@ -158,7 +168,12 @@ export const sendApiError = (res: Response, error: unknown): void => {
   // 先把任意异常收口成统一错误模型，再转成最终响应体。
   const normalizedError = normalizeError(error);
   const responseBody = toApiErrorResponseBody(normalizedError);
-  res.send(responseBody.statusCode, responseBody);
+
+  if (normalizedError.retryAfterSeconds !== undefined) {
+    res.header("Retry-After", String(normalizedError.retryAfterSeconds));
+  }
+
+  res.send(responseBody.error.statusCode, responseBody);
 };
 
 /**

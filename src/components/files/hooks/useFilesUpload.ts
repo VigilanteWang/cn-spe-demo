@@ -19,10 +19,10 @@ import { buildUploadFailureSummaryError } from "../services/filesErrors";
  * 文件上传链路里的稳定 Graph/服务错误。
  */
 class FilesUploadError extends FrontendApiError {
-  constructor(code: string, message: string, details: Record<string, unknown>) {
+  constructor(code: string, message: string, context: Record<string, unknown>) {
     super(code, message, {
       name: "FilesUploadError",
-      details,
+      context,
     });
   }
 }

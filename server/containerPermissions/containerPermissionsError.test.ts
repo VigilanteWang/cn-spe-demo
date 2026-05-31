@@ -17,16 +17,15 @@ describe("mapContainerPermissionsGraphError", () => {
     expect(mappedError.statusCode).toBe(429);
     expect(mappedError.retryAfterSeconds).toBe(12);
     expect(mappedError.requestId).toBe("req-429");
-    expect(mappedError.message).toContain("SDK retries were exhausted");
+    expect(mappedError.message).toBe("Retry attempts exhausted");
   });
 
-  it("should read request id and retry-after from innerError when headers are absent", () => {
+  it("should read request id and status from innerError when headers are absent", () => {
     const mappedError = mapContainerPermissionsGraphError({
-      statusCode: 503,
       error: {
         innerError: {
+          status: "503",
           requestId: "inner-503",
-          retryAfterSeconds: 7,
         },
       },
       message: "temporary outage",
@@ -34,7 +33,7 @@ describe("mapContainerPermissionsGraphError", () => {
 
     expect(mappedError.code).toBe("serviceUnavailable");
     expect(mappedError.requestId).toBe("inner-503");
-    expect(mappedError.retryAfterSeconds).toBe(7);
+    expect(mappedError.retryAfterSeconds).toBeUndefined();
   });
 
   it("should read header values from Headers-like get() objects", () => {

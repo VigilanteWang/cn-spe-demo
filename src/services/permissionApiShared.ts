@@ -1,3 +1,9 @@
+import type {
+  ErrorCategory,
+  ErrorSource,
+  IErrorDetail,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
 import { FrontendApiError } from "../common/errors.ts";
 import type { IPermissionEntryBaseForUI } from "../../common/contracts/permissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
@@ -10,10 +16,6 @@ import { readApiErrorResponseSummary } from "./apiErrorMapper";
  * 例如 `retryAfterSeconds` 和 `requestId`，方便上层 UI 统一展示与排障。
  */
 export class PermissionApiError extends FrontendApiError {
-  readonly retryAfterSeconds?: number;
-
-  readonly requestId?: string;
-
   /**
    * 创建一个带权限接口上下文的前端错误对象。
    *
@@ -25,17 +27,27 @@ export class PermissionApiError extends FrontendApiError {
     code: string,
     message: string,
     options?: {
+      category?: ErrorCategory;
+      source?: ErrorSource;
       retryAfterSeconds?: number;
       requestId?: string;
       statusCode?: number;
+      details?: IErrorDetail[];
+      context?: Record<string, unknown>;
+      originError?: IOriginErrorInfo;
     },
   ) {
     super(code, message, {
       name: "PermissionApiError",
+      category: options?.category,
+      source: options?.source,
       statusCode: options?.statusCode,
+      retryAfterSeconds: options?.retryAfterSeconds,
+      requestId: options?.requestId,
+      details: options?.details,
+      context: options?.context,
+      originError: options?.originError,
     });
-    this.retryAfterSeconds = options?.retryAfterSeconds;
-    this.requestId = options?.requestId;
   }
 }
 
@@ -86,8 +98,13 @@ export const buildPermissionApiError = async (
   });
 
   return new PermissionApiError(summary.code, summary.message, {
+    category: summary.category,
+    source: summary.source,
     retryAfterSeconds: summary.retryAfterSeconds,
     requestId: summary.requestId,
     statusCode: summary.statusCode,
+    details: summary.details,
+    context: summary.context,
+    originError: summary.originError,
   });
 };

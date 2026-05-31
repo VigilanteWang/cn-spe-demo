@@ -8,9 +8,7 @@ describe("PreviewContent", () => {
   it("should format standardized preview errors before rendering them", () => {
     const throttledError = Object.assign(
       new FrontendApiError("throttled", "Preview request throttled.", {
-        details: {
-          retryAfterSeconds: 12,
-        },
+        retryAfterSeconds: 12,
       }),
       {
         retryAfterSeconds: 12,

@@ -34,23 +34,29 @@ describe("downloadHandlers error handling", () => {
         name: "ArchiveJobNotFoundError",
         code: "notFound",
         category: "business",
+        source: "backend",
         message: "Job not found, expired, or access denied.",
         statusCode: 404,
       });
     });
 
     const req = { params: { jobId: "job-1" } } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadProgressRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(404, {
-      code: "notFound",
-      message: "Job not found, expired, or access denied.",
-      statusCode: 404,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "notFound",
+        message: "Job not found, expired, or access denied.",
+        statusCode: 404,
+        category: "business",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 
@@ -60,39 +66,50 @@ describe("downloadHandlers error handling", () => {
         name: "ArchiveManifestNotReadyError",
         code: "conflict",
         category: "business",
+        source: "backend",
         message: "Archive manifest not ready yet. Status: preparing",
         statusCode: 409,
       });
     });
 
     const req = { params: { jobId: "job-2" } } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadManifestRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(409, {
-      code: "conflict",
-      message: "Archive manifest not ready yet. Status: preparing",
-      statusCode: 409,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "conflict",
+        message: "Archive manifest not ready yet. Status: preparing",
+        statusCode: 409,
+        category: "business",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 
   it("should return invalidRequest when jobId route parameter is missing", async () => {
     const req = { params: {} } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadProgressRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(400, {
-      code: "invalidRequest",
-      message: "jobId route parameter is required.",
-      statusCode: 400,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "invalidRequest",
+        message: "jobId route parameter is required.",
+        statusCode: 400,
+        category: "validation",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 });

@@ -26,17 +26,22 @@ describe("deleteItems error handling", () => {
         itemIds: [],
       },
     } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(deleteItems)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(400, {
-      code: "invalidRequest",
-      message: "containerId and a non-empty itemIds array are required.",
-      statusCode: 400,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "invalidRequest",
+        message: "containerId and a non-empty itemIds array are required.",
+        statusCode: 400,
+        category: "validation",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 });

@@ -54,9 +54,9 @@ const buildArchivePreparationError = (
   const message =
     rawErrors.length > 0 ? rawErrors.join("; ") : "Archive job failed.";
 
-  // 把后端错误转换为统一的前端错误类型，并把原始错误放进 details 供后续排查。
+  // 把后端错误转换为统一的前端错误类型，并把原始错误放进 context 供后续排查。
   return new FrontendApiError("archivePreparationFailed", message, {
-    details: {
+    context: {
       errors: rawErrors,
     },
   });

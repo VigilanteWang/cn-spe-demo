@@ -35,7 +35,7 @@ export class ArchiveItemDownloadError extends FrontendApiError {
       {
         name: "ArchiveItemDownloadError",
         statusCode,
-        details: { relativePath },
+        context: { relativePath },
       },
     );
     this.relativePath = relativePath;

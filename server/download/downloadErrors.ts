@@ -50,6 +50,7 @@ export const createArchiveJobNotFoundError = (): BackendError =>
     name: "ArchiveJobNotFoundError",
     code: "notFound",
     category: "business",
+    source: "backend",
     message: "Job not found, expired, or access denied.",
     statusCode: 404,
   });
@@ -67,6 +68,7 @@ export const createArchiveManifestNotReadyError = (
     name: "ArchiveManifestNotReadyError",
     code: "conflict",
     category: "business",
+    source: "backend",
     message: `Archive manifest not ready yet. Status: ${status}`,
     statusCode: 409,
   });
@@ -81,6 +83,7 @@ export const createArchiveManifestNotFoundError = (): BackendError =>
     name: "ArchiveManifestNotFoundError",
     code: "notFound",
     category: "business",
+    source: "backend",
     message: "Archive manifest not found.",
     statusCode: 404,
   });
@@ -120,6 +123,7 @@ export const createArchiveEmptyError = (): BackendError =>
     name: "ArchiveEmptyError",
     code: "conflict",
     category: "business",
+    source: "backend",
     message: "No files found to archive.",
     statusCode: 409,
   });
@@ -139,9 +143,10 @@ export const createArchiveTooManyFilesError = (
     name: "ArchiveTooManyFilesError",
     code: "conflict",
     category: "business",
+    source: "backend",
     message: `Too many files (${totalFiles}). Maximum is ${maxFiles}.`,
     statusCode: 409,
-    details: { totalFiles, maxFiles },
+    context: { totalFiles, maxFiles },
   });
 
 /**
@@ -155,7 +160,8 @@ export const createArchiveTooLargeError = (maxBytes: number): BackendError =>
     name: "ArchiveTooLargeError",
     code: "conflict",
     category: "business",
+    source: "backend",
     message: `Archive would exceed the ${maxBytes / 1024 / 1024} MB size limit.`,
     statusCode: 409,
-    details: { maxBytes },
+    context: { maxBytes },
   });

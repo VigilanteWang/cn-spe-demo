@@ -239,7 +239,7 @@ export const Files = ({
         code: "deleteItemsFailed",
         fallbackMessage: "Failed to delete selected items.",
         name: "FilesDeleteError",
-        details: { itemIds: selectedIds },
+        context: { itemIds: selectedIds },
       });
       console.error("Delete failed:", deleteError);
       setDeleteDialogError(deleteError);
@@ -272,7 +272,7 @@ export const Files = ({
         code: "createFolderFailed",
         fallbackMessage: "Failed to create folder.",
         name: "FilesCreateFolderError",
-        details: { folderId, folderName },
+        context: { folderId, folderName },
       });
       console.error("Create folder failed:", createFolderError);
       setNewFolderError(createFolderError);
@@ -348,7 +348,7 @@ export const Files = ({
         code: "previewDeleteFailed",
         fallbackMessage: "Failed to delete the current file.",
         name: "FilesPreviewDeleteError",
-        details: { itemId: currentPreviewFile.id },
+        context: { itemId: currentPreviewFile.id },
       });
       console.error("Preview delete failed:", previewDeleteError);
       setPreviewActionError(previewDeleteError);

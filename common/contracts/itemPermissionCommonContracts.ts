@@ -1,8 +1,4 @@
-import type {
-  IPermissionApiErrorBody,
-  IPermissionEntryBaseForUI,
-  PermissionApiErrorCode,
-} from "./permissionCommonContracts";
+import type { IPermissionEntryBaseForUI } from "./permissionCommonContracts";
 
 /**
  * item dialog 当前只暴露两种可编辑角色。
@@ -77,10 +73,3 @@ export interface IItemPermissionChangeSetFromUI {
   update: IItemPermissionUpdateChange[];
   remove: IItemPermissionRemoveChange[];
 }
-
-export type ItemPermissionsApiErrorCode = PermissionApiErrorCode;
-
-/**
- * item 权限 API 的稳定错误响应体。
- */
-export interface IItemPermissionsApiErrorBody extends IPermissionApiErrorBody {}

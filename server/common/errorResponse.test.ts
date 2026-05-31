@@ -35,29 +35,36 @@ describe("toApiErrorResponseBody", () => {
       new BackendError({
         name: "SerializableError",
         code: "serviceUnavailable",
-        category: "upstream",
+        category: "graph",
+        source: "graph",
         message: "Temporarily unavailable.",
         statusCode: 503,
-        details: { operation: "listContainers" },
+        context: { operation: "listContainers" },
         requestId: "req-503",
         retryAfterSeconds: 9,
+        originError: { service: "microsoft-graph", status: 503 },
       }),
     );
 
     expect(responseBody).toEqual({
-      code: "serviceUnavailable",
-      message: "Temporarily unavailable.",
-      statusCode: 503,
-      details: { operation: "listContainers" },
-      requestId: "req-503",
-      retryAfterSeconds: 9,
+      error: {
+        code: "serviceUnavailable",
+        message: "Temporarily unavailable.",
+        statusCode: 503,
+        category: "graph",
+        source: "graph",
+        details: undefined,
+        context: { operation: "listContainers" },
+        requestId: "req-503",
+        originError: { service: "microsoft-graph", status: 503 },
+      },
     });
   });
 });
 
 describe("withErrorHandling", () => {
   it("should send a unified error response body", async () => {
-    const res = { send: vi.fn() };
+    const res = { send: vi.fn(), header: vi.fn() };
     const wrappedHandler = withErrorHandling(async () => {
       throw new BackendAuthError("unauthorized", "No access token provided.", {
         statusCode: 401,
@@ -67,12 +74,17 @@ describe("withErrorHandling", () => {
     await wrappedHandler({} as never, res as never);
 
     expect(res.send).toHaveBeenCalledWith(401, {
-      code: "unauthorized",
-      message: "No access token provided.",
-      statusCode: 401,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        code: "unauthorized",
+        message: "No access token provided.",
+        statusCode: 401,
+        category: "auth",
+        source: "backend",
+        details: undefined,
+        context: undefined,
+        requestId: undefined,
+        originError: undefined,
+      },
     });
   });
 });

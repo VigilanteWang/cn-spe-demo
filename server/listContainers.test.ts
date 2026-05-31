@@ -42,18 +42,26 @@ describe("listContainers error handling", () => {
     });
 
     const req = {} as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(listContainers)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(429, {
-      code: "throttled",
-      message:
-        "Microsoft Graph throttled the container list request after retries were exhausted.",
-      statusCode: 429,
-      details: undefined,
-      requestId: "req-429",
-      retryAfterSeconds: 12,
+      error: {
+        code: "throttled",
+        message: "Retry attempts exhausted",
+        statusCode: 429,
+        category: "graph",
+        source: "graph",
+        details: undefined,
+        context: undefined,
+        requestId: "req-429",
+        originError: {
+          service: "microsoft-graph",
+          status: 429,
+        },
+      },
     });
+    expect(res.header).toHaveBeenCalledWith("Retry-After", "12");
   });
 });

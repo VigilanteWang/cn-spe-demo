@@ -1,171 +1,212 @@
-/**
- * 约束前端统一使用的错误类别。
- *
- * 这些类别用于帮助 UI 按错误来源选择提示方式，
- * 避免上层组件直接依赖某个具体错误类名。
- */
-export type FrontendErrorCategory =
-  | "api"
-  | "validation"
-  | "config"
-  | "userAction";
+import type {
+  ErrorCategory,
+  ErrorSource,
+  IErrorDetail,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
+
+export type FrontendErrorCategory = ErrorCategory;
+export type FrontendErrorSource = ErrorSource;
 
 /**
- * 描述前端业务错误的通用可选元信息。
- *
- * 这里只保留跨模块都稳定可用的字段，
- * 避免上层代码依赖某个局部实现里的私有结构。
+ * 描述前端错误对象的通用可选元信息。
  */
-export interface IFrontendBusinessErrorOptions {
+export interface IFrontendErrorOptions {
   statusCode?: number;
-  details?: Record<string, unknown>;
+  details?: IErrorDetail[];
+  context?: Record<string, unknown>;
+  requestId?: string;
+  retryAfterSeconds?: number;
+  cause?: unknown;
+  originError?: IOriginErrorInfo;
+  category?: FrontendErrorCategory;
+  source?: FrontendErrorSource;
+}
+
+/**
+ * 定义创建前端错误实例时需要的完整参数。
+ */
+interface IFrontendErrorInit extends IFrontendErrorOptions {
+  name: string;
+  category: FrontendErrorCategory;
+  source: FrontendErrorSource;
+  code: string;
+  message: string;
 }
 
 /**
  * 描述可能附带标准化元信息的错误对象形状。
  *
  * 这个内部接口用于在格式化错误文案时安全读取附加字段，
- * 例如 `requestId`、`retryAfterSeconds` 和 `details`。
+ * 例如 `requestId` 和 `retryAfterSeconds`。
  */
 interface IStandardErrorWithMetadataShape {
   message: string;
   code?: unknown;
   requestId?: unknown;
   retryAfterSeconds?: unknown;
-  details?: unknown;
 }
 
 /**
- * 定义创建前端业务错误实例时需要的完整参数。
+ * 前端统一错误基类。
  *
- * 与对外暴露的可选参数相比，这里补齐了错误类别、错误码和名称，
- * 便于基类统一初始化。
+ * 所有前端可消费的稳定错误对象都应继承这个基类，
+ * 让 UI 可以基于 `code`、`category` 和 `source` 做分支处理。
  */
-interface IFrontendBusinessErrorInit extends IFrontendBusinessErrorOptions {
-  name: string;
-  category: FrontendErrorCategory;
-  code: string;
-  message: string;
-}
-
-/**
- * 前端业务错误基类。
- *
- * 各模块可以在这个基类之上派生稳定的错误类型，
- * 让 UI 优先基于 `code` 和 `category` 做分支处理，
- * 而不是去解析不稳定的错误文案。
- */
-export class FrontendBusinessError extends Error {
+export class FrontendErrorBase extends Error {
   readonly code: string;
 
   readonly category: FrontendErrorCategory;
 
+  readonly source: FrontendErrorSource;
+
   readonly statusCode?: number;
 
-  readonly details?: Record<string, unknown>;
+  readonly requestId?: string;
+
+  readonly retryAfterSeconds?: number;
+
+  readonly details?: IErrorDetail[];
+
+  readonly context?: Record<string, unknown>;
+
+  readonly cause?: unknown;
+
+  readonly originError?: IOriginErrorInfo;
 
   /**
-   * 使用统一结构初始化前端业务错误实例。
+   * 使用统一结构初始化前端错误实例。
    */
-  constructor(init: IFrontendBusinessErrorInit) {
+  constructor(init: IFrontendErrorInit) {
     super(init.message);
+    Object.setPrototypeOf(this, new.target.prototype);
     // 保留更具体的错误名称，方便日志和调试时快速识别来源。
     this.name = init.name;
     this.code = init.code;
     this.category = init.category;
+    this.source = init.source;
     this.statusCode = init.statusCode;
+    this.requestId = init.requestId;
+    this.retryAfterSeconds = init.retryAfterSeconds;
     this.details = init.details;
+    this.context = init.context;
+    this.cause = init.cause;
+    this.originError = init.originError;
   }
 }
 
 /**
- * 表示接口调用相关的前端业务错误。
+ * 表示接口调用相关的前端稳定错误。
  */
-export class FrontendApiError extends FrontendBusinessError {
+export class FrontendApiError extends FrontendErrorBase {
   /**
-   * 创建一个 API 类别的业务错误实例。
+   * 创建一个 API 风格的前端错误实例。
    */
   constructor(
     code: string,
     message: string,
-    options?: IFrontendBusinessErrorOptions & { name?: string },
+    options?: IFrontendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "FrontendApiError",
-      category: "api",
+      category: options?.category ?? "business",
+      source: options?.source ?? "frontend",
       code,
       message,
       statusCode: options?.statusCode,
+      requestId: options?.requestId,
+      retryAfterSeconds: options?.retryAfterSeconds,
       details: options?.details,
+      context: options?.context,
+      cause: options?.cause,
+      originError: options?.originError,
     });
   }
 }
 
 /**
- * 表示参数校验或输入校验相关的前端业务错误。
+ * 表示参数校验或输入校验相关的前端错误。
  */
-export class FrontendValidationError extends FrontendBusinessError {
+export class FrontendValidationError extends FrontendErrorBase {
   /**
-   * 创建一个 validation 类别的业务错误实例。
+   * 创建一个 validation 类别的前端错误实例。
    */
   constructor(
     code: string,
     message: string,
-    options?: IFrontendBusinessErrorOptions & { name?: string },
+    options?: IFrontendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "FrontendValidationError",
       category: "validation",
+      source: options?.source ?? "frontend",
       code,
       message,
       statusCode: options?.statusCode,
+      requestId: options?.requestId,
+      retryAfterSeconds: options?.retryAfterSeconds,
       details: options?.details,
+      context: options?.context,
+      cause: options?.cause,
+      originError: options?.originError,
     });
   }
 }
 
 /**
- * 表示配置缺失或配置异常相关的前端业务错误。
+ * 表示配置缺失或配置异常相关的前端错误。
  */
-export class FrontendConfigError extends FrontendBusinessError {
+export class FrontendConfigError extends FrontendErrorBase {
   /**
-   * 创建一个 config 类别的业务错误实例。
+   * 创建一个 config 类别的前端错误实例。
    */
   constructor(
     code: string,
     message: string,
-    options?: IFrontendBusinessErrorOptions & { name?: string },
+    options?: IFrontendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "FrontendConfigError",
       category: "config",
+      source: options?.source ?? "frontend",
       code,
       message,
       statusCode: options?.statusCode,
+      requestId: options?.requestId,
+      retryAfterSeconds: options?.retryAfterSeconds,
       details: options?.details,
+      context: options?.context,
+      cause: options?.cause,
+      originError: options?.originError,
     });
   }
 }
 
 /**
- * 表示用户主动取消、关闭或中断操作的前端业务错误。
+ * 表示用户主动取消、关闭或中断操作的前端错误。
  */
-export class FrontendUserActionError extends FrontendBusinessError {
+export class FrontendUserActionError extends FrontendErrorBase {
   /**
-   * 创建一个 userAction 类别的业务错误实例。
+   * 创建一个 userAction 类别的前端错误实例。
    */
   constructor(
     code: string,
     message: string,
-    options?: IFrontendBusinessErrorOptions & { name?: string },
+    options?: IFrontendErrorOptions & { name?: string },
   ) {
     super({
       name: options?.name ?? "FrontendUserActionError",
       category: "userAction",
+      source: options?.source ?? "frontend",
       code,
       message,
       statusCode: options?.statusCode,
+      requestId: options?.requestId,
+      retryAfterSeconds: options?.retryAfterSeconds,
       details: options?.details,
+      context: options?.context,
+      cause: options?.cause,
+      originError: options?.originError,
     });
   }
 }
@@ -183,6 +224,13 @@ export const readErrorMessage = (
   // 只有真正的 Error 且包含 message 时，才直接复用原始错误文案。
   if (error instanceof Error && error.message) {
     return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message) {
+      return record.message;
+    }
   }
 
   return fallbackMessage;
@@ -215,41 +263,34 @@ export const formatStandardErrorMessageForUI = (
   }
 
   const errorWithMetadata = error as Error & IStandardErrorWithMetadataShape;
-  // `details` 可能来自后端错误体，这里先收窄成可安全读取的对象。
-  const details =
-    typeof errorWithMetadata.details === "object" &&
-    errorWithMetadata.details !== null
-      ? (errorWithMetadata.details as Record<string, unknown>)
-      : null;
-  // 优先读取顶层 requestId；如果没有，再尝试从 details 里补拿。
+  // 统一只读取顶层 requestId，避免 formatter 自己再去猜测 details 的私有结构。
   const requestId =
     typeof errorWithMetadata.requestId === "string"
       ? errorWithMetadata.requestId
-      : typeof details?.requestId === "string"
-        ? details.requestId
-        : undefined;
-  // 限流重试秒数同样支持顶层字段和 details 两种来源。
+      : undefined;
+  // 统一只读取顶层 retryAfterSeconds，由 service 层负责从 header 注入。
   const retryAfterSeconds =
     typeof errorWithMetadata.retryAfterSeconds === "number"
       ? errorWithMetadata.retryAfterSeconds
-      : typeof details?.retryAfterSeconds === "number"
-        ? details.retryAfterSeconds
-        : undefined;
+      : undefined;
   // 只在 code 是字符串时才继续使用，避免把未知值带进展示文案。
   const code =
     typeof errorWithMetadata.code === "string"
       ? errorWithMetadata.code
       : undefined;
 
+  // 统一把补充信息按顺序拼到原始 message 后面，避免不同 UI 自己再重复组装。
+  const messageParts = [error.message];
+
   // 对限流错误追加重试时间，帮助用户理解何时可以再次发起请求。
   if (code === "throttled" && retryAfterSeconds) {
-    return `${error.message} Retry after ${retryAfterSeconds} seconds.`;
+    messageParts.push(`Retry after ${retryAfterSeconds} seconds.`);
   }
 
   // 如果有 requestId，就拼进文案，便于用户反馈问题时携带排查线索。
   if (requestId) {
-    return `${error.message} Request ID: ${requestId}.`;
+    messageParts.push(`Request ID: ${requestId}.`);
   }
 
-  return error.message;
+  return messageParts.join(" ");
 };

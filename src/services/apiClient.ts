@@ -44,6 +44,7 @@ export async function getApiAccessToken(): Promise<string> {
   if (provider.state !== ProviderState.SignedIn) {
     throw new FrontendApiError("unauthorized", "You are not signed in.", {
       name: "ApiClientError",
+      category: "auth",
       statusCode: 401,
     });
   }
@@ -62,8 +63,9 @@ export async function getApiAccessToken(): Promise<string> {
       "Failed to get access token.",
       {
         name: "ApiClientError",
+        category: "auth",
         statusCode: 401,
-        details: {
+        context: {
           cause:
             error instanceof Error
               ? {

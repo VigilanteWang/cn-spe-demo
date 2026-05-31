@@ -260,6 +260,9 @@ export const applyItemPermissionChangeSet = async (
 const sendItemPermissionMappedGraphError = (res: Response, error: unknown) => {
   /** 先把原始异常转成前端约定的稳定错误结构。 */
   const mappedError = mapItemPermissionsGraphError(error);
+  if (mappedError.retryAfterSeconds !== undefined) {
+    res.header("Retry-After", String(mappedError.retryAfterSeconds));
+  }
   res.send(
     getItemPermissionsApiErrorResponseStatus(mappedError),
     toItemPermissionsApiErrorResponseBody(mappedError),

@@ -22,7 +22,7 @@ export class ContainerPermissionValidationError extends FrontendValidationError 
   constructor(code: string, message: string, entryId: string) {
     super(code, message, {
       name: "ContainerPermissionValidationError",
-      details: { entryId },
+      context: { entryId },
     });
   }
 }

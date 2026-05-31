@@ -22,6 +22,12 @@ import {
   IShowSaveFilePickerWindow,
 } from "../common/types";
 import { readApiErrorResponseSummary } from "./apiErrorMapper";
+import type {
+  ErrorCategory,
+  ErrorSource,
+  IErrorDetail,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
 
 /**
  * ZIP 归档任务的进度信息。
@@ -64,27 +70,31 @@ export class DownloadSaveTargetSelectionCancelledError extends FrontendUserActio
  * 归档下载相关后端请求失败时抛出的稳定错误类型。
  */
 export class ArchiveRequestError extends FrontendApiError {
-  readonly requestId?: string;
-
-  readonly retryAfterSeconds?: number;
-
   constructor(
     code: string,
     message: string,
     options: {
       statusCode: number;
+      category: ErrorCategory;
+      source: ErrorSource;
       requestId?: string;
       retryAfterSeconds?: number;
-      details?: Record<string, unknown>;
+      details?: IErrorDetail[];
+      context?: Record<string, unknown>;
+      originError?: IOriginErrorInfo;
     },
   ) {
     super(code, message, {
       name: "ArchiveRequestError",
+      category: options.category,
+      source: options.source,
       statusCode: options.statusCode,
+      requestId: options.requestId,
+      retryAfterSeconds: options.retryAfterSeconds,
       details: options.details,
+      context: options.context,
+      originError: options.originError,
     });
-    this.requestId = options.requestId;
-    this.retryAfterSeconds = options.retryAfterSeconds;
   }
 }
 
@@ -108,9 +118,13 @@ const buildArchiveRequestError = async (
 
   return new ArchiveRequestError(summary.code, summary.message, {
     statusCode: summary.statusCode,
+    category: summary.category,
+    source: summary.source,
     requestId: summary.requestId,
     retryAfterSeconds: summary.retryAfterSeconds,
     details: summary.details,
+    context: summary.context,
+    originError: summary.originError,
   });
 };
 

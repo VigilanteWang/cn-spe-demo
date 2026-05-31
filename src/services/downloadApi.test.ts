@@ -13,16 +13,24 @@ describe("downloadApi", () => {
     sendAuthorizedRequestMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          code: "throttled",
-          message: "Archive preparation was throttled.",
-          statusCode: 429,
-          requestId: "req-download-429",
-          retryAfterSeconds: 9,
+          error: {
+            code: "throttled",
+            message: "Archive preparation was throttled.",
+            statusCode: 429,
+            category: "graph",
+            source: "graph",
+            requestId: "req-download-429",
+            originError: {
+              service: "microsoft-graph",
+              status: 429,
+            },
+          },
         }),
         {
           status: 429,
           headers: {
             "Content-Type": "application/json",
+            "Retry-After": "9",
           },
         },
       ),
@@ -37,6 +45,12 @@ describe("downloadApi", () => {
       statusCode: 429,
       requestId: "req-download-429",
       retryAfterSeconds: 9,
+      source: "graph",
+      category: "graph",
+      originError: {
+        service: "microsoft-graph",
+        status: 429,
+      },
     });
   });
 

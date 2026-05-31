@@ -1,4 +1,4 @@
-import type { ApiErrorCode, IApiErrorResponseBody } from "./apiErrorContracts";
+import type { ErrorCode, IErrorResponseBody } from "./errorContracts";
 
 /**
  * 权限弹窗共享的主体类型。
@@ -78,7 +78,7 @@ export interface IPermissionEntryBaseForUI {
 }
 
 export type PermissionApiErrorCode = Extract<
-  ApiErrorCode,
+  ErrorCode,
   | "invalidRequest"
   | "unauthorized"
   | "forbidden"
@@ -91,7 +91,5 @@ export type PermissionApiErrorCode = Extract<
 /**
  * 后端暴露给前端的稳定错误响应体。
  */
-export interface IPermissionApiErrorBody
-  extends Omit<IApiErrorResponseBody, "code"> {
-  code: PermissionApiErrorCode;
-}
+export type IPermissionApiErrorBody =
+  IErrorResponseBody<PermissionApiErrorCode>;

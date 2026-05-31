@@ -28,7 +28,7 @@ export class ItemPermissionValidationError extends FrontendValidationError {
   constructor(code: string, message: string, entryId: string) {
     super(code, message, {
       name: "ItemPermissionValidationError",
-      details: { entryId },
+      context: { entryId },
     });
   }
 }

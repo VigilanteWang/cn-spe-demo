@@ -7,10 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFilesUpload } from "./useFilesUpload";
 
 const createFileList = (files: File[]): FileList =>
-  ({
-    length: files.length,
+  Object.assign([...files], {
     item: (index: number) => files[index] ?? null,
-    ...files,
   }) as unknown as FileList;
 
 describe("useFilesUpload", () => {

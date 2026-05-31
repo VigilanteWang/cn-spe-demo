@@ -12,6 +12,7 @@ export class DirectoryPrincipalSearchError extends FrontendErrorBase {
     super({
       name: "DirectoryPrincipalSearchError",
       category: getDirectorySearchErrorCategory(code),
+      source: getDirectorySearchErrorSource(code),
       code,
       message,
       statusCode,
@@ -28,7 +29,18 @@ const getDirectorySearchErrorCategory = (code: string) => {
     return "validation" as const;
   }
 
-  return "api" as const;
+  return "graph" as const;
+};
+
+/**
+ * 为目录搜索错误推导稳定来源。
+ */
+const getDirectorySearchErrorSource = (code: string) => {
+  if (code === "emptyQuery" || code === "invalidSearchSyntax") {
+    return "frontend" as const;
+  }
+
+  return "graph" as const;
 };
 
 /**

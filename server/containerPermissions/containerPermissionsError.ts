@@ -1,29 +1,39 @@
 import type {
-  ContainerPermissionsApiErrorCode,
-  IContainerPermissionsApiErrorBody,
-} from "../../common/contracts/containerPermissionCommonContracts";
+  IPermissionApiErrorBody,
+  PermissionApiErrorCode,
+} from "../../common/contracts/permissionCommonContracts";
+import type {
+  IErrorDetail,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
 import { readGraphToRecord } from "./containerPermissionsReaders";
 import {
   BackendError,
+  BackendErrorSource,
   BackendValidationError,
+  readErrorDetails,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
+  readErrorUpstream,
 } from "../common/errors";
 
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。
  */
-export class ContainerPermissionsApiError extends BackendError<ContainerPermissionsApiErrorCode> {
+export class ContainerPermissionsApiError extends BackendError<PermissionApiErrorCode> {
   constructor(
-    code: ContainerPermissionsApiErrorCode,
+    code: PermissionApiErrorCode,
     message: string,
     options?: {
       retryAfterSeconds?: number;
       requestId?: string;
       statusCode?: number;
-      details?: Record<string, unknown>;
+      details?: IErrorDetail[];
+      context?: Record<string, unknown>;
       cause?: unknown;
+      source?: BackendErrorSource;
+      originError?: IOriginErrorInfo;
     },
   ) {
     super({
@@ -39,12 +49,21 @@ export class ContainerPermissionsApiError extends BackendError<ContainerPermissi
                 code === "graphFailure"
               ? "graph"
               : "business",
+      source:
+        options?.source ??
+        (code === "throttled" ||
+        code === "serviceUnavailable" ||
+        code === "graphFailure"
+          ? "graph"
+          : "backend"),
       message,
       statusCode: options?.statusCode,
       requestId: options?.requestId,
       retryAfterSeconds: options?.retryAfterSeconds,
       details: options?.details,
+      context: options?.context,
       cause: options?.cause,
+      originError: options?.originError,
     });
   }
 }
@@ -63,97 +82,75 @@ export const mapContainerPermissionsGraphError = (
     return new ContainerPermissionsApiError("invalidRequest", error.message, {
       statusCode: error.statusCode ?? 400,
       details: error.details,
+      context: error.context,
       cause: error.cause ?? error,
+      source: error.source,
+      originError: error.originError,
     });
   }
 
   const statusCode = readErrorStatusCode(error);
   const retryAfterSeconds = readErrorRetryAfterSeconds(error);
   const requestId = readErrorRequestId(error);
+  const details = readErrorDetails(error);
   const message = readGraphErrorMessage(error);
+  const originError = readErrorUpstream(error, "microsoft-graph");
 
   if (statusCode === 400) {
-    return new ContainerPermissionsApiError(
-      "invalidRequest",
-      `Container permission request is invalid: ${message}`,
-      {
-        statusCode,
-        requestId,
-        cause: error,
-      },
-    );
+    return new ContainerPermissionsApiError("invalidRequest", message, {
+      statusCode,
+      requestId,
+      cause: error,
+      source: "graph",
+      originError,
+    });
   }
 
   if (statusCode === 401) {
-    return new ContainerPermissionsApiError(
-      "unauthorized",
-      "Container permission authentication expired. Please sign in again.",
-      {
-        statusCode,
-        requestId,
-        cause: error,
-      },
-    );
+    return new ContainerPermissionsApiError("unauthorized", message, {
+      statusCode,
+      requestId,
+      cause: error,
+      source: "graph",
+      originError,
+    });
   }
 
   if (statusCode === 403) {
-    return new ContainerPermissionsApiError(
-      "forbidden",
-      "The current account does not have permission to manage this container.",
-      {
-        statusCode,
-        requestId,
-        cause: error,
-      },
-    );
+    return new ContainerPermissionsApiError("forbidden", message, {
+      statusCode,
+      requestId,
+      cause: error,
+      source: "graph",
+      originError,
+    });
   }
 
   if (statusCode === 404) {
-    return new ContainerPermissionsApiError(
-      "notFound",
-      "The target container or permission record was not found.",
-      {
-        statusCode,
-        requestId,
-        cause: error,
-      },
-    );
-  }
-
-  if (statusCode === 429) {
-    return new ContainerPermissionsApiError(
-      "throttled",
-      "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
-      {
-        statusCode,
-        retryAfterSeconds,
-        requestId,
-        cause: error,
-      },
-    );
-  }
-
-  if (statusCode === 503 || statusCode === 504) {
-    return new ContainerPermissionsApiError(
-      "serviceUnavailable",
-      `Container permission request still failed after SDK retries: ${message}`,
-      {
-        statusCode,
-        retryAfterSeconds,
-        requestId,
-        cause: error,
-      },
-    );
+    return new ContainerPermissionsApiError("notFound", message, {
+      statusCode,
+      requestId,
+      cause: error,
+      source: "graph",
+      originError,
+    });
   }
 
   return new ContainerPermissionsApiError(
-    "graphFailure",
-    `Microsoft Graph container permission request failed: ${message}`,
+    statusCode === 429
+      ? "throttled"
+      : statusCode === 503 || statusCode === 504
+        ? "serviceUnavailable"
+        : "graphFailure",
+    message,
     {
       statusCode,
       retryAfterSeconds,
       requestId,
+      details,
       cause: error,
+      source: "graph",
+      originError,
     },
   );
 };
@@ -163,14 +160,19 @@ export const mapContainerPermissionsGraphError = (
  */
 export const toContainerPermissionsApiErrorResponseBody = (
   error: ContainerPermissionsApiError,
-): IContainerPermissionsApiErrorBody => ({
-  code: error.code,
-  message: error.message,
-  retryAfterSeconds: error.retryAfterSeconds,
-  requestId: error.requestId,
-  statusCode:
-    error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
-  details: error.details,
+): IPermissionApiErrorBody => ({
+  error: {
+    code: error.code,
+    message: error.message,
+    requestId: error.requestId,
+    statusCode:
+      error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
+    category: error.category,
+    source: error.source,
+    details: error.details,
+    context: error.context,
+    originError: error.originError,
+  },
 });
 
 /**
@@ -202,16 +204,23 @@ export const getContainerPermissionsApiErrorResponseStatus = (
 };
 
 const readGraphErrorMessage = (error: unknown): string => {
-  if (error instanceof Error && error.message) {
-    return error.message;
+  const record = readGraphToRecord(error);
+  const body = readGraphToRecord(record.body);
+  const bodyError = readGraphToRecord(body.error);
+  const nestedError = readGraphToRecord(record.error);
+  const graphMessage =
+    typeof bodyError.message === "string" && bodyError.message
+      ? bodyError.message
+      : typeof nestedError.message === "string" && nestedError.message
+        ? nestedError.message
+        : undefined;
+
+  if (graphMessage) {
+    return graphMessage;
   }
 
-  const record = readGraphToRecord(error);
-  const nestedError = readGraphToRecord(record.error);
-  const nestedMessage = nestedError.message;
-
-  if (typeof nestedMessage === "string" && nestedMessage) {
-    return nestedMessage;
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
 
   const message = record.message;

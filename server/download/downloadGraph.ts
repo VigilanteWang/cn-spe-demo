@@ -80,7 +80,7 @@ export const resolveDownloadUrl = async (
       {
         name: "DownloadUrlNotFoundError",
         statusCode: response.status,
-        details: { driveId, itemId },
+        context: { driveId, itemId },
       },
     );
   } catch (error: unknown) {

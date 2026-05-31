@@ -1,4 +1,10 @@
-import type { IApiErrorResponseBody } from "../../common/contracts/apiErrorContracts";
+import type {
+  ErrorCategory,
+  ErrorSource,
+  IErrorDetail,
+  IErrorResponseBody,
+  IOriginErrorInfo,
+} from "../../common/contracts/errorContracts";
 
 /**
  * service 层归一化后的后端 API 错误信息。
@@ -10,8 +16,12 @@ export interface IApiErrorResponseSummary {
   code: string;
   message: string;
   statusCode: number;
-  details?: Record<string, unknown>;
+  category: ErrorCategory;
+  source: ErrorSource;
+  details?: IErrorDetail[];
+  context?: Record<string, unknown>;
   requestId?: string;
+  originError?: IOriginErrorInfo;
   retryAfterSeconds?: number;
 }
 
@@ -28,17 +38,45 @@ interface IReadApiErrorResponseOptions {
  */
 const isApiErrorResponseBody = (
   value: unknown,
-): value is IApiErrorResponseBody => {
+): value is IErrorResponseBody => {
+  if (typeof value !== "object" || value === null || !("error" in value)) {
+    return false;
+  }
+
+  const payload = value.error;
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    typeof value.code === "string" &&
-    "message" in value &&
-    typeof value.message === "string" &&
-    "statusCode" in value &&
-    typeof value.statusCode === "number"
+    typeof payload === "object" &&
+    payload !== null &&
+    "code" in payload &&
+    typeof payload.code === "string" &&
+    "message" in payload &&
+    typeof payload.message === "string" &&
+    "statusCode" in payload &&
+    typeof payload.statusCode === "number" &&
+    "category" in payload &&
+    typeof payload.category === "string" &&
+    "source" in payload &&
+    typeof payload.source === "string"
   );
+};
+
+/**
+ * 从失败响应头中读取 `Retry-After` 秒数。
+ *
+ * 统一只从 header 读取，避免在 body 中继续复制节流字段。
+ */
+const readRetryAfterSecondsFromHeaders = (
+  headers: Headers,
+): number | undefined => {
+  const retryAfter =
+    headers.get("Retry-After") ?? headers.get("retry-after") ?? undefined;
+
+  if (!retryAfter) {
+    return undefined;
+  }
+
+  const retryAfterSeconds = Number.parseInt(retryAfter, 10);
+  return Number.isNaN(retryAfterSeconds) ? undefined : retryAfterSeconds;
 };
 
 /**
@@ -52,7 +90,7 @@ const isApiErrorResponseBody = (
  */
 export const tryReadApiErrorResponse = async (
   response: Response,
-): Promise<IApiErrorResponseBody | null> => {
+): Promise<IErrorResponseBody | null> => {
   try {
     // 先按 JSON 解析，便于复用后端已经标准化的错误字段。
     const payload = (await response.json()) as unknown;
@@ -76,18 +114,22 @@ export const readApiErrorResponseSummary = async (
   options: IReadApiErrorResponseOptions,
 ): Promise<IApiErrorResponseSummary> => {
   const payload = await tryReadApiErrorResponse(response);
+  const error = payload?.error;
 
   return {
     // 优先使用后端返回的结构化字段，失败时再使用本地兜底值。
-    code: payload?.code ?? options.fallbackCode,
+    code: error?.code ?? options.fallbackCode,
     // 兜底文案保留操作名和状态码，便于排查请求失败原因。
     message:
-      payload?.message ??
-      `${options.operationLabel} failed: ${response.status}`,
+      error?.message ?? `${options.operationLabel} failed: ${response.status}`,
     // 状态码以后端返回值为准，解析不到时使用 HTTP 响应状态。
-    statusCode: payload?.statusCode ?? response.status,
-    details: payload?.details,
-    requestId: payload?.requestId,
-    retryAfterSeconds: payload?.retryAfterSeconds,
+    statusCode: error?.statusCode ?? response.status,
+    category: error?.category ?? "business",
+    source: error?.source ?? "backend",
+    details: error?.details,
+    context: error?.context,
+    requestId: error?.requestId,
+    originError: error?.originError,
+    retryAfterSeconds: readRetryAfterSecondsFromHeaders(response.headers),
   };
 };

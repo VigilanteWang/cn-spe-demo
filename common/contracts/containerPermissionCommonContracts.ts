@@ -1,9 +1,4 @@
-import type {
-  IPermissionApiErrorBody,
-  IPermissionEntryBaseForUI,
-  PermissionApiErrorCode,
-  PermissionTabValue,
-} from "./permissionCommonContracts";
+import type { IPermissionEntryBaseForUI } from "./permissionCommonContracts";
 
 /**
  * 容器权限模块在前后端之间共享的主体类型。
@@ -98,11 +93,3 @@ export interface IContainerPermissionChangeSetFromUI {
   update: IContainerPermissionUpdateChange[];
   remove: IContainerPermissionRemoveChange[];
 }
-
-export type ContainerPermissionsApiErrorCode = PermissionApiErrorCode;
-
-/**
- * 后端暴露给前端的稳定错误响应体。
- */
-export interface IContainerPermissionsApiErrorBody
-  extends IPermissionApiErrorBody {}

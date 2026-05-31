@@ -203,7 +203,7 @@ export const useFilesData = ({ containerId }: IUseFilesDataOptions) => {
           code: "loadItemsFailed",
           fallbackMessage: "Failed to load items.",
           name: "FilesLoadError",
-          details: { itemId },
+          context: { itemId },
         });
         console.error("Failed to load items:", loadItemsError);
         setLoadError(loadItemsError);

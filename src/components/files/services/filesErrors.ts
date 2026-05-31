@@ -14,8 +14,8 @@ interface INormalizeFilesOperationErrorOptions {
   fallbackMessage: string;
   /** 自定义错误名称，便于日志排查。 */
   name?: string;
-  /** 需要透传到 details 的附加上下文。 */
-  details?: Record<string, unknown>;
+  /** 需要透传到错误对象里的附加上下文。 */
+  context?: Record<string, unknown>;
 }
 
 /**
@@ -51,7 +51,7 @@ export const normalizeFilesOperationError = (
     readErrorMessage(error, options.fallbackMessage),
     {
       name: options.name ?? "FilesOperationError",
-      details: options.details,
+      context: options.context,
     },
   );
 };
@@ -83,7 +83,7 @@ export const buildUploadFailureSummaryError = (
     `${failedUploads.length} files failed to upload. Latest failure: ${latestFailure.error.message}`,
     {
       name: "FilesUploadError",
-      details: {
+      context: {
         failedUploads: failedUploads.map(
           ({ relativePath, error: uploadError }) => ({
             relativePath,
@@ -116,6 +116,6 @@ export const buildDeletePartialFailureError = (
 
   return new FrontendApiError("deleteItemsPartiallyFailed", message, {
     name: "FilesDeleteError",
-    details: { failedItems },
+    context: { failedItems },
   });
 };
