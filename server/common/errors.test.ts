@@ -19,6 +19,28 @@ describe("toBackendGraphError", () => {
     expect(mappedError.requestId).toBe("req-429");
   });
 
+  it("should preserve innerError message in originError when available", () => {
+    const mappedError = toBackendGraphError({
+      error: {
+        code: "serviceUnavailable",
+        innerError: {
+          code: "timeout",
+          message: "The upstream request timed out.",
+          status: 503,
+        },
+      },
+      message: "temporary outage",
+    });
+
+    expect(mappedError.originError).toEqual({
+      service: "microsoft-graph",
+      code: "serviceUnavailable",
+      innerErrorCode: "timeout",
+      innerErrorMessage: "The upstream request timed out.",
+      status: 503,
+    });
+  });
+
   it("should preserve the original Graph message when no richer payload is available", () => {
     const mappedError = toBackendGraphError(
       Object.assign(new Error("Retry attempts exhausted"), {

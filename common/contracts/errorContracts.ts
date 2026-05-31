@@ -56,6 +56,7 @@ export interface IOriginErrorInfo {
   service?: string;
   code?: string;
   innerErrorCode?: string;
+  innerErrorMessage?: string;
   status?: number;
 }
 

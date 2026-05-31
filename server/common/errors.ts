@@ -247,7 +247,9 @@ const readString = (value: unknown): string | undefined =>
 /**
  * 读取 Graph / Microsoft API Guidelines 风格的 `details` 子错误数组。
  */
-export const readErrorDetails = (error: unknown): IErrorDetail[] | undefined => {
+export const readErrorDetails = (
+  error: unknown,
+): IErrorDetail[] | undefined => {
   const record = readRecord(error);
   const body = readRecord(record.body);
   const bodyError = readRecord(body.error);
@@ -273,11 +275,21 @@ export const readErrorDetails = (error: unknown): IErrorDetail[] | undefined => 
           return undefined;
         }
 
-        return {
-          code: readString(detail.code),
+        const errorDetail: IErrorDetail = {
           message,
-          target: readString(detail.target),
-        } satisfies IErrorDetail;
+        };
+
+        const code = readString(detail.code);
+        if (code) {
+          errorDetail.code = code;
+        }
+
+        const target = readString(detail.target);
+        if (target) {
+          errorDetail.target = target;
+        }
+
+        return errorDetail;
       })
       .filter((item): item is IErrorDetail => item !== undefined);
 
@@ -396,8 +408,15 @@ export const readErrorUpstream = (
     readErrorStatusCode(error) ?? readNumberLike(innerError.status);
   const code = readString(graphError.code);
   const innerErrorCode = readString(innerError.code);
+  const innerErrorMessage = readString(innerError.message);
 
-  if (!service && !code && !innerErrorCode && status === undefined) {
+  if (
+    !service &&
+    !code &&
+    !innerErrorCode &&
+    !innerErrorMessage &&
+    status === undefined
+  ) {
     return undefined;
   }
 
@@ -405,6 +424,7 @@ export const readErrorUpstream = (
     service,
     code,
     innerErrorCode,
+    innerErrorMessage,
     status,
   };
 };
