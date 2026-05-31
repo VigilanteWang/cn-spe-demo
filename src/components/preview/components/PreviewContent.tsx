@@ -1,14 +1,14 @@
 import { Spinner } from "@fluentui/react-components";
 import {
   formatStandardErrorMessageForUI,
-  type FrontendBusinessError,
+  type FrontendErrorBase,
 } from "../../../common/errors.ts";
 import { usePreviewStyles } from "./previewStyles";
 import type { IPreviewContentState } from "../models/previewTypes";
 
 interface IPreviewContentProps extends IPreviewContentState {
   fileName: string;
-  actionError?: FrontendBusinessError | null;
+  actionError?: FrontendErrorBase | null;
 }
 
 /**

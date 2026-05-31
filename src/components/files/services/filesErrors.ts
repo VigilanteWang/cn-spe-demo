@@ -1,6 +1,6 @@
 import {
   FrontendApiError,
-  FrontendBusinessError,
+  FrontendErrorBase,
   readErrorMessage,
 } from "../../../common/errors.ts";
 
@@ -25,7 +25,7 @@ interface IUploadFailureEntry {
   /** 失败文件的相对路径。 */
   relativePath: string;
   /** 该文件对应的标准化错误对象。 */
-  error: FrontendBusinessError;
+  error: FrontendErrorBase;
 }
 
 /**
@@ -41,8 +41,8 @@ interface IUploadFailureEntry {
 export const normalizeFilesOperationError = (
   error: unknown,
   options: INormalizeFilesOperationErrorOptions,
-): FrontendBusinessError => {
-  if (error instanceof FrontendBusinessError) {
+): FrontendErrorBase => {
+  if (error instanceof FrontendErrorBase) {
     return error;
   }
 
@@ -67,7 +67,7 @@ export const normalizeFilesOperationError = (
  */
 export const buildUploadFailureSummaryError = (
   failedUploads: IUploadFailureEntry[],
-): FrontendBusinessError | null => {
+): FrontendErrorBase | null => {
   if (failedUploads.length === 0) {
     return null;
   }
@@ -104,7 +104,7 @@ export const buildUploadFailureSummaryError = (
  */
 export const buildDeletePartialFailureError = (
   failedItems: Array<{ id: string; reason: string }>,
-): FrontendBusinessError => {
+): FrontendErrorBase => {
   const readableReasons = failedItems
     .map((item) => item.reason.trim())
     .filter((reason) => reason.length > 0);

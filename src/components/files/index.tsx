@@ -34,7 +34,7 @@ import { Providers } from "@microsoft/mgt-element";
 import { ItemPermissionDialog } from "../permissions";
 import {
   formatStandardErrorMessageForUI,
-  type FrontendBusinessError,
+  type FrontendErrorBase,
 } from "../../common/errors.ts";
 import {
   buildDeletePartialFailureError,
@@ -101,11 +101,11 @@ export const Files = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [newFolderError, setNewFolderError] =
-    useState<FrontendBusinessError | null>(null);
+    useState<FrontendErrorBase | null>(null);
   const [deleteDialogError, setDeleteDialogError] =
-    useState<FrontendBusinessError | null>(null);
+    useState<FrontendErrorBase | null>(null);
   const [previewActionError, setPreviewActionError] =
-    useState<FrontendBusinessError | null>(null);
+    useState<FrontendErrorBase | null>(null);
   const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
     useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =

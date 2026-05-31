@@ -1,5 +1,5 @@
 import type { IDriveItemExtended } from "../../../common/types";
-import type { FrontendBusinessError } from "../../../common/errors.ts";
+import type { FrontendErrorBase } from "../../../common/errors.ts";
 
 /**
  * Preview 模块对页面层暴露的属性接口。
@@ -24,7 +24,7 @@ export interface IPreviewProps {
   /** 当前容器 ID，可作为 driveId 的优先来源。 */
   containerId?: string;
   /** 预览弹窗内操作失败时的标准化错误对象。 */
-  actionError?: FrontendBusinessError | null;
+  actionError?: FrontendErrorBase | null;
 }
 
 /**
@@ -39,7 +39,7 @@ export interface IPreviewContentState {
   /** 是否正在请求预览地址。 */
   isLoading: boolean;
   /** 当前预览加载阶段的标准化错误对象。 */
-  error: FrontendBusinessError | null;
+  error: FrontendErrorBase | null;
 }
 
 /**

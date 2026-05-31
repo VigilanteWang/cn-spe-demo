@@ -1,7 +1,7 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IArchiveClientProgress, IContainer } from "../../common/types";
 import type { IJobProgress } from "../../services/downloadApi";
-import type { FrontendBusinessError } from "../../common/errors.ts";
+import type { FrontendErrorBase } from "../../common/errors.ts";
 
 /**
  * Files 入口组件属性。
@@ -43,7 +43,7 @@ export interface IUploadProgress {
   /** 是否显示完成态。 */
   isCompleted: boolean;
   /** 当前上传批次的标准化错误对象。 */
-  error: FrontendBusinessError | null;
+  error: FrontendErrorBase | null;
 }
 
 /**

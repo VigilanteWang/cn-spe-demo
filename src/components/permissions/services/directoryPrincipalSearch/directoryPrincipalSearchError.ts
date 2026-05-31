@@ -1,4 +1,4 @@
-import { FrontendBusinessError } from "../../../../common/errors.ts";
+import { FrontendErrorBase } from "../../../../common/errors.ts";
 import { readRecord } from "./directoryPrincipalSearchObjectUtils";
 
 /**
@@ -7,7 +7,7 @@ import { readRecord } from "./directoryPrincipalSearchObjectUtils";
  * message 统一使用英文，便于和 Microsoft Graph / SDK 原始错误放在一起排查；
  * code 保持稳定，方便 UI 做本地化或分支处理。
  */
-export class DirectoryPrincipalSearchError extends FrontendBusinessError {
+export class DirectoryPrincipalSearchError extends FrontendErrorBase {
   constructor(code: string, message: string, statusCode?: number) {
     super({
       name: "DirectoryPrincipalSearchError",

@@ -3,7 +3,7 @@ import { Providers } from "@microsoft/mgt-element";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import {
   FrontendApiError,
-  FrontendBusinessError,
+  FrontendErrorBase,
   readErrorMessage,
 } from "../../../common/errors.ts";
 import {
@@ -72,8 +72,8 @@ export const useFilesUpload = ({
    * @returns 标准化后的上传错误。
    */
   const normalizeUploadError = useCallback(
-    (error: unknown, relativePath: string): FrontendBusinessError => {
-      if (error instanceof FrontendBusinessError) {
+    (error: unknown, relativePath: string): FrontendErrorBase => {
+      if (error instanceof FrontendErrorBase) {
         return error;
       }
 
@@ -197,7 +197,7 @@ export const useFilesUpload = ({
       const folderIdSnapshot = currentFolderId || "root";
       const failedUploads: Array<{
         relativePath: string;
-        error: FrontendBusinessError;
+        error: FrontendErrorBase;
       }> = [];
 
       setUploadProgress({
