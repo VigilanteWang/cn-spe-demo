@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { BackendError, toBackendGraphError } from "./errors";
 
+const createHeadersLike = (entries: Record<string, string>) => ({
+  get: (name: string) => entries[name],
+});
+
 describe("toBackendGraphError", () => {
   it("should map 429 errors with Retry-After and request id", () => {
     const mappedError = toBackendGraphError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
-        headers: {
+        headers: createHeadersLike({
           "Retry-After": "12",
           "request-id": "req-429",
-        },
+        }),
       }),
     );
 
@@ -17,6 +21,24 @@ describe("toBackendGraphError", () => {
     expect(mappedError.statusCode).toBe(429);
     expect(mappedError.retryAfterSeconds).toBe(12);
     expect(mappedError.requestId).toBe("req-429");
+  });
+
+  it("should fall back to response headers when the first header container is empty", () => {
+    const mappedError = toBackendGraphError(
+      Object.assign(new Error("Retry attempts exhausted"), {
+        statusCode: 429,
+        headers: {},
+        response: {
+          headers: createHeadersLike({
+            "Retry-After": "7",
+            "request-id": "response-req-429",
+          }),
+        },
+      }),
+    );
+
+    expect(mappedError.retryAfterSeconds).toBe(7);
+    expect(mappedError.requestId).toBe("response-req-429");
   });
 
   it("should preserve innerError message in originError when available", () => {

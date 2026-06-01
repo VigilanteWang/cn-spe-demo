@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withErrorHandling } from "./common/errorResponse";
 import { listContainers } from "./listContainers";
 
+const createHeadersLike = (entries: Record<string, string>) => ({
+  get: (name: string) => entries[name],
+});
+
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),
   getGraphOBOToken: vi.fn(),
@@ -30,10 +34,10 @@ describe("listContainers error handling", () => {
             get: vi.fn().mockRejectedValue(
               Object.assign(new Error("Retry attempts exhausted"), {
                 statusCode: 429,
-                headers: {
+                headers: createHeadersLike({
                   "Retry-After": "12",
                   "request-id": "req-429",
-                },
+                }),
               }),
             ),
           }),

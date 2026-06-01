@@ -48,10 +48,7 @@ const statusToDefaultMessageMap: Record<number, string> = {
  * @param defaultMessage 提取失败时的兜底文案。
  * @returns 可用于 API 响应的错误文案。
  */
-const readFallbackMessage = (
-  error: unknown,
-  defaultMessage: string,
-): string => {
+const readErrorMessage = (error: unknown, defaultMessage: string): string => {
   // 优先复用原生 Error.message，避免丢失更具体的上游信息。
   if (error instanceof Error && error.message) {
     return error.message;
@@ -112,9 +109,9 @@ export const normalizeError = (error: unknown): BackendError => {
   const originError = readOriginError(error);
 
   // 只有识别出已知状态码时，才按映射规则进一步归类成 auth / validation / graph / business。
-  if (statusCode && statusToCodeMap[statusCode]) {
-    const normalizedCode = statusToCodeMap[statusCode];
-    const message = readFallbackMessage(
+  const normalizedCode = statusCode ? statusToCodeMap[statusCode] : undefined;
+  if (statusCode && normalizedCode) {
+    const message = readErrorMessage(
       error,
       statusToDefaultMessageMap[statusCode],
     );
@@ -135,7 +132,6 @@ export const normalizeError = (error: unknown): BackendError => {
     return new BackendError({
       name: "NormalizedBackendError",
       code: normalizedCode,
-      // 这里按稳定错误码继续推导大类，避免每个调用点重复写同样的分类逻辑。
       category,
       source,
       message,

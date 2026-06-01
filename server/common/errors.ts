@@ -318,39 +318,49 @@ const readNumberLike = (value: unknown): number | undefined => {
 };
 
 /**
- * 从 headers 候选对象里读取指定响应头。
+ * 收集错误对象上可能承载响应头的容器。
+ *
+ * 当前仓库使用的 Graph SDK 会把失败响应头挂到 `error.headers`，
+ * 但测试桩或其他错误包装仍可能使用 `response.headers` 等形态。
  */
-const readHeaderValue = (
-  headersCandidate: unknown,
-  headerName: string,
-): string | undefined => {
-  const headersRecord = readRecord(headersCandidate);
-  const directValue = headersRecord[headerName];
+const readErrorHeaderCandidates = (error: unknown): unknown[] => {
+  const record = readRecord(error);
+  const responseRecord = readRecord(record.response);
+  const bodyRecord = readRecord(record.body);
 
-  if (typeof directValue === "string" && directValue) {
-    return directValue;
-  }
-
-  const getCandidate = headersRecord.get;
-  if (typeof getCandidate === "function") {
-    const value = getCandidate.call(headersCandidate, headerName);
-    return typeof value === "string" && value ? value : undefined;
-  }
-
-  return undefined;
+  return [
+    record.headers,
+    responseRecord.headers,
+    record.responseHeaders,
+    bodyRecord.headers,
+  ].filter((candidate): candidate is unknown => candidate !== undefined);
 };
 
 /**
- * 提取错误对象里可能承载响应头的容器。
+ * 按优先级从错误对象承载的 headers 候选里读取指定响应头。
  */
-const readErrorHeadersCandidate = (error: unknown): unknown => {
-  const record = readRecord(error);
-  return (
-    record.headers ??
-    record.responseHeaders ??
-    readRecord(record.response).headers ??
-    readRecord(record.body).headers
-  );
+const readHeaderValue = (
+  error: unknown,
+  headerName: string,
+): string | undefined => {
+  for (const headersCandidate of readErrorHeaderCandidates(error)) {
+    const headersRecord = readRecord(headersCandidate);
+    const directValue = headersRecord[headerName];
+
+    if (typeof directValue === "string" && directValue) {
+      return directValue;
+    }
+
+    const getCandidate = headersRecord.get;
+    if (typeof getCandidate === "function") {
+      const value = getCandidate.call(headersCandidate, headerName);
+      if (typeof value === "string" && value) {
+        return value;
+      }
+    }
+  }
+
+  return undefined;
 };
 
 /**
@@ -448,12 +458,10 @@ export const readErrorStatusCode = (error: unknown): number | undefined => {
  * 读取错误对象上的请求 ID。
  */
 export const readErrorRequestId = (error: unknown): string | undefined => {
-  const headersCandidate = readErrorHeadersCandidate(error);
-
   const headerRequestId =
-    readHeaderValue(headersCandidate, "request-id") ??
-    readHeaderValue(headersCandidate, "Request-Id") ??
-    readHeaderValue(headersCandidate, "client-request-id");
+    readHeaderValue(error, "request-id") ??
+    readHeaderValue(error, "Request-Id") ??
+    readHeaderValue(error, "client-request-id");
 
   if (headerRequestId) {
     return headerRequestId;
@@ -475,10 +483,9 @@ export const readErrorRequestId = (error: unknown): string | undefined => {
 export const readErrorRetryAfterSeconds = (
   error: unknown,
 ): number | undefined => {
-  const headersCandidate = readErrorHeadersCandidate(error);
   const headerValue =
-    readHeaderValue(headersCandidate, "Retry-After") ??
-    readHeaderValue(headersCandidate, "retry-after");
+    readHeaderValue(error, "Retry-After") ??
+    readHeaderValue(error, "retry-after");
 
   return readNumberLike(headerValue);
 };
