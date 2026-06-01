@@ -398,7 +398,7 @@ const readErrorInnerError = (error: unknown): Record<string, unknown> => {
 /**
  * 从未知错误对象中提取可用于调试的上游信息。
  */
-export const readErrorUpstream = (
+export const readOriginError = (
   error: unknown,
   service?: string,
 ): IOriginErrorInfo | undefined => {
@@ -537,7 +537,7 @@ export const toBackendGraphError = (
   const requestId = readErrorRequestId(error);
   const retryAfterSeconds = readErrorRetryAfterSeconds(error);
   const details = readErrorDetails(error);
-  const originError = readErrorUpstream(error, "microsoft-graph");
+  const originError = readOriginError(error, "microsoft-graph");
   const message = readErrorMessage(
     error,
     options?.failureMessage ??

@@ -11,7 +11,7 @@ import {
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
-  readErrorUpstream,
+  readOriginError,
   readSourceFromUnknownError,
 } from "./errors";
 
@@ -109,7 +109,7 @@ export const normalizeError = (error: unknown): BackendError => {
   const statusCode = readErrorStatusCode(error);
   const requestId = readErrorRequestId(error);
   const retryAfterSeconds = readErrorRetryAfterSeconds(error);
-  const originError = readErrorUpstream(error);
+  const originError = readOriginError(error);
 
   // 只有识别出已知状态码时，才按映射规则进一步归类成 auth / validation / graph / business。
   if (statusCode && statusToCodeMap[statusCode]) {

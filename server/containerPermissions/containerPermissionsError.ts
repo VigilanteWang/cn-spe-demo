@@ -15,7 +15,7 @@ import {
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
-  readErrorUpstream,
+  readOriginError,
 } from "../common/errors";
 
 /**
@@ -94,7 +94,7 @@ export const mapContainerPermissionsGraphError = (
   const requestId = readErrorRequestId(error);
   const details = readErrorDetails(error);
   const message = readGraphErrorMessage(error);
-  const originError = readErrorUpstream(error, "microsoft-graph");
+  const originError = readOriginError(error, "microsoft-graph");
 
   if (statusCode === 400) {
     return new ContainerPermissionsApiError("invalidRequest", message, {

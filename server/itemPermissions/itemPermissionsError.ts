@@ -15,7 +15,7 @@ import {
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
-  readErrorUpstream,
+  readOriginError,
 } from "../common/errors";
 
 /**
@@ -111,7 +111,7 @@ export const mapItemPermissionsGraphError = (
   const requestId = readErrorRequestId(error);
   const details = readErrorDetails(error);
   const message = readGraphErrorMessage(error);
-  const originError = readErrorUpstream(error, "microsoft-graph");
+  const originError = readOriginError(error, "microsoft-graph");
 
   // 400 通常表示请求体、权限 id 或 Graph 参数不符合预期。
   if (statusCode === 400) {
