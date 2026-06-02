@@ -30,7 +30,9 @@ const createEntry = (
 });
 
 const renderTable = (
-  overrides: Partial<IPermissionAccessListTableProps<ITestPermissionEntry>> = {},
+  overrides: Partial<
+    IPermissionAccessListTableProps<ITestPermissionEntry>
+  > = {},
 ) => {
   const onRoleChange = vi.fn();
   const onRemove = vi.fn();
@@ -62,11 +64,16 @@ describe("PermissionAccessListTable", () => {
 
     const row = screen.getByTestId("permission-row-people:user-adele-vance");
     expect(within(row).getByText("Adele Vance")).toBeInTheDocument();
-    expect(within(row).getByText("adele.vance@contoso.com")).toBeInTheDocument();
+    expect(
+      within(row).getByText("adele.vance@contoso.com"),
+    ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Adele Vance role" }), {
-      target: { value: "Writer" },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Adele Vance role" }),
+      {
+        target: { value: "Writer" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Remove Adele Vance" }));
 
     expect(screen.getByRole("option", { name: "Reader" })).toBeInTheDocument();

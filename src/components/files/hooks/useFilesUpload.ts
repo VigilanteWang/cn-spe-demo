@@ -1,11 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import {
-  FrontendApiError,
-  FrontendErrorBase,
-  readErrorMessage,
-} from "../../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../../common/errors.ts";
 import {
   IFileWithRelativePath,
   IFilesUploadItem,
@@ -18,11 +14,16 @@ import { buildUploadFailureSummaryError } from "../services/filesErrors";
 /**
  * 文件上传链路里的稳定 Graph/服务错误。
  */
-class FilesUploadError extends FrontendApiError {
+class FilesUploadError extends AppError {
   constructor(code: string, message: string, context: Record<string, unknown>) {
-    super(code, message, {
+    super({
       name: "FilesUploadError",
-      context,
+      code,
+      message,
+      originError: {
+        source: "app",
+      },
+      cause: { context },
     });
   }
 }
@@ -72,8 +73,8 @@ export const useFilesUpload = ({
    * @returns 标准化后的上传错误。
    */
   const normalizeUploadError = useCallback(
-    (error: unknown, relativePath: string): FrontendErrorBase => {
-      if (error instanceof FrontendErrorBase) {
+    (error: unknown, relativePath: string): AppError => {
+      if (error instanceof AppError) {
         return error;
       }
 
@@ -197,7 +198,7 @@ export const useFilesUpload = ({
       const folderIdSnapshot = currentFolderId || "root";
       const failedUploads: Array<{
         relativePath: string;
-        error: FrontendErrorBase;
+        error: AppError;
       }> = [];
 
       setUploadProgress({

@@ -1,8 +1,4 @@
-import {
-  FrontendApiError,
-  FrontendErrorBase,
-  readErrorMessage,
-} from "../../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../../common/errors.ts";
 
 /**
  * 统一描述 files 模块里一次失败操作的标准化错误选项。
@@ -25,14 +21,14 @@ interface IUploadFailureEntry {
   /** 失败文件的相对路径。 */
   relativePath: string;
   /** 该文件对应的标准化错误对象。 */
-  error: FrontendErrorBase;
+  error: AppError;
 }
 
 /**
  * 将 files 模块里的未知错误归一化为稳定前端错误对象。
  *
  * 如果上游已经抛出了标准化业务错误，则直接复用；
- * 否则包装成 `FrontendApiError`，避免页面层继续依赖裸字符串。
+ * 否则包装成 `AppError`，避免页面层继续依赖裸字符串。
  *
  * @param error 原始未知错误。
  * @param options 当前操作的错误码、兜底文案和附加上下文。
@@ -41,19 +37,20 @@ interface IUploadFailureEntry {
 export const normalizeFilesOperationError = (
   error: unknown,
   options: INormalizeFilesOperationErrorOptions,
-): FrontendErrorBase => {
-  if (error instanceof FrontendErrorBase) {
+): AppError => {
+  if (error instanceof AppError) {
     return error;
   }
 
-  return new FrontendApiError(
-    options.code,
-    readErrorMessage(error, options.fallbackMessage),
-    {
-      name: options.name ?? "FilesOperationError",
-      context: options.context,
+  return new AppError({
+    name: options.name ?? "FilesOperationError",
+    code: options.code,
+    message: readErrorMessage(error, options.fallbackMessage),
+    originError: {
+      source: "app",
     },
-  );
+    cause: options.context ? { error, context: options.context } : error,
+  });
 };
 
 /**
@@ -67,7 +64,7 @@ export const normalizeFilesOperationError = (
  */
 export const buildUploadFailureSummaryError = (
   failedUploads: IUploadFailureEntry[],
-): FrontendErrorBase | null => {
+): AppError | null => {
   if (failedUploads.length === 0) {
     return null;
   }
@@ -78,22 +75,23 @@ export const buildUploadFailureSummaryError = (
 
   const latestFailure = failedUploads[failedUploads.length - 1];
 
-  return new FrontendApiError(
-    "uploadBatchPartiallyFailed",
-    `${failedUploads.length} files failed to upload. Latest failure: ${latestFailure.error.message}`,
-    {
-      name: "FilesUploadError",
-      context: {
-        failedUploads: failedUploads.map(
-          ({ relativePath, error: uploadError }) => ({
-            relativePath,
-            code: uploadError.code,
-            message: uploadError.message,
-          }),
-        ),
-      },
+  return new AppError({
+    name: "FilesUploadError",
+    code: "uploadBatchPartiallyFailed",
+    message: `${failedUploads.length} files failed to upload. Latest failure: ${latestFailure.error.message}`,
+    originError: {
+      source: "app",
     },
-  );
+    cause: {
+      failedUploads: failedUploads.map(
+        ({ relativePath, error: uploadError }) => ({
+          relativePath,
+          code: uploadError.code,
+          message: uploadError.message,
+        }),
+      ),
+    },
+  });
 };
 
 /**
@@ -104,7 +102,7 @@ export const buildUploadFailureSummaryError = (
  */
 export const buildDeletePartialFailureError = (
   failedItems: Array<{ id: string; reason: string }>,
-): FrontendErrorBase => {
+): AppError => {
   const readableReasons = failedItems
     .map((item) => item.reason.trim())
     .filter((reason) => reason.length > 0);
@@ -114,8 +112,13 @@ export const buildDeletePartialFailureError = (
       ? readableReasons.join("; ")
       : "Some selected items could not be deleted.";
 
-  return new FrontendApiError("deleteItemsPartiallyFailed", message, {
+  return new AppError({
     name: "FilesDeleteError",
-    context: { failedItems },
+    code: "deleteItemsPartiallyFailed",
+    message,
+    originError: {
+      source: "app",
+    },
+    cause: { failedItems },
   });
 };

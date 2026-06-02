@@ -18,7 +18,7 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { toBackendGraphError } from "./common/errorUtils";
+import { toGraphAppError } from "./common/appErrorHelpers";
 import { serverConfig } from "./config";
 
 /**
@@ -54,9 +54,6 @@ export const listContainers = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    throw toBackendGraphError(error, {
-      failureMessage: "Unable to list containers.",
-      operationDescription: "container list",
-    });
+    throw toGraphAppError(error, "Unable to list containers.");
   }
 };

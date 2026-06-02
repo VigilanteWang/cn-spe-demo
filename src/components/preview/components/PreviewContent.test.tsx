@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { FrontendApiError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 import { PreviewContent } from "./PreviewContent";
 
 describe("PreviewContent", () => {
   it("should format standardized preview errors before rendering them", () => {
-    const throttledError = Object.assign(
-      new FrontendApiError("throttled", "Preview request throttled.", {
-        retryAfterSeconds: 12,
-      }),
-      {
-        retryAfterSeconds: 12,
+    const throttledError = new AppError({
+      name: "AppError",
+      code: "throttled",
+      message: "Preview request throttled.",
+      originError: {
+        retryAfter: 12,
       },
-    );
+    });
 
     render(
       <PreviewContent
@@ -25,7 +25,7 @@ describe("PreviewContent", () => {
     );
 
     expect(
-      screen.getByText("Preview request throttled. Retry after 12 seconds."),
+      screen.getByText("AppError: Preview request throttled."),
     ).toBeInTheDocument();
   });
 });

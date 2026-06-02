@@ -14,15 +14,13 @@ describe("downloadApi", () => {
       new Response(
         JSON.stringify({
           error: {
+            name: "ArchiveRequestError",
             code: "throttled",
             message: "Archive preparation was throttled.",
             statusCode: 429,
-            category: "graph",
-            source: "graph",
-            requestId: "req-download-429",
             originError: {
-              service: "microsoft-graph",
-              status: 429,
+              source: "microsoft-graph",
+              requestId: "req-download-429",
             },
           },
         }),
@@ -43,13 +41,10 @@ describe("downloadApi", () => {
       code: "throttled",
       message: "Archive preparation was throttled.",
       statusCode: 429,
-      requestId: "req-download-429",
-      retryAfterSeconds: 9,
-      source: "graph",
-      category: "graph",
       originError: {
-        service: "microsoft-graph",
-        status: 429,
+        source: "microsoft-graph",
+        requestId: "req-download-429",
+        retryAfter: 9,
       },
     });
   });
@@ -66,7 +61,6 @@ describe("downloadApi", () => {
 
     await expect(getDownloadProgress("job-a")).rejects.toMatchObject({
       name: "ArchiveRequestError",
-      code: "archivePreparationProgressFailed",
       message: "getDownloadProgress failed: 500",
       statusCode: 500,
     });

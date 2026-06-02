@@ -1,55 +1,7 @@
-import type {
-  ErrorCategory,
-  ErrorSource,
-  IErrorDetail,
-  IOriginErrorInfo,
-} from "../../common/contracts/errorContracts";
-import { FrontendApiError } from "../common/errors.ts";
+import { AppError } from "../common/errors.ts";
 import type { IPermissionEntryBaseForUI } from "../../common/contracts/permissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
 import { readApiErrorResponseSummary } from "./apiErrorMapper";
-
-/**
- * 表示权限相关后端 API 失败时的统一前端错误类型。
- *
- * 这个错误类型会在共享服务层补充权限接口常用的上下文，
- * 例如 `retryAfterSeconds` 和 `requestId`，方便上层 UI 统一展示与排障。
- */
-export class PermissionApiError extends FrontendApiError {
-  /**
-   * 创建一个带权限接口上下文的前端错误对象。
-   *
-   * @param code 后端返回的稳定错误码；缺失时会由共享构建函数提供默认值。
-   * @param message 面向前端展示或记录的错误消息。
-   * @param options 附加错误上下文，例如重试秒数、请求 ID 和 HTTP 状态码。
-   */
-  constructor(
-    code: string,
-    message: string,
-    options?: {
-      category?: ErrorCategory;
-      source?: ErrorSource;
-      retryAfterSeconds?: number;
-      requestId?: string;
-      statusCode?: number;
-      details?: IErrorDetail[];
-      context?: Record<string, unknown>;
-      originError?: IOriginErrorInfo;
-    },
-  ) {
-    super(code, message, {
-      name: "PermissionApiError",
-      category: options?.category,
-      source: options?.source,
-      statusCode: options?.statusCode,
-      retryAfterSeconds: options?.retryAfterSeconds,
-      requestId: options?.requestId,
-      details: options?.details,
-      context: options?.context,
-      originError: options?.originError,
-    });
-  }
-}
 
 /**
  * 把权限数组重新按 `people/groups` 页签结构分组。
@@ -91,20 +43,8 @@ export const mapPermissionEntriesToTabs = <
 export const buildPermissionApiError = async (
   response: Response,
   operationLabel: string,
-): Promise<PermissionApiError> => {
-  const summary = await readApiErrorResponseSummary(response, {
-    fallbackCode: "graphFailure",
+): Promise<AppError> => {
+  return readApiErrorResponseSummary(response, {
     operationLabel,
-  });
-
-  return new PermissionApiError(summary.code, summary.message, {
-    category: summary.category,
-    source: summary.source,
-    retryAfterSeconds: summary.retryAfterSeconds,
-    requestId: summary.requestId,
-    statusCode: summary.statusCode,
-    details: summary.details,
-    context: summary.context,
-    originError: summary.originError,
   });
 };

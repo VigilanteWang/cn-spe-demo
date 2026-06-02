@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { Providers } from "@microsoft/mgt-element";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FrontendApiError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 
 import { useFilesData } from "./useFilesData";
 
@@ -98,13 +98,15 @@ describe("useFilesData", () => {
 
   it("should expose a standardized page error when the main file list load fails", async () => {
     const getMock = vi.fn().mockRejectedValue(
-      Object.assign(
-        new FrontendApiError("throttled", "Items request was throttled."),
-        {
-          retryAfterSeconds: 9,
+      new AppError({
+        name: "AppError",
+        code: "throttled",
+        message: "Items request was throttled.",
+        originError: {
+          retryAfter: 9,
           requestId: "req-files-load",
         },
-      ),
+      }),
     );
     const apiMock = vi.fn(() => ({ get: getMock }));
     Providers.globalProvider = {

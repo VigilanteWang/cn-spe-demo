@@ -4,17 +4,14 @@ import type {
   IContainerPermissionEntryForUI,
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
+import type { AppError } from "../common/errors.ts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
 import {
   buildPermissionApiError,
   mapPermissionEntriesToTabs,
-  PermissionApiError,
 } from "./permissionApiShared";
 
-export {
-  PermissionApiError,
-  PermissionApiError as ContainerPermissionApiError,
-};
+export type ContainerPermissionApiError = AppError;
 
 /**
  * 加载指定容器的当前权限列表。
@@ -24,7 +21,7 @@ export {
  *
  * @param containerId 当前容器的标识。
  * @returns 供容器权限对话框直接消费的分组结果。
- * @throws 当后端返回非成功状态时抛出 `ContainerPermissionApiError`。
+ * @throws 当后端返回非成功状态时抛出 `AppError`。
  */
 export const listContainerPermissions = async (
   containerId: string,
@@ -60,7 +57,7 @@ export const listContainerPermissions = async (
  * @param containerId 当前容器的标识。
  * @param changes 前端差异计算阶段产出的 create/update/remove 变更集合。
  * @returns 服务端应用变更后返回的最新权限分组结果。
- * @throws 当 apply 请求失败时抛出 `ContainerPermissionApiError`。
+ * @throws 当 apply 请求失败时抛出 `AppError`。
  */
 export const applyContainerPermissionChanges = async (
   containerId: string,

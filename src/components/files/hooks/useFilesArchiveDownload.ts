@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
 import {
-  formatStandardErrorMessageForUI,
-  FrontendApiError,
+  AppError,
+  formatAppErrorMessageForUI,
 } from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
@@ -55,8 +55,14 @@ const buildArchivePreparationError = (
     rawErrors.length > 0 ? rawErrors.join("; ") : "Archive job failed.";
 
   // 把后端错误转换为统一的前端错误类型，并把原始错误放进 context 供后续排查。
-  return new FrontendApiError("archivePreparationFailed", message, {
-    context: {
+  return new AppError({
+    name: "ArchivePreparationError",
+    code: "archivePreparationFailed",
+    message,
+    originError: {
+      source: "app",
+    },
+    cause: {
       errors: rawErrors,
     },
   });
@@ -184,7 +190,7 @@ export const useFilesArchiveDownload = ({
         setDownloadProgress(
           createDownloadProgressState({
             phase: "failed",
-            errorMessage: formatStandardErrorMessageForUI(
+            errorMessage: formatAppErrorMessageForUI(
               error,
               "Failed to start download.",
             ),
@@ -323,7 +329,7 @@ export const useFilesArchiveDownload = ({
               createDownloadProgressState({
                 phase: "failed",
                 backendProgress: progress,
-                errorMessage: formatStandardErrorMessageForUI(
+                errorMessage: formatAppErrorMessageForUI(
                   standardizedError,
                   "Archive job failed.",
                 ),
@@ -348,7 +354,7 @@ export const useFilesArchiveDownload = ({
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
-                errorMessage: formatStandardErrorMessageForUI(
+                errorMessage: formatAppErrorMessageForUI(
                   error,
                   "Download failed.",
                 ),
@@ -411,7 +417,7 @@ export const useFilesArchiveDownload = ({
           errorMessage:
             error instanceof DownloadSaveTargetSelectionCancelledError
               ? "Download cancelled."
-              : formatStandardErrorMessageForUI(
+              : formatAppErrorMessageForUI(
                   error,
                   "Failed to open save dialog.",
                 ),

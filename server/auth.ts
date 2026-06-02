@@ -44,15 +44,13 @@ import jwksClient from "jwks-rsa";
 import { Request } from "restify";
 // Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
 import type { IErrorResponseBody } from "../common/contracts/errorContracts";
+import { AppError } from "../common/appError";
 import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
+import { createAuthError, toGraphAppError } from "./common/appErrorHelpers";
 import { toApiErrorResponseBody } from "./common/errorResponse";
-import {
-  BackendAuthError,
-  BackendGraphError,
-} from "./common/errorDefinitions";
 import { serverConfig } from "./config";
 
 /**
@@ -470,9 +468,7 @@ export const authorizeContainerManageRequest = async (
       ok: false,
       status: 401,
       body: toApiErrorResponseBody(
-        new BackendAuthError("unauthorized", "No access token provided.", {
-          statusCode: 401,
-        }),
+        createAuthError("unauthorized", "No access token provided."),
       ),
     };
   }
@@ -487,12 +483,9 @@ export const authorizeContainerManageRequest = async (
       ok: false,
       status: 401,
       body: toApiErrorResponseBody(
-        new BackendAuthError(
+        createAuthError(
           "unauthorized",
           "Authorization header must use Bearer token format.",
-          {
-            statusCode: 401,
-          },
         ),
       ),
     };
@@ -508,12 +501,9 @@ export const authorizeContainerManageRequest = async (
         ok: false,
         status: 403,
         body: toApiErrorResponseBody(
-          new BackendAuthError(
+          createAuthError(
             "forbidden",
             `Access token is missing required scope ${SPEMBEDDED_CONTAINER_MANAGE}.`,
-            {
-              statusCode: 403,
-            },
           ),
         ),
       };
@@ -532,14 +522,16 @@ export const authorizeContainerManageRequest = async (
       ok: false,
       status: 401,
       body: toApiErrorResponseBody(
-        new BackendAuthError(
-          "unauthorized",
-          `Invalid access token: ${message}`,
-          {
-            statusCode: 401,
-            cause: error,
+        new AppError({
+          name: "AuthError",
+          code: "unauthorized",
+          message: `Invalid access token: ${message}`,
+          statusCode: 401,
+          cause: error,
+          originError: {
+            source: "app",
           },
-        ),
+        }),
       ),
     };
   }
@@ -560,19 +552,14 @@ export const requireContainerManageRequest = async (
     return authorizationResult;
   }
 
-  throw new BackendAuthError(
-    authorizationResult.body.error.code === "forbidden"
-      ? "forbidden"
-      : "unauthorized",
-    authorizationResult.body.error.message,
-    {
-      statusCode: authorizationResult.status,
-      details: authorizationResult.body.error.details,
-      context: authorizationResult.body.error.context,
-      requestId: authorizationResult.body.error.requestId,
-      originError: authorizationResult.body.error.originError,
-    },
-  );
+  throw new AppError({
+    name: authorizationResult.body.error.name,
+    code: authorizationResult.body.error.code,
+    message: authorizationResult.body.error.message,
+    statusCode: authorizationResult.status,
+    originError: authorizationResult.body.error.originError,
+    cause: authorizationResult.body.error.cause,
+  });
 };
 
 /**
@@ -624,15 +611,10 @@ export const getGraphOBOToken = async (token: string): Promise<string> => {
 
     return oboGraphToken;
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new BackendGraphError(
-      "graphFailure",
+    throw toGraphAppError(
+      error,
       "Unable to generate Microsoft Graph OBO token.",
-      {
-        statusCode: 502,
-        context: { upstreamMessage: message },
-        cause: error,
-      },
+      502,
     );
   }
 };

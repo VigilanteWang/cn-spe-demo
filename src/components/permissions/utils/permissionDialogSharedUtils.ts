@@ -1,4 +1,4 @@
-import { formatStandardErrorMessageForUI } from "../../../common/errors.ts";
+import { formatAppErrorMessageForUI } from "../../../common/errors.ts";
 import type { IPermissionEntryBaseForUI } from "../../../../common/contracts/permissionCommonContracts";
 import type {
   IPermissionPrincipalCandidate,
@@ -33,7 +33,7 @@ export const buildPermissionErrorMessages = (
       ? `Api Error: ${permissionRequestErrorMessage}`
       : null,
     searchError
-      ? `Search Error: ${formatStandardErrorMessageForUI(
+      ? `Search Error: ${formatAppErrorMessageForUI(
           searchError,
           "Directory search failed. Please try again later.",
         )}`

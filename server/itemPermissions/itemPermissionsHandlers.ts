@@ -24,7 +24,7 @@ import {
   readGraphToRecord,
   readOptionalString,
 } from "../permissionsCore/permissionGraphReaders";
-import { BackendValidationError } from "../common/errorDefinitions";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * Step 0 已在当前租户确认 item 显式 invite permission 的 PATCH 稳定可用，
@@ -55,7 +55,7 @@ export const listItemPermissionsFromGraph = async (
   const itemId = readItemId(req);
 
   if (!driveId || !itemId) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "driveId and itemId route parameters are required.",
     );
   }
@@ -98,7 +98,7 @@ export const applyItemPermissionsToGraph = async (
   const itemId = readItemId(req);
 
   if (!driveId || !itemId) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "driveId and itemId route parameters are required.",
     );
   }
@@ -107,7 +107,7 @@ export const applyItemPermissionsToGraph = async (
   const changeSet = parseItemPermissionChangeSet(req.body);
 
   if (!changeSet) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "create, update and remove arrays are required.",
     );
   }
@@ -260,8 +260,8 @@ export const applyItemPermissionChangeSet = async (
 const sendItemPermissionMappedGraphError = (res: Response, error: unknown) => {
   /** 先把原始异常转成前端约定的稳定错误结构。 */
   const mappedError = mapItemPermissionsGraphError(error);
-  if (mappedError.retryAfterSeconds !== undefined) {
-    res.header("Retry-After", String(mappedError.retryAfterSeconds));
+  if (mappedError.originError?.retryAfter !== undefined) {
+    res.header("Retry-After", String(mappedError.originError.retryAfter));
   }
   res.send(
     getItemPermissionsApiErrorResponseStatus(mappedError),

@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Providers } from "@microsoft/mgt-element";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { FrontendApiError } from "../../common/errors.ts";
+import { AppError } from "../../common/errors.ts";
 import { Files } from "./index";
 
 const {
@@ -231,7 +231,9 @@ describe("Files", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Folder" }));
 
     expect(
-      await screen.findByText("Folder name already exists."),
+      await screen.findByText(
+        "FilesCreateFolderError: Folder name already exists.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -251,16 +253,19 @@ describe("Files", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Delete Dialog" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(await screen.findByText("Folder is locked.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("FilesDeleteError: Folder is locked."),
+    ).toBeInTheDocument();
     expect(updateSelectedRowsMock).toHaveBeenCalledWith(new Set(["file-1"]));
   });
 
   it("should keep preview open and show delete errors inside the preview dialog", async () => {
     deleteItemsMock.mockRejectedValue(
-      new FrontendApiError(
-        "previewDeleteFailed",
-        "Failed to delete the current file.",
-      ),
+      new AppError({
+        name: "AppError",
+        code: "previewDeleteFailed",
+        message: "Failed to delete the current file.",
+      }),
     );
 
     render(

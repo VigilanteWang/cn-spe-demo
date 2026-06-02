@@ -2,10 +2,10 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../common/errors.ts";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
 import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
 import {
-  ContainerPermissionApiError,
   applyContainerPermissionChanges,
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
@@ -27,36 +27,7 @@ vi.mock(
 );
 
 vi.mock("../../services/containerPermissionApi", () => {
-  class PermissionApiError extends Error {
-    readonly code: string;
-
-    readonly retryAfterSeconds?: number;
-
-    readonly requestId?: string;
-
-    readonly statusCode?: number;
-
-    constructor(
-      code: string,
-      message: string,
-      options?: {
-        retryAfterSeconds?: number;
-        requestId?: string;
-        statusCode?: number;
-      },
-    ) {
-      super(message);
-      this.name = "PermissionApiError";
-      this.code = code;
-      this.retryAfterSeconds = options?.retryAfterSeconds;
-      this.requestId = options?.requestId;
-      this.statusCode = options?.statusCode;
-    }
-  }
-
   return {
-    PermissionApiError,
-    ContainerPermissionApiError: PermissionApiError,
     listContainerPermissions: vi.fn(),
     applyContainerPermissionChanges: vi.fn(),
   };
@@ -418,15 +389,17 @@ describe("ContainerPermissionDialog", () => {
       groups: [],
     });
     applyContainerPermissionChangesMock.mockRejectedValue(
-      new ContainerPermissionApiError(
-        "throttled",
-        "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
-        {
-          retryAfterSeconds: 12,
+      new AppError({
+        name: "AppError",
+        code: "throttled",
+        message:
+          "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
+        statusCode: 429,
+        originError: {
+          retryAfter: 12,
           requestId: "req-429",
-          statusCode: 429,
         },
-      ),
+      }),
     );
 
     renderDialog();
@@ -439,7 +412,11 @@ describe("ContainerPermissionDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     await flushAsyncWork();
 
-    expect(screen.getByText(/Retry after 12 seconds/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Api Error: AppError: Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
 
     expect(

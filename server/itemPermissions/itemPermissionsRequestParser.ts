@@ -11,7 +11,7 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../permissionsCore/permissionGraphReaders";
-import { BackendValidationError } from "../common/errorDefinitions";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * 读取并校验前端请求，转成 item 权限变更集。
@@ -124,7 +124,7 @@ const readRecipient = (
 
   // 三种标识至少要有一个，后端才可能构造出合法的 Graph recipient。
   if (!recipientObjectId && !recipientEmail && !recipientAlias) {
-    throw new BackendValidationError(
+    throw createValidationError(
       `Item permission ${operationLabel} requires at least one recipient identifier.`,
     );
   }
@@ -148,7 +148,7 @@ const readUiRole = (value: unknown): ItemPermissionRoleForUI => {
     return value;
   }
 
-  throw new BackendValidationError(
+  throw createValidationError(
     `Unsupported item permission UI role: ${String(value)}`,
   );
 };
@@ -165,7 +165,7 @@ const readPrincipalType = (value: unknown): "people" | "groups" => {
     return value;
   }
 
-  throw new BackendValidationError(
+  throw createValidationError(
     `Unsupported permission principal type: ${String(value)}`,
   );
 };

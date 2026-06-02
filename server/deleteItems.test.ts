@@ -32,15 +32,15 @@ describe("deleteItems error handling", () => {
 
     expect(res.send).toHaveBeenCalledWith(400, {
       error: {
+        name: "ValidationError",
         code: "invalidRequest",
         message: "containerId and a non-empty itemIds array are required.",
         statusCode: 400,
-        category: "validation",
-        source: "backend",
-        details: undefined,
-        context: undefined,
-        requestId: undefined,
-        originError: undefined,
+        originError: {
+          source: "validation",
+          raw: undefined,
+        },
+        cause: undefined,
       },
     });
   });

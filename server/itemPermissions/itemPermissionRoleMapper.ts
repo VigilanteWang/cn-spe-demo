@@ -1,4 +1,4 @@
-import { BackendValidationError } from "../common/errorDefinitions";
+import { createValidationError } from "../common/appErrorHelpers";
 import type { ItemPermissionRoleForUI } from "../../common/contracts/itemPermissionCommonContracts";
 
 /**
@@ -33,7 +33,7 @@ export const mapUiItemPermissionRoleToGraph = (
     case "Reader":
       return "read";
     default:
-      throw new BackendValidationError(
+      throw createValidationError(
         `Unsupported item permission UI role: ${String(role)}`,
       );
   }

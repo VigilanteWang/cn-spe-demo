@@ -1,6 +1,6 @@
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { useEffect, useRef, useState } from "react";
-import { FrontendUserActionError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 import type {
   IPermissionPrincipalCandidate,
   PermissionTabValue,
@@ -233,10 +233,15 @@ export const usePermissionPrincipalSearch = ({
         }));
         setSearchErrorByTab((currentErrors) => ({
           ...currentErrors,
-          [selectedTab]: new FrontendUserActionError(
-            "directorySearchNotSignedIn",
-            "You are not signed in, so directory search is unavailable.",
-          ),
+          [selectedTab]: new AppError({
+            name: "PermissionSearchError",
+            code: "directorySearchNotSignedIn",
+            message:
+              "You are not signed in, so directory search is unavailable.",
+            originError: {
+              source: "app",
+            },
+          }),
         }));
         return;
       }

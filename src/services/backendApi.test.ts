@@ -14,18 +14,13 @@ describe("backendApi", () => {
       new Response(
         JSON.stringify({
           error: {
+            name: "BackendRequestError",
             code: "throttled",
             message: "Container request was throttled.",
             statusCode: 429,
-            category: "graph",
-            source: "graph",
-            requestId: "req-backend-429",
-            context: {
-              scope: "containers",
-            },
             originError: {
-              service: "microsoft-graph",
-              status: 429,
+              source: "microsoft-graph",
+              requestId: "req-backend-429",
             },
           },
         }),
@@ -44,16 +39,10 @@ describe("backendApi", () => {
       code: "throttled",
       message: "Container request was throttled.",
       statusCode: 429,
-      requestId: "req-backend-429",
-      retryAfterSeconds: 15,
-      context: {
-        scope: "containers",
-      },
-      source: "graph",
-      category: "graph",
       originError: {
-        service: "microsoft-graph",
-        status: 429,
+        source: "microsoft-graph",
+        requestId: "req-backend-429",
+        retryAfter: 15,
       },
     });
   });

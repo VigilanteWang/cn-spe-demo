@@ -3,14 +3,14 @@ import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
+import type { AppError } from "../common/errors.ts";
 import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
 import {
   buildPermissionApiError,
   mapPermissionEntriesToTabs,
-  PermissionApiError,
 } from "./permissionApiShared";
 
-export { PermissionApiError as ItemPermissionApiError };
+export type ItemPermissionApiError = AppError;
 
 /**
  * 加载指定 item 的当前权限列表。
@@ -21,7 +21,7 @@ export { PermissionApiError as ItemPermissionApiError };
  * @param driveId 当前 item 所属 drive 的标识。
  * @param itemId 当前 item 的标识。
  * @returns 供权限对话框直接消费的分组选项结果。
- * @throws 当后端返回非成功状态时抛出 `ItemPermissionApiError`。
+ * @throws 当后端返回非成功状态时抛出 `AppError`。
  */
 export const listItemPermissions = async (
   driveId: string,
@@ -57,7 +57,7 @@ export const listItemPermissions = async (
  * @param itemId 当前 item 的标识。
  * @param changes 前端差异计算阶段产出的 create/update/remove 变更集合。
  * @returns 服务端应用变更后返回的最新权限分组结果。
- * @throws 当 apply 请求失败时抛出 `ItemPermissionApiError`。
+ * @throws 当 apply 请求失败时抛出 `AppError`。
  */
 export const applyItemPermissionChanges = async (
   driveId: string,

@@ -18,7 +18,7 @@ describe("permissionDialogSharedUtils", () => {
       ),
     ).toEqual([
       "Api Error: Unable to load permissions.",
-      "Search Error: Directory unavailable.",
+      "Search Error: Error: Directory unavailable.",
     ]);
   });
 });

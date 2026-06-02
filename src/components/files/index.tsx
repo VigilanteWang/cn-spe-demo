@@ -33,8 +33,8 @@ import { useFilesArchiveDownload } from "./hooks/useFilesArchiveDownload";
 import { Providers } from "@microsoft/mgt-element";
 import { ItemPermissionDialog } from "../permissions";
 import {
-  formatStandardErrorMessageForUI,
-  type FrontendErrorBase,
+  formatAppErrorMessageForUI,
+  type AppError,
 } from "../../common/errors.ts";
 import {
   buildDeletePartialFailureError,
@@ -100,12 +100,13 @@ export const Files = ({
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [newFolderError, setNewFolderError] =
-    useState<FrontendErrorBase | null>(null);
-  const [deleteDialogError, setDeleteDialogError] =
-    useState<FrontendErrorBase | null>(null);
-  const [previewActionError, setPreviewActionError] =
-    useState<FrontendErrorBase | null>(null);
+  const [newFolderError, setNewFolderError] = useState<AppError | null>(null);
+  const [deleteDialogError, setDeleteDialogError] = useState<AppError | null>(
+    null,
+  );
+  const [previewActionError, setPreviewActionError] = useState<AppError | null>(
+    null,
+  );
   const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
     useState(false);
   const [currentPreviewFile, setCurrentPreviewFile] =
@@ -517,7 +518,7 @@ export const Files = ({
                   role="alert"
                   style={{ color: tokens.colorPaletteRedForeground1 }}
                 >
-                  {formatStandardErrorMessageForUI(
+                  {formatAppErrorMessageForUI(
                     newFolderError,
                     "Failed to create folder.",
                   )}
@@ -583,7 +584,7 @@ export const Files = ({
                   role="alert"
                   style={{ color: tokens.colorPaletteRedForeground1 }}
                 >
-                  {formatStandardErrorMessageForUI(
+                  {formatAppErrorMessageForUI(
                     deleteDialogError,
                     "Failed to delete selected items.",
                   )}

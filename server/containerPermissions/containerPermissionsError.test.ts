@@ -17,10 +17,12 @@ describe("mapContainerPermissionsGraphError", () => {
 
     const mappedError = mapContainerPermissionsGraphError(error);
 
-    expect(mappedError.code).toBe("throttled");
+    expect(mappedError.name).toBe("GraphError");
+    expect(mappedError.code).toBeUndefined();
     expect(mappedError.statusCode).toBe(429);
-    expect(mappedError.retryAfterSeconds).toBe(12);
-    expect(mappedError.requestId).toBe("req-429");
+    expect(mappedError.originError?.retryAfter).toBe(12);
+    expect(mappedError.originError?.requestId).toBe("req-429");
+    expect(mappedError.originError?.source).toBe("microsoft-graph");
     expect(mappedError.message).toBe("Retry attempts exhausted");
   });
 
@@ -35,9 +37,11 @@ describe("mapContainerPermissionsGraphError", () => {
       message: "temporary outage",
     });
 
-    expect(mappedError.code).toBe("serviceUnavailable");
-    expect(mappedError.requestId).toBe("inner-503");
-    expect(mappedError.retryAfterSeconds).toBeUndefined();
+    expect(mappedError.name).toBe("GraphError");
+    expect(mappedError.code).toBeUndefined();
+    expect(mappedError.statusCode).toBe(503);
+    expect(mappedError.originError?.requestId).toBe("inner-503");
+    expect(mappedError.originError?.retryAfter).toBeUndefined();
   });
 
   it("should read header values from Headers-like get() objects", () => {
@@ -50,8 +54,8 @@ describe("mapContainerPermissionsGraphError", () => {
       message: "throttled",
     });
 
-    expect(mappedError.retryAfterSeconds).toBe(5);
-    expect(mappedError.requestId).toBe("headers-like-req");
+    expect(mappedError.originError?.retryAfter).toBe(5);
+    expect(mappedError.originError?.requestId).toBe("headers-like-req");
   });
 
   it("should fall back to response headers when error.headers is present but empty", () => {
@@ -67,7 +71,7 @@ describe("mapContainerPermissionsGraphError", () => {
       message: "throttled",
     });
 
-    expect(mappedError.retryAfterSeconds).toBe(6);
-    expect(mappedError.requestId).toBe("response-headers-req");
+    expect(mappedError.originError?.retryAfter).toBe(6);
+    expect(mappedError.originError?.requestId).toBe("response-headers-req");
   });
 });

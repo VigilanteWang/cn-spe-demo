@@ -23,9 +23,7 @@ describe("AppErrorBoundary", () => {
       </FluentProvider>,
     );
 
-    expect(
-      screen.getByText("Application render failed"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Application render failed")).toBeInTheDocument();
     expect(screen.getByText("Render exploded.")).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();

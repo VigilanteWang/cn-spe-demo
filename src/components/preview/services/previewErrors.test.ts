@@ -10,7 +10,7 @@ describe("previewErrors", () => {
     const error = createMissingPreviewTargetError();
 
     expect(error.code).toBe("missingPreviewTarget");
-    expect(error.category).toBe("validation");
+    expect(error.originError?.source).toBe("validation");
     expect(error.message).toBe("Unable to get drive or file information.");
   });
 
@@ -18,7 +18,7 @@ describe("previewErrors", () => {
     const error = createPreviewUnavailableError();
 
     expect(error.code).toBe("previewUnavailable");
-    expect(error.category).toBe("business");
+    expect(error.originError?.source).toBe("app");
     expect(error.message).toBe("Preview not available for this file.");
   });
 
@@ -26,7 +26,7 @@ describe("previewErrors", () => {
     const error = createPreviewLoadFailedError();
 
     expect(error.code).toBe("previewLoadFailed");
-    expect(error.category).toBe("business");
+    expect(error.originError?.source).toBe("app");
     expect(error.message).toBe("Failed to load preview.");
   });
 });

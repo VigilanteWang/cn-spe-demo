@@ -1,6 +1,6 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { createGraphClient } from "../auth";
-import { BackendGraphError } from "../common/errorDefinitions";
+import { AppError } from "../../common/appError";
 import { toDownloadGraphError } from "./downloadErrors";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
@@ -74,17 +74,17 @@ export const resolveDownloadUrl = async (
       return location;
     }
 
-    throw new BackendGraphError(
-      "graphFailure",
-      `Unable to resolve the download url for item ${itemId}.`,
-      {
-        name: "DownloadUrlNotFoundError",
-        statusCode: response.status,
-        context: { driveId, itemId },
+    throw new AppError({
+      name: "DownloadUrlNotFoundError",
+      message: `Unable to resolve the download url for item ${itemId}.`,
+      statusCode: response.status,
+      originError: {
+        source: "microsoft-graph",
       },
-    );
+      cause: { driveId, itemId },
+    });
   } catch (error: unknown) {
-    if (error instanceof BackendGraphError) {
+    if (error instanceof AppError) {
       throw error;
     }
 

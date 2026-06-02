@@ -30,15 +30,15 @@ describe("createContainer error handling", () => {
 
     expect(res.send).toHaveBeenCalledWith(400, {
       error: {
+        name: "ValidationError",
         code: "invalidRequest",
         message: "displayName is required.",
         statusCode: 400,
-        category: "validation",
-        source: "backend",
-        details: undefined,
-        context: undefined,
-        requestId: undefined,
-        originError: undefined,
+        originError: {
+          source: "validation",
+          raw: undefined,
+        },
+        cause: undefined,
       },
     });
   });

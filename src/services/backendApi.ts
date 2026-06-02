@@ -12,51 +12,10 @@
  * - POST /api/deleteItems      - 批量删除文件/文件夹
  */
 
-import type {
-  ErrorCategory,
-  ErrorSource,
-  IErrorDetail,
-  IOriginErrorInfo,
-} from "../../common/contracts/errorContracts";
-import { FrontendApiError } from "../common/errors.ts";
+import { AppError } from "../common/errors.ts";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
 import { readApiErrorResponseSummary } from "./apiErrorMapper";
-
-/**
- * 后端 API 请求失败时抛出的稳定错误类型。
- *
- * 携带 code（错误标识）和 statusCode（HTTP 状态码），
- * 便于调用方通过 instanceof 和 code 区分不同失败场景。
- */
-export class BackendRequestError extends FrontendApiError {
-  constructor(
-    code: string,
-    message: string,
-    options: {
-      statusCode: number;
-      category: ErrorCategory;
-      source: ErrorSource;
-      requestId?: string;
-      retryAfterSeconds?: number;
-      details?: IErrorDetail[];
-      context?: Record<string, unknown>;
-      originError?: IOriginErrorInfo;
-    },
-  ) {
-    super(code, message, {
-      name: "BackendRequestError",
-      category: options.category,
-      source: options.source,
-      statusCode: options.statusCode,
-      requestId: options.requestId,
-      retryAfterSeconds: options.retryAfterSeconds,
-      details: options.details,
-      context: options.context,
-      originError: options.originError,
-    });
-  }
-}
 
 /**
  * 批量删除操作的返回结果。
@@ -77,26 +36,20 @@ export interface IDeleteItemsResult {
  * @returns 统一的后端请求错误实例。
  */
 const buildBackendRequestError = async (
-  code: string,
   operation: string,
   response: Response,
-): Promise<BackendRequestError> => {
-  // 先尝试读取后端标准化错误体，尽量保留服务端返回的上下文信息。
-  const summary = await readApiErrorResponseSummary(response, {
-    fallbackCode: code,
+): Promise<AppError> => {
+  const appError = await readApiErrorResponseSummary(response, {
     operationLabel: operation,
   });
 
-  // 将摘要转换为前端稳定抛出的错误类型，便于上层统一处理。
-  return new BackendRequestError(summary.code, summary.message, {
-    statusCode: summary.statusCode,
-    category: summary.category,
-    source: summary.source,
-    requestId: summary.requestId,
-    retryAfterSeconds: summary.retryAfterSeconds,
-    details: summary.details,
-    context: summary.context,
-    originError: summary.originError,
+  return new AppError({
+    name: "BackendRequestError",
+    code: appError.code,
+    message: appError.message,
+    statusCode: appError.statusCode,
+    originError: appError.originError,
+    cause: appError.cause,
   });
 };
 
@@ -122,11 +75,7 @@ export async function listContainers(): Promise<IContainer[]> {
     // Graph API 把集合包在 value 数组里返回；空集合时返回空数组而非 undefined
     return (body.value as IContainer[]) ?? [];
   }
-  throw await buildBackendRequestError(
-    "listContainersFailed",
-    "listContainers",
-    response,
-  );
+  throw await buildBackendRequestError("listContainers", response);
 }
 
 /**
@@ -158,11 +107,7 @@ export async function createContainer(
   if (response.ok) {
     return (await response.json()) as IContainer;
   }
-  throw await buildBackendRequestError(
-    "createContainerFailed",
-    "createContainer",
-    response,
-  );
+  throw await buildBackendRequestError("createContainer", response);
 }
 
 /**
@@ -188,9 +133,5 @@ export async function deleteItems(
   if (response.ok) {
     return (await response.json()) as IDeleteItemsResult;
   }
-  throw await buildBackendRequestError(
-    "deleteItemsFailed",
-    "deleteItems",
-    response,
-  );
+  throw await buildBackendRequestError("deleteItems", response);
 }

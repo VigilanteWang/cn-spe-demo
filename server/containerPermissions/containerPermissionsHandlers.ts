@@ -37,7 +37,7 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
-import { BackendValidationError } from "../common/errorDefinitions";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。
@@ -57,9 +57,7 @@ export const listContainerPermissionsFromGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError(
-      "containerId route parameter is required.",
-    );
+    throw createValidationError("containerId route parameter is required.");
   }
 
   try {
@@ -99,16 +97,14 @@ export const applyContainerPermissionsToGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError(
-      "containerId route parameter is required.",
-    );
+    throw createValidationError("containerId route parameter is required.");
   }
 
   // 解析并校验 create/update/remove 三段变更数据。
   const changeSet = parseContainerPermissionChangeSet(req.body);
 
   if (!changeSet) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "create, update and remove arrays are required.",
     );
   }
@@ -240,8 +236,8 @@ const sendContainerPermissionMappedGraphError = (
   error: unknown,
 ) => {
   const mappedError = mapContainerPermissionsGraphError(error);
-  if (mappedError.retryAfterSeconds !== undefined) {
-    res.header("Retry-After", String(mappedError.retryAfterSeconds));
+  if (mappedError.originError?.retryAfter !== undefined) {
+    res.header("Retry-After", String(mappedError.originError.retryAfter));
   }
   res.send(
     getContainerPermissionsApiErrorResponseStatus(mappedError),

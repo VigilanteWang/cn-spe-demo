@@ -1,7 +1,7 @@
 import { Link, ProgressBar, Text, tokens } from "@fluentui/react-components";
 import {
-  formatStandardErrorMessageForUI,
-  type FrontendErrorBase,
+  formatAppErrorMessageForUI,
+  type AppError,
 } from "../../../common/errors.ts";
 import { IDownloadProgress, IUploadProgress } from "../filesTypes";
 
@@ -9,7 +9,7 @@ interface IFilesProgressProps {
   /** 上传进度。 */
   uploadProgress: IUploadProgress;
   /** 页面主区域的标准化错误。 */
-  pageError: FrontendErrorBase | null;
+  pageError: AppError | null;
   /** 下载进度。 */
   downloadProgress: IDownloadProgress;
   /** 进度条容器样式类名。 */
@@ -113,7 +113,7 @@ export const FilesProgress = ({
                   className={progressStatusTextClassName}
                   style={{ color: tokens.colorPaletteRedForeground1 }}
                 >
-                  {formatStandardErrorMessageForUI(
+                  {formatAppErrorMessageForUI(
                     uploadProgress.error,
                     "Upload failed.",
                   )}
@@ -130,10 +130,7 @@ export const FilesProgress = ({
             className={progressStatusTextClassName}
             style={{ color: tokens.colorPaletteRedForeground1 }}
           >
-            {formatStandardErrorMessageForUI(
-              pageError,
-              "Failed to load items.",
-            )}
+            {formatAppErrorMessageForUI(pageError, "Failed to load items.")}
           </Text>
         </div>
       )}

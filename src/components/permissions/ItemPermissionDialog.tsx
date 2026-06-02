@@ -230,8 +230,7 @@ export const ItemPermissionDialog = ({
       <Text size={200}>
         This list may be empty even when item-level permissions exist. With only{" "}
         <strong>read access</strong> to this file, Microsoft Graph{" "}
-        <strong>may not</strong>
-        return them. Learn more at{" "}
+        <strong>may not</strong> return them. Learn more at{" "}
         <Link
           href={ITEM_PERMISSION_READ_VISIBILITY_LEARN_MORE_URL}
           target="_blank"

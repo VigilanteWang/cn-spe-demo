@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { FrontendErrorBase, readErrorMessage } from "../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../common/errors.ts";
 
 const useStyles = makeStyles({
   container: {
@@ -27,7 +27,7 @@ interface IAppErrorBoundaryProps {
 }
 
 interface IAppErrorBoundaryState {
-  readonly error: FrontendErrorBase | null;
+  readonly error: AppError | null;
 }
 
 /**
@@ -45,21 +45,19 @@ export class AppErrorBoundary extends React.Component<
    * 当子树 render 抛错时，将异常立即收敛为可展示的稳定错误对象。
    */
   static getDerivedStateFromError(error: unknown): IAppErrorBoundaryState {
-    if (error instanceof FrontendErrorBase) {
+    if (error instanceof AppError) {
       return { error };
     }
 
     return {
-      error: new FrontendErrorBase({
+      error: new AppError({
         name: "ReactRenderError",
         code: "renderError",
-        category: "render",
-        source: "react",
-        message: readErrorMessage(
-          error,
-          "The application failed to render.",
-        ),
+        message: readErrorMessage(error, "The application failed to render."),
         cause: error,
+        originError: {
+          source: "app",
+        },
       }),
     };
   }
@@ -78,7 +76,9 @@ export class AppErrorBoundary extends React.Component<
 
   render() {
     if (this.state.error) {
-      return <ErrorFallback error={this.state.error} onReload={this.handleReload} />;
+      return (
+        <ErrorFallback error={this.state.error} onReload={this.handleReload} />
+      );
     }
 
     return this.props.children;
@@ -92,7 +92,7 @@ const ErrorFallback = ({
   error,
   onReload,
 }: {
-  error: FrontendErrorBase;
+  error: AppError;
   onReload: () => void;
 }) => {
   const styles = useStyles();

@@ -1,4 +1,4 @@
-import { FrontendConfigError } from "./errors.ts";
+import { AppError } from "./errors.ts";
 
 /**
  * 前端配置管理模块
@@ -26,19 +26,15 @@ import { FrontendConfigError } from "./errors.ts";
  * | china    | login.chinacloudapi.cn             | microsoftgraph.chinacloudapi.cn          |
  **/
 
-/**
- * 前端运行时配置错误。
- *
- * 这类错误通常意味着部署环境或本地启动参数不完整，
- * 需要尽早失败，避免后续链路在半初始化状态下继续运行。
- */
-export class ClientConfigError extends FrontendConfigError {
-  constructor(code: string, message: string) {
-    super(code, message, {
-      name: "ClientConfigError",
-    });
-  }
-}
+const createClientConfigError = (code: string, message: string) =>
+  new AppError({
+    name: "ClientConfigError",
+    code,
+    message,
+    originError: {
+      source: "validation",
+    },
+  });
 
 /**
  * 读取必需的环境变量，缺失时抛出明确错误
@@ -50,7 +46,7 @@ const required = (key: string): string => {
   // Vite 通过 import.meta.env 注入前端环境变量，替代 CRA 的 process.env
   const value = import.meta.env[key] as string | undefined;
   if (!value) {
-    throw new ClientConfigError(
+    throw createClientConfigError(
       "missingEnvVar",
       `[config] Missing required env var: ${key}`,
     );
@@ -85,7 +81,7 @@ const CLOUD_ENDPOINTS: Record<
 const resolveCloudEnv = (): CloudEnv => {
   const val = (import.meta.env.VITE_CLOUD_ENV ?? "global").toLowerCase();
   if (val !== "global" && val !== "china") {
-    throw new ClientConfigError(
+    throw createClientConfigError(
       "unsupportedCloudEnv",
       `[config] Unsupported VITE_CLOUD_ENV value: "${val}". Supported values: global, china`,
     );

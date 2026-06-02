@@ -13,7 +13,7 @@
  * - 可观测：关键阶段持续上报 downloaded/zipped/progress
  */
 import { AsyncZipDeflate, Zip } from "fflate";
-import { FrontendApiError } from "../common/errors.ts";
+import { AppError } from "../common/errors.ts";
 import { IAbortRequestOptions } from "./apiClient";
 import {
   IArchiveClientProgress,
@@ -25,19 +25,19 @@ import {
 /**
  * 归档下载过程中单个文件的下载错误。
  */
-export class ArchiveItemDownloadError extends FrontendApiError {
+export class ArchiveItemDownloadError extends AppError {
   readonly relativePath: string;
 
   constructor(relativePath: string, statusCode: number) {
-    super(
-      "downloadItemFailed",
-      `Failed to download ${relativePath}. HTTP ${statusCode}`,
-      {
-        name: "ArchiveItemDownloadError",
-        statusCode,
-        context: { relativePath },
+    super({
+      name: "ArchiveItemDownloadError",
+      code: "downloadItemFailed",
+      message: `Failed to download ${relativePath}. HTTP ${statusCode}`,
+      statusCode,
+      originError: {
+        source: "network",
       },
-    );
+    });
     this.relativePath = relativePath;
   }
 }

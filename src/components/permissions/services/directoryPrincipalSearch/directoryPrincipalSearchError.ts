@@ -1,4 +1,4 @@
-import { FrontendErrorBase } from "../../../../common/errors.ts";
+import { AppError } from "../../../../common/errors.ts";
 import { readRecord } from "./directoryPrincipalSearchObjectUtils";
 
 /**
@@ -7,15 +7,19 @@ import { readRecord } from "./directoryPrincipalSearchObjectUtils";
  * message 统一使用英文，便于和 Microsoft Graph / SDK 原始错误放在一起排查；
  * code 保持稳定，方便 UI 做本地化或分支处理。
  */
-export class DirectoryPrincipalSearchError extends FrontendErrorBase {
+export class DirectoryPrincipalSearchError extends AppError {
   constructor(code: string, message: string, statusCode?: number) {
     super({
       name: "DirectoryPrincipalSearchError",
-      category: getDirectorySearchErrorCategory(code),
-      source: getDirectorySearchErrorSource(code),
       code,
       message,
       statusCode,
+      originError: {
+        source:
+          getDirectorySearchErrorCategory(code) === "validation"
+            ? "validation"
+            : "microsoft-graph",
+      },
     });
   }
 }
@@ -35,14 +39,6 @@ const getDirectorySearchErrorCategory = (code: string) => {
 /**
  * 为目录搜索错误推导稳定来源。
  */
-const getDirectorySearchErrorSource = (code: string) => {
-  if (code === "emptyQuery" || code === "invalidSearchSyntax") {
-    return "frontend" as const;
-  }
-
-  return "graph" as const;
-};
-
 /**
  * 把 Graph SDK 抛出的 unknown 错误映射为本模块的稳定错误类型。
  *

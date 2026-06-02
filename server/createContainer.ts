@@ -18,8 +18,11 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { BackendValidationError } from "./common/errorDefinitions";
-import { toBackendGraphError } from "./common/errorUtils";
+import {
+  createValidationError,
+  toGraphAppError,
+} from "./common/appErrorHelpers";
+import { AppError } from "../common/appError";
 import { serverConfig } from "./config";
 
 /**
@@ -51,7 +54,7 @@ export const createContainer = async (req: Request, res: Response) => {
       typeof req.body?.displayName !== "string" ||
       !req.body.displayName.trim()
     ) {
-      throw new BackendValidationError("displayName is required.");
+      throw createValidationError("displayName is required.");
     }
 
     const containerRequestData = {
@@ -68,13 +71,10 @@ export const createContainer = async (req: Request, res: Response) => {
     res.send(200, graphResponse);
     return;
   } catch (error: unknown) {
-    if (error instanceof BackendValidationError) {
+    if (error instanceof AppError && error.statusCode === 400) {
       throw error;
     }
 
-    throw toBackendGraphError(error, {
-      failureMessage: "Failed to create container.",
-      operationDescription: "create-container",
-    });
+    throw toGraphAppError(error, "Failed to create container.");
   }
 };

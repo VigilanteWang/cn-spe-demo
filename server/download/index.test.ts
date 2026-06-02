@@ -118,9 +118,7 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "expand failed",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").errors).toEqual(["expand failed"]);
   });
 
   it("should fail the job when resolving a download url fails", async () => {

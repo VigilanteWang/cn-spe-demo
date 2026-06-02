@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { BackendError } from "./errorDefinitions";
-import { toBackendGraphError } from "./errorUtils";
+import { AppError } from "../../common/appError";
+import { toGraphAppError } from "./appErrorHelpers";
 
 const createHeadersLike = (entries: Record<string, string>) => ({
   get: (name: string) => entries[name],
 });
 
-describe("toBackendGraphError", () => {
-  it("should map 429 errors with Retry-After and request id", () => {
-    const mappedError = toBackendGraphError(
+describe("toGraphAppError", () => {
+  it("should preserve Retry-After and request id from 429 responses", () => {
+    const mappedError = toGraphAppError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
         headers: createHeadersLike({
@@ -18,14 +18,14 @@ describe("toBackendGraphError", () => {
       }),
     );
 
-    expect(mappedError.code).toBe("throttled");
+    expect(mappedError.code).toBeUndefined();
     expect(mappedError.statusCode).toBe(429);
-    expect(mappedError.retryAfterSeconds).toBe(12);
-    expect(mappedError.requestId).toBe("req-429");
+    expect(mappedError.originError?.retryAfter).toBe(12);
+    expect(mappedError.originError?.requestId).toBe("req-429");
   });
 
   it("should fall back to response headers when the first header container is empty", () => {
-    const mappedError = toBackendGraphError(
+    const mappedError = toGraphAppError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
         headers: {},
@@ -38,12 +38,12 @@ describe("toBackendGraphError", () => {
       }),
     );
 
-    expect(mappedError.retryAfterSeconds).toBe(7);
-    expect(mappedError.requestId).toBe("response-req-429");
+    expect(mappedError.originError?.retryAfter).toBe(7);
+    expect(mappedError.originError?.requestId).toBe("response-req-429");
   });
 
-  it("should preserve innerError message in originError when available", () => {
-    const mappedError = toBackendGraphError({
+  it("should preserve Graph code path and raw diagnostics when available", () => {
+    const mappedError = toGraphAppError({
       error: {
         code: "serviceUnavailable",
         innerError: {
@@ -55,40 +55,38 @@ describe("toBackendGraphError", () => {
       message: "temporary outage",
     });
 
-    expect(mappedError.originError).toEqual({
-      service: "microsoft-graph",
-      code: "serviceUnavailable",
-      innerErrorCode: "timeout",
-      innerErrorMessage: "The upstream request timed out.",
-      status: 503,
+    expect(mappedError.originError).toMatchObject({
+      source: "microsoft-graph",
+      codePath: ["serviceUnavailable", "timeout"],
+      raw: {
+        code: "serviceUnavailable",
+      },
     });
   });
 
   it("should preserve the original Graph message when no richer payload is available", () => {
-    const mappedError = toBackendGraphError(
+    const mappedError = toGraphAppError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
       }),
-      {
-        failureMessage: "Unable to list containers.",
-        operationDescription: "container list",
-      },
+      "Unable to list containers.",
     );
 
     expect(mappedError.message).toBe("Retry attempts exhausted");
   });
 
   it("should keep an existing graph error instance", () => {
-    const existingError = new BackendError({
+    const existingError = new AppError({
       name: "ExistingError",
       code: "graphFailure",
-      category: "graph",
-      source: "graph",
       message: "Already normalised",
       statusCode: 502,
+      originError: {
+        source: "microsoft-graph",
+      },
     });
 
-    const mappedError = toBackendGraphError(existingError);
+    const mappedError = toGraphAppError(existingError, "fallback");
 
     expect(mappedError).toBe(existingError);
   });

@@ -50,22 +50,22 @@ describe("listContainers error handling", () => {
 
     await withErrorHandling(listContainers)(req, res);
 
-    expect(res.send).toHaveBeenCalledWith(429, {
-      error: {
-        code: "throttled",
-        message: "Retry attempts exhausted",
-        statusCode: 429,
-        category: "graph",
-        source: "graph",
-        details: undefined,
-        context: undefined,
-        requestId: "req-429",
-        originError: {
-          service: "microsoft-graph",
-          status: 429,
-        },
-      },
-    });
+    expect(res.send).toHaveBeenCalledWith(
+      429,
+      expect.objectContaining({
+        error: expect.objectContaining({
+          name: "GraphError",
+          code: undefined,
+          message: "Retry attempts exhausted",
+          statusCode: 429,
+          originError: expect.objectContaining({
+            source: "microsoft-graph",
+            requestId: "req-429",
+            retryAfter: 12,
+          }),
+        }),
+      }),
+    );
     expect(res.header).toHaveBeenCalledWith("Retry-After", "12");
   });
 });

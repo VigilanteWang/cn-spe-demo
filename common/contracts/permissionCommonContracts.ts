@@ -1,4 +1,4 @@
-import type { ErrorCode, IErrorResponseBody } from "./errorContracts";
+import type { IErrorResponseBody } from "./errorContracts";
 
 /**
  * 权限弹窗共享的主体类型。
@@ -77,19 +77,7 @@ export interface IPermissionEntryBaseForUI {
   isRemovable: boolean;
 }
 
-export type PermissionApiErrorCode = Extract<
-  ErrorCode,
-  | "invalidRequest"
-  | "unauthorized"
-  | "forbidden"
-  | "notFound"
-  | "throttled"
-  | "serviceUnavailable"
-  | "graphFailure"
->;
-
 /**
  * 后端暴露给前端的稳定错误响应体。
  */
-export type IPermissionApiErrorBody =
-  IErrorResponseBody<PermissionApiErrorCode>;
+export type IPermissionApiErrorBody = IErrorResponseBody;

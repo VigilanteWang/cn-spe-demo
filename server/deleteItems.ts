@@ -4,8 +4,10 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { BackendValidationError } from "./common/errorDefinitions";
-import { toBackendGraphError } from "./common/errorUtils";
+import {
+  createValidationError,
+  toGraphAppError,
+} from "./common/appErrorHelpers";
 
 interface IDeleteItemsRequestBody {
   containerId?: unknown;
@@ -28,7 +30,7 @@ export const deleteItems = async (req: Request, res: Response) => {
   const itemIds = readStringArray(body.itemIds);
 
   if (!containerId || itemIds.length === 0) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "containerId and a non-empty itemIds array are required.",
     );
   }
@@ -43,7 +45,9 @@ export const deleteItems = async (req: Request, res: Response) => {
     // 顺序删除可以降低瞬时并发，减少 Graph 节流和竞争失败的概率。
     for (const itemId of itemIds) {
       try {
-        await graphClient.api(`/drives/${containerId}/items/${itemId}`).delete();
+        await graphClient
+          .api(`/drives/${containerId}/items/${itemId}`)
+          .delete();
         successful.push(itemId);
       } catch (error: unknown) {
         failed.push({
@@ -55,10 +59,7 @@ export const deleteItems = async (req: Request, res: Response) => {
 
     res.send(200, { successful, failed });
   } catch (error: unknown) {
-    throw toBackendGraphError(error, {
-      failureMessage: "Unable to delete the selected items.",
-      operationDescription: "delete-items",
-    });
+    throw toGraphAppError(error, "Unable to delete the selected items.");
   }
 };
 

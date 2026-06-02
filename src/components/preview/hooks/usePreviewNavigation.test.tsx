@@ -4,10 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IDriveItemExtended } from "../../../common/types";
 import { usePreviewNavigation } from "./usePreviewNavigation";
 
-const createFile = (
-  id: string,
-  name: string,
-): IDriveItemExtended =>
+const createFile = (id: string, name: string): IDriveItemExtended =>
   ({
     id,
     name,

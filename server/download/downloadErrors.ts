@@ -1,10 +1,9 @@
+import { AppError } from "../../common/appError";
 import {
-  BackendError,
-  BackendGraphError,
-  BackendInternalError,
-  BackendValidationError,
-} from "../common/errorDefinitions";
-import { toBackendGraphError } from "../common/errorUtils";
+  createInternalError,
+  createValidationError,
+  toGraphAppError,
+} from "../common/appErrorHelpers";
 
 /**
  * 提取适合写入任务状态的稳定错误文案。
@@ -17,7 +16,7 @@ export const getDownloadJobFailureMessage = (
   error: unknown,
   fallbackMessage: string,
 ): string => {
-  if (error instanceof BackendError || error instanceof Error) {
+  if (error instanceof AppError || error instanceof Error) {
     return error.message;
   }
 
@@ -34,25 +33,22 @@ export const getDownloadJobFailureMessage = (
 export const toDownloadGraphError = (
   error: unknown,
   failureMessage: string,
-): BackendGraphError =>
-  toBackendGraphError(error, {
-    failureMessage,
-    operationDescription: "download preparation",
-  });
+): AppError => toGraphAppError(error, failureMessage);
 
 /**
  * 构造“任务不存在或不可访问”错误。
  *
  * @returns 对应 404 的业务错误。
  */
-export const createArchiveJobNotFoundError = (): BackendError =>
-  new BackendError({
+export const createArchiveJobNotFoundError = (): AppError =>
+  new AppError({
     name: "ArchiveJobNotFoundError",
     code: "notFound",
-    category: "business",
-    source: "backend",
     message: "Job not found, expired, or access denied.",
     statusCode: 404,
+    originError: {
+      source: "app",
+    },
   });
 
 /**
@@ -61,16 +57,15 @@ export const createArchiveJobNotFoundError = (): BackendError =>
  * @param status 当前任务状态。
  * @returns 对应 409 的业务错误。
  */
-export const createArchiveManifestNotReadyError = (
-  status: string,
-): BackendError =>
-  new BackendError({
+export const createArchiveManifestNotReadyError = (status: string): AppError =>
+  new AppError({
     name: "ArchiveManifestNotReadyError",
     code: "conflict",
-    category: "business",
-    source: "backend",
     message: `Archive manifest not ready yet. Status: ${status}`,
     statusCode: 409,
+    originError: {
+      source: "app",
+    },
   });
 
 /**
@@ -78,14 +73,15 @@ export const createArchiveManifestNotReadyError = (
  *
  * @returns 对应 404 的业务错误。
  */
-export const createArchiveManifestNotFoundError = (): BackendError =>
-  new BackendError({
+export const createArchiveManifestNotFoundError = (): AppError =>
+  new AppError({
     name: "ArchiveManifestNotFoundError",
     code: "notFound",
-    category: "business",
-    source: "backend",
     message: "Archive manifest not found.",
     statusCode: 404,
+    originError: {
+      source: "app",
+    },
   });
 
 /**
@@ -101,13 +97,13 @@ export const validateDownloadJobInput = (
   ownerOid: string,
 ): void => {
   if (!containerId || itemIds.length === 0) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "containerId and a non-empty itemIds array are required.",
     );
   }
 
   if (!ownerOid) {
-    throw new BackendInternalError(
+    throw createInternalError(
       "The authenticated user oid is required to create a download job.",
     );
   }
@@ -118,14 +114,15 @@ export const validateDownloadJobInput = (
  *
  * @returns 对应 409 的业务错误。
  */
-export const createArchiveEmptyError = (): BackendError =>
-  new BackendError({
+export const createArchiveEmptyError = (): AppError =>
+  new AppError({
     name: "ArchiveEmptyError",
     code: "conflict",
-    category: "business",
-    source: "backend",
     message: "No files found to archive.",
     statusCode: 409,
+    originError: {
+      source: "app",
+    },
   });
 
 /**
@@ -138,15 +135,16 @@ export const createArchiveEmptyError = (): BackendError =>
 export const createArchiveTooManyFilesError = (
   totalFiles: number,
   maxFiles: number,
-): BackendError =>
-  new BackendError({
+): AppError =>
+  new AppError({
     name: "ArchiveTooManyFilesError",
     code: "conflict",
-    category: "business",
-    source: "backend",
     message: `Too many files (${totalFiles}). Maximum is ${maxFiles}.`,
     statusCode: 409,
-    context: { totalFiles, maxFiles },
+    originError: {
+      source: "app",
+    },
+    cause: { totalFiles, maxFiles },
   });
 
 /**
@@ -155,13 +153,14 @@ export const createArchiveTooManyFilesError = (
  * @param maxBytes 允许的最大总字节数。
  * @returns 对应 409 的业务错误。
  */
-export const createArchiveTooLargeError = (maxBytes: number): BackendError =>
-  new BackendError({
+export const createArchiveTooLargeError = (maxBytes: number): AppError =>
+  new AppError({
     name: "ArchiveTooLargeError",
     code: "conflict",
-    category: "business",
-    source: "backend",
     message: `Archive would exceed the ${maxBytes / 1024 / 1024} MB size limit.`,
     statusCode: 409,
-    context: { maxBytes },
+    originError: {
+      source: "app",
+    },
+    cause: { maxBytes },
   });

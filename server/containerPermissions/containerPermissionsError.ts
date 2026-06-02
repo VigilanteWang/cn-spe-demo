@@ -1,209 +1,29 @@
-import type {
-  IPermissionApiErrorBody,
-  PermissionApiErrorCode,
-} from "../../common/contracts/permissionCommonContracts";
-import type {
-  IErrorDetail,
-  IOriginErrorInfo,
-} from "../../common/contracts/errorContracts";
+import type { IPermissionApiErrorBody } from "../../common/contracts/permissionCommonContracts";
+import { AppError, serializeAppError } from "../../common/appError";
 import { readGraphToRecord } from "./containerPermissionsReaders";
-import {
-  type BackendErrorSource,
-  BackendError,
-  BackendValidationError,
-} from "../common/errorDefinitions";
-import {
-  readErrorDetails,
-  readErrorRequestId,
-  readErrorRetryAfterSeconds,
-  readErrorStatusCode,
-  readOriginError,
-} from "../common/errorUtils";
-
-/**
- * Graph 权限请求失败后，在服务端内部使用的错误类型。
- */
-export class ContainerPermissionsApiError extends BackendError<PermissionApiErrorCode> {
-  constructor(
-    code: PermissionApiErrorCode,
-    message: string,
-    options?: {
-      retryAfterSeconds?: number;
-      requestId?: string;
-      statusCode?: number;
-      details?: IErrorDetail[];
-      context?: Record<string, unknown>;
-      cause?: unknown;
-      source?: BackendErrorSource;
-      originError?: IOriginErrorInfo;
-    },
-  ) {
-    super({
-      name: "ContainerPermissionsApiError",
-      code,
-      category:
-        code === "invalidRequest"
-          ? "validation"
-          : code === "unauthorized" || code === "forbidden"
-            ? "auth"
-            : code === "throttled" ||
-                code === "serviceUnavailable" ||
-                code === "graphFailure"
-              ? "graph"
-              : "business",
-      source:
-        options?.source ??
-        (code === "throttled" ||
-        code === "serviceUnavailable" ||
-        code === "graphFailure"
-          ? "graph"
-          : "backend"),
-      message,
-      statusCode: options?.statusCode,
-      requestId: options?.requestId,
-      retryAfterSeconds: options?.retryAfterSeconds,
-      details: options?.details,
-      context: options?.context,
-      cause: options?.cause,
-      originError: options?.originError,
-    });
-  }
-}
+import { toGraphAppError } from "../common/appErrorHelpers";
 
 /**
  * 把 Graph SDK 抛出的未知错误映射成权限 API 自己的稳定错误类型。
  */
-export const mapContainerPermissionsGraphError = (
-  error: unknown,
-): ContainerPermissionsApiError => {
-  if (error instanceof ContainerPermissionsApiError) {
-    return error;
-  }
-
-  if (error instanceof BackendValidationError) {
-    return new ContainerPermissionsApiError("invalidRequest", error.message, {
-      statusCode: error.statusCode ?? 400,
-      details: error.details,
-      context: error.context,
-      cause: error.cause ?? error,
-      source: error.source,
-      originError: error.originError,
-    });
-  }
-
-  const statusCode = readErrorStatusCode(error);
-  const retryAfterSeconds = readErrorRetryAfterSeconds(error);
-  const requestId = readErrorRequestId(error);
-  const details = readErrorDetails(error);
-  const message = readGraphErrorMessage(error);
-  const originError = readOriginError(error, "microsoft-graph");
-
-  if (statusCode === 400) {
-    return new ContainerPermissionsApiError("invalidRequest", message, {
-      statusCode,
-      requestId,
-      cause: error,
-      source: "graph",
-      originError,
-    });
-  }
-
-  if (statusCode === 401) {
-    return new ContainerPermissionsApiError("unauthorized", message, {
-      statusCode,
-      requestId,
-      cause: error,
-      source: "graph",
-      originError,
-    });
-  }
-
-  if (statusCode === 403) {
-    return new ContainerPermissionsApiError("forbidden", message, {
-      statusCode,
-      requestId,
-      cause: error,
-      source: "graph",
-      originError,
-    });
-  }
-
-  if (statusCode === 404) {
-    return new ContainerPermissionsApiError("notFound", message, {
-      statusCode,
-      requestId,
-      cause: error,
-      source: "graph",
-      originError,
-    });
-  }
-
-  return new ContainerPermissionsApiError(
-    statusCode === 429
-      ? "throttled"
-      : statusCode === 503 || statusCode === 504
-        ? "serviceUnavailable"
-        : "graphFailure",
-    message,
-    {
-      statusCode,
-      retryAfterSeconds,
-      requestId,
-      details,
-      cause: error,
-      source: "graph",
-      originError,
-    },
-  );
-};
+export const mapContainerPermissionsGraphError = (error: unknown): AppError =>
+  toGraphAppError(error, readGraphErrorMessage(error), 500);
 
 /**
  * 把服务端内部错误对象转换成稳定的 API 响应体。
  */
 export const toContainerPermissionsApiErrorResponseBody = (
-  error: ContainerPermissionsApiError,
+  error: AppError,
 ): IPermissionApiErrorBody => ({
-  error: {
-    code: error.code,
-    message: error.message,
-    requestId: error.requestId,
-    statusCode:
-      error.statusCode ?? getContainerPermissionsApiErrorResponseStatus(error),
-    category: error.category,
-    source: error.source,
-    details: error.details,
-    context: error.context,
-    originError: error.originError,
-  },
+  error: serializeAppError(error),
 });
 
 /**
  * 根据业务错误类型选择合适的 HTTP 状态码。
  */
 export const getContainerPermissionsApiErrorResponseStatus = (
-  error: ContainerPermissionsApiError,
-): number => {
-  if (error.statusCode) {
-    return error.statusCode;
-  }
-
-  switch (error.code) {
-    case "invalidRequest":
-      return 400;
-    case "unauthorized":
-      return 401;
-    case "forbidden":
-      return 403;
-    case "notFound":
-      return 404;
-    case "throttled":
-      return 429;
-    case "serviceUnavailable":
-      return 503;
-    default:
-      return 500;
-  }
-};
+  error: AppError,
+): number => error.statusCode ?? 500;
 
 const readGraphErrorMessage = (error: unknown): string => {
   const record = readGraphToRecord(error);

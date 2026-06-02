@@ -1,4 +1,4 @@
-import { BackendValidationError } from "../common/errorDefinitions";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * 读取 Graph 返回值为普通对象。
@@ -39,5 +39,5 @@ export const readRequiredString = (
     return value;
   }
 
-  throw new BackendValidationError(`Missing required ${fieldName}.`);
+  throw createValidationError(`Missing required ${fieldName}.`);
 };

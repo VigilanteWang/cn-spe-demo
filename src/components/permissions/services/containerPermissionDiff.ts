@@ -1,4 +1,4 @@
-import { FrontendValidationError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 import type {
   IContainerPermissionChangeSetFromUI,
   IContainerPermissionCreateChange,
@@ -18,11 +18,16 @@ export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeS
  * 这类错误说明前端当前持有的权限快照不完整，
  * 应该阻止继续写回后端，并把上下文反馈给 UI。
  */
-export class ContainerPermissionValidationError extends FrontendValidationError {
+export class ContainerPermissionValidationError extends AppError {
   constructor(code: string, message: string, entryId: string) {
-    super(code, message, {
+    super({
       name: "ContainerPermissionValidationError",
-      context: { entryId },
+      code,
+      message,
+      originError: {
+        source: "validation",
+      },
+      cause: { entryId },
     });
   }
 }

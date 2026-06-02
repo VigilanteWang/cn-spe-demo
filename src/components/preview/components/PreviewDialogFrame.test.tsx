@@ -2,7 +2,7 @@
 import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { FrontendApiError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 import { PreviewDialogFrame } from "./PreviewDialogFrame";
 
 const renderFrame = (
@@ -70,14 +70,17 @@ describe("PreviewDialogFrame", () => {
       previewState: {
         previewUrl: "",
         isLoading: false,
-        error: new FrontendApiError(
-          "previewLoadFailed",
-          "Failed to load preview.",
-        ),
+        error: new AppError({
+          name: "AppError",
+          code: "previewLoadFailed",
+          message: "Failed to load preview.",
+        }),
       },
     });
 
-    expect(screen.getByText("Failed to load preview.")).toBeInTheDocument();
+    expect(
+      screen.getByText("AppError: Failed to load preview."),
+    ).toBeInTheDocument();
   });
 
   it("should render the preview iframe when a preview URL exists", () => {
@@ -107,14 +110,15 @@ describe("PreviewDialogFrame", () => {
         isLoading: false,
         error: null,
       },
-      actionError: new FrontendApiError(
-        "previewDeleteFailed",
-        "Failed to delete the current file.",
-      ),
+      actionError: new AppError({
+        name: "AppError",
+        code: "previewDeleteFailed",
+        message: "Failed to delete the current file.",
+      }),
     });
 
     expect(
-      screen.getByText("Failed to delete the current file."),
+      screen.getByText("AppError: Failed to delete the current file."),
     ).toBeInTheDocument();
     expect(
       screen.queryByTitle("Preview of Quarterly Report.pdf"),

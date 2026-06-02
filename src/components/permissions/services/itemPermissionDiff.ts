@@ -1,4 +1,4 @@
-import { FrontendValidationError } from "../../../common/errors.ts";
+import { AppError } from "../../../common/errors.ts";
 import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionCreateChange,
@@ -17,7 +17,7 @@ export { type IItemPermissionChangeSetFromUI as IItemPermissionChangeSet } from 
  *
  * 这个错误会把问题定位到具体 entry，方便调用方在草稿列表里高亮出错项。
  */
-export class ItemPermissionValidationError extends FrontendValidationError {
+export class ItemPermissionValidationError extends AppError {
   /**
    * 创建一个带 entryId 上下文的草稿校验错误。
    *
@@ -26,9 +26,14 @@ export class ItemPermissionValidationError extends FrontendValidationError {
    * @param entryId 出错的权限行 id。
    */
   constructor(code: string, message: string, entryId: string) {
-    super(code, message, {
+    super({
       name: "ItemPermissionValidationError",
-      context: { entryId },
+      code,
+      message,
+      originError: {
+        source: "validation",
+      },
+      cause: { entryId },
     });
   }
 }

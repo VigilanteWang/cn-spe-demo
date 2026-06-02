@@ -67,7 +67,7 @@ describe("useFilesArchiveDownload", () => {
 
     expect(result.current.downloadProgress.phase).toBe("failed");
     expect(result.current.downloadProgress.errorMessage).toBe(
-      "Archive request was throttled. Retry after 6 seconds. Request ID: req-archive-429.",
+      "Error: Archive request was throttled.",
     );
     expect(getDownloadProgressMock).not.toHaveBeenCalled();
     expect(getDownloadManifestMock).not.toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe("useFilesArchiveDownload", () => {
 
     expect(result.current.downloadProgress.phase).toBe("failed");
     expect(result.current.downloadProgress.errorMessage).toBe(
-      "Folder A failed; Folder B failed",
+      "ArchivePreparationError: Folder A failed; Folder B failed",
     );
     expect(result.current.downloadProgress.backendProgress?.status).toBe(
       "failed",

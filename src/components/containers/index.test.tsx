@@ -176,9 +176,7 @@ describe("Containers", () => {
     render(<Containers />);
 
     expect(
-      await screen.findByText(
-        "Container list request was throttled. Retry after 8 seconds. Request ID: req-containers-429.",
-      ),
+      await screen.findByText("Error: Container list request was throttled."),
     ).toBeInTheDocument();
   });
 });

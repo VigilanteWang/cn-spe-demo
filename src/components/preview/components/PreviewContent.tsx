@@ -1,14 +1,14 @@
 import { Spinner } from "@fluentui/react-components";
 import {
-  formatStandardErrorMessageForUI,
-  type FrontendErrorBase,
+  formatAppErrorMessageForUI,
+  type AppError,
 } from "../../../common/errors.ts";
 import { usePreviewStyles } from "./previewStyles";
 import type { IPreviewContentState } from "../models/previewTypes";
 
 interface IPreviewContentProps extends IPreviewContentState {
   fileName: string;
-  actionError?: FrontendErrorBase | null;
+  actionError?: AppError | null;
 }
 
 /**
@@ -45,7 +45,7 @@ export const PreviewContent = ({
     return (
       <div className={styles.loadingContainer}>
         <div>
-          {formatStandardErrorMessageForUI(error, "Failed to load preview.")}
+          {formatAppErrorMessageForUI(error, "Failed to load preview.")}
         </div>
       </div>
     );
@@ -55,7 +55,7 @@ export const PreviewContent = ({
     return (
       <div className={styles.loadingContainer}>
         <div>
-          {formatStandardErrorMessageForUI(
+          {formatAppErrorMessageForUI(
             actionError,
             "Failed to complete preview action.",
           )}

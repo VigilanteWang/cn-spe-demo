@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { FrontendValidationError } from "../../../common/errors.ts";
 import { usePermissionDialogApiRequestState } from "./usePermissionDialogApiRequestState";
 
 interface ITestEntriesByTab {
@@ -83,7 +82,7 @@ describe("usePermissionDialogApiRequestState", () => {
     });
 
     expect(result.current.permissionErrorMessages).toEqual([
-      "Api Error: No container selected.",
+      "Api Error: PermissionValidationError: No container selected.",
     ]);
   });
 
@@ -119,7 +118,7 @@ describe("usePermissionDialogApiRequestState", () => {
 
     await waitFor(() => {
       expect(result.current.permissionErrorMessages).toEqual([
-        "Api Error: load failed",
+        "Api Error: Error: load failed",
       ]);
     });
 
@@ -203,7 +202,7 @@ describe("usePermissionDialogApiRequestState", () => {
     expect(options.replaceEntries).not.toHaveBeenCalled();
     expect(result.current.applyFeedbackStatus).toBe("error");
     expect(result.current.permissionErrorMessages).toEqual([
-      "Api Error: apply failed",
+      "Api Error: Error: apply failed",
     ]);
   });
 
@@ -222,10 +221,10 @@ describe("usePermissionDialogApiRequestState", () => {
     });
 
     expect(result.current.permissionRequestErrorMessage).toBe(
-      new FrontendValidationError("missingTarget", "No item selected.").message,
+      "PermissionValidationError: No item selected.",
     );
     expect(result.current.permissionErrorMessages).toEqual([
-      "Api Error: No item selected.",
+      "Api Error: PermissionValidationError: No item selected.",
     ]);
   });
 });

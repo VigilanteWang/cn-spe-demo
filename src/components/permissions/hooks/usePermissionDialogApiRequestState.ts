@@ -4,8 +4,8 @@ import {
   type PermissionApplyFeedbackStatus,
 } from "../utils/permissionDialogSharedUtils";
 import {
-  formatStandardErrorMessageForUI,
-  FrontendValidationError,
+  AppError,
+  formatAppErrorMessageForUI,
 } from "../../../common/errors.ts";
 
 /**
@@ -97,10 +97,14 @@ export const usePermissionDialogApiRequestState = <
   // 把缺少目标资源建模成稳定的前端验证错误，避免组件层继续依赖裸字符串判断。
   const missingTargetError = useMemo(
     () => ({
-      missingTarget: new FrontendValidationError(
-        "missingTarget",
-        `No ${resourceLabel} selected.`,
-      ),
+      missingTarget: new AppError({
+        name: "PermissionValidationError",
+        code: "missingTarget",
+        message: `No ${resourceLabel} selected.`,
+        originError: {
+          source: "validation",
+        },
+      }),
     }),
     [resourceLabel],
   );
@@ -163,7 +167,7 @@ export const usePermissionDialogApiRequestState = <
       setIsApplyingPermissions(false);
       resetToEmptyEntries();
       setPermissionRequestErrorMessage(
-        formatStandardErrorMessageForUI(
+        formatAppErrorMessageForUI(
           missingTargetError.missingTarget,
           missingTargetError.missingTarget.message,
         ),
@@ -194,7 +198,7 @@ export const usePermissionDialogApiRequestState = <
         // 读取失败时把本地权限清空，避免界面继续显示旧资源或旧请求留下的数据。
         resetToEmptyEntries();
         setPermissionRequestErrorMessage(
-          formatStandardErrorMessageForUI(
+          formatAppErrorMessageForUI(
             error,
             requestFallbackErrorMessages.loadErrorFallback,
           ),
@@ -231,7 +235,7 @@ export const usePermissionDialogApiRequestState = <
     } catch (error: unknown) {
       // 差异计算阶段出错时，不进入真正的保存流程，直接给出 prepare 阶段反馈。
       setPermissionRequestErrorMessage(
-        formatStandardErrorMessageForUI(
+        formatAppErrorMessageForUI(
           error,
           requestFallbackErrorMessages.prepareErrorFallback,
         ),
@@ -255,7 +259,7 @@ export const usePermissionDialogApiRequestState = <
       setApplyFeedbackStatus("success");
     } catch (error: unknown) {
       setPermissionRequestErrorMessage(
-        formatStandardErrorMessageForUI(
+        formatAppErrorMessageForUI(
           error,
           requestFallbackErrorMessages.applyErrorFallback,
         ),

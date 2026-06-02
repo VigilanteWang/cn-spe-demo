@@ -13,37 +13,39 @@ vi.mock("../auth", () => ({
 
 describe("fetchMapItemPermissionsFromGraphToResponse", () => {
   it("should skip parent permission lookup when parentReference points to drive root", async () => {
-    const currentPermissionsPath =
-      "/drives/drive-1/items/item-top/permissions";
+    const currentPermissionsPath = "/drives/drive-1/items/item-top/permissions";
     const itemParentReferencePath =
       "/drives/drive-1/items/item-top?$select=parentReference";
     const rootItemPermissionsPath =
       "/drives/drive-1/items/root-item/permissions";
     const requestedPaths: string[] = [];
 
-    const graphClient = createMockGraphClient({
-      [currentPermissionsPath]: {
-        value: [
-          {
-            id: "perm-top",
-            roles: ["read"],
-            grantedToV2: {
-              user: {
-                id: "user-1",
-                displayName: "Adele Vance",
-                userPrincipalName: "adele@contoso.com",
+    const graphClient = createMockGraphClient(
+      {
+        [currentPermissionsPath]: {
+          value: [
+            {
+              id: "perm-top",
+              roles: ["read"],
+              grantedToV2: {
+                user: {
+                  id: "user-1",
+                  displayName: "Adele Vance",
+                  userPrincipalName: "adele@contoso.com",
+                },
               },
             },
+          ],
+        },
+        [itemParentReferencePath]: {
+          parentReference: {
+            id: "root-item",
+            path: "/drives/drive-1/root:",
           },
-        ],
-      },
-      [itemParentReferencePath]: {
-        parentReference: {
-          id: "root-item",
-          path: "/drives/drive-1/root:",
         },
       },
-    }, requestedPaths);
+      requestedPaths,
+    );
 
     const response = await fetchMapItemPermissionsFromGraphToResponse(
       graphClient,
@@ -74,44 +76,47 @@ describe("fetchMapItemPermissionsFromGraphToResponse", () => {
       "/drives/drive-1/items/folder-parent/permissions";
     const requestedPaths: string[] = [];
 
-    const graphClient = createMockGraphClient({
-      [currentPermissionsPath]: {
-        value: [
-          {
-            id: "perm-shared",
-            roles: ["read"],
-            grantedToV2: {
-              group: {
-                id: "group-1",
-                displayName: "Retail Members",
-                email: "retail@contoso.com",
+    const graphClient = createMockGraphClient(
+      {
+        [currentPermissionsPath]: {
+          value: [
+            {
+              id: "perm-shared",
+              roles: ["read"],
+              grantedToV2: {
+                group: {
+                  id: "group-1",
+                  displayName: "Retail Members",
+                  email: "retail@contoso.com",
+                },
               },
             },
+          ],
+        },
+        [itemParentReferencePath]: {
+          parentReference: {
+            id: "folder-parent",
+            path: "/drives/drive-1/root:/Projects",
           },
-        ],
-      },
-      [itemParentReferencePath]: {
-        parentReference: {
-          id: "folder-parent",
-          path: "/drives/drive-1/root:/Projects",
+        },
+        [parentPermissionsPath]: {
+          value: [
+            {
+              id: "perm-shared",
+              roles: ["read"],
+              grantedToV2: {
+                group: {
+                  id: "group-1",
+                  displayName: "Retail Members",
+                  email: "retail@contoso.com",
+                },
+              },
+            },
+          ],
         },
       },
-      [parentPermissionsPath]: {
-        value: [
-          {
-            id: "perm-shared",
-            roles: ["read"],
-            grantedToV2: {
-              group: {
-                id: "group-1",
-                displayName: "Retail Members",
-                email: "retail@contoso.com",
-              },
-            },
-          },
-        ],
-      },
-    }, requestedPaths);
+      requestedPaths,
+    );
 
     const response = await fetchMapItemPermissionsFromGraphToResponse(
       graphClient,

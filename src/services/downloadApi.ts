@@ -15,19 +15,13 @@
  */
 
 import { IAbortRequestOptions, sendAuthorizedRequest } from "./apiClient";
-import { FrontendApiError, FrontendUserActionError } from "../common/errors.ts";
+import { AppError } from "../common/errors.ts";
 import {
   IArchiveManifest,
   IArchiveSaveTarget,
   IShowSaveFilePickerWindow,
 } from "../common/types";
 import { readApiErrorResponseSummary } from "./apiErrorMapper";
-import type {
-  ErrorCategory,
-  ErrorSource,
-  IErrorDetail,
-  IOriginErrorInfo,
-} from "../../common/contracts/errorContracts";
 
 /**
  * ZIP 归档任务的进度信息。
@@ -55,45 +49,18 @@ export interface IJobProgress {
  * 当 showSaveFilePicker 弹窗被用户关闭时抛出，
  * 调用方应捕获此错误并中止整个下载流程。
  */
-export class DownloadSaveTargetSelectionCancelledError extends FrontendUserActionError {
+export class DownloadSaveTargetSelectionCancelledError extends AppError {
   /**
    * 创建一个“用户主动取消下载保存”的稳定错误。
    */
   constructor() {
-    super("downloadCancelled", "Download cancelled by user.", {
+    super({
       name: "DownloadSaveTargetSelectionCancelledError",
-    });
-  }
-}
-
-/**
- * 归档下载相关后端请求失败时抛出的稳定错误类型。
- */
-export class ArchiveRequestError extends FrontendApiError {
-  constructor(
-    code: string,
-    message: string,
-    options: {
-      statusCode: number;
-      category: ErrorCategory;
-      source: ErrorSource;
-      requestId?: string;
-      retryAfterSeconds?: number;
-      details?: IErrorDetail[];
-      context?: Record<string, unknown>;
-      originError?: IOriginErrorInfo;
-    },
-  ) {
-    super(code, message, {
-      name: "ArchiveRequestError",
-      category: options.category,
-      source: options.source,
-      statusCode: options.statusCode,
-      requestId: options.requestId,
-      retryAfterSeconds: options.retryAfterSeconds,
-      details: options.details,
-      context: options.context,
-      originError: options.originError,
+      code: "downloadCancelled",
+      message: "Download cancelled by user.",
+      originError: {
+        source: "app",
+      },
     });
   }
 }
@@ -107,24 +74,20 @@ export class ArchiveRequestError extends FrontendApiError {
  * @returns 统一的前端 API 错误对象。
  */
 const buildArchiveRequestError = async (
-  code: string,
   operation: string,
   response: Response,
-): Promise<ArchiveRequestError> => {
-  const summary = await readApiErrorResponseSummary(response, {
-    fallbackCode: code,
+): Promise<AppError> => {
+  const appError = await readApiErrorResponseSummary(response, {
     operationLabel: operation,
   });
 
-  return new ArchiveRequestError(summary.code, summary.message, {
-    statusCode: summary.statusCode,
-    category: summary.category,
-    source: summary.source,
-    requestId: summary.requestId,
-    retryAfterSeconds: summary.retryAfterSeconds,
-    details: summary.details,
-    context: summary.context,
-    originError: summary.originError,
+  return new AppError({
+    name: "ArchiveRequestError",
+    code: appError.code,
+    message: appError.message,
+    statusCode: appError.statusCode,
+    originError: appError.originError,
+    cause: appError.cause,
   });
 };
 
@@ -161,11 +124,7 @@ export async function startDownload(
     const data = await response.json();
     return data.jobId as string;
   }
-  throw await buildArchiveRequestError(
-    "startArchivePreparationFailed",
-    "startDownload",
-    response,
-  );
+  throw await buildArchiveRequestError("startDownload", response);
 }
 
 /**
@@ -190,11 +149,7 @@ export async function getDownloadProgress(
     // 这里直接把后端 JSON 映射成强类型进度对象，供页面驱动进度条和状态文案。
     return (await response.json()) as IJobProgress;
   }
-  throw await buildArchiveRequestError(
-    "archivePreparationProgressFailed",
-    "getDownloadProgress",
-    response,
-  );
+  throw await buildArchiveRequestError("getDownloadProgress", response);
 }
 
 /**
@@ -219,11 +174,7 @@ export async function getDownloadManifest(
     // manifest 是前端流式下载和压缩 ZIP 的最小输入，不需要再额外拼接 Graph 数据。
     return (await response.json()) as IArchiveManifest;
   }
-  throw await buildArchiveRequestError(
-    "downloadManifestFailed",
-    "getDownloadManifest",
-    response,
-  );
+  throw await buildArchiveRequestError("getDownloadManifest", response);
 }
 
 /**

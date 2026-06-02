@@ -35,7 +35,7 @@ import type {
   SelectionEvents,
 } from "@fluentui/react-combobox";
 import { IContainer } from "../../common/types";
-import { formatStandardErrorMessageForUI } from "../../common/errors.ts";
+import { formatAppErrorMessageForUI } from "../../common/errors.ts";
 import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";
@@ -83,7 +83,7 @@ export const Containers = () => {
       } catch (error) {
         // 加载容器列表失败时，在按鈕旁显示错误提示
         setContainerError(
-          formatStandardErrorMessageForUI(error, "Failed to load containers"),
+          formatAppErrorMessageForUI(error, "Failed to load containers"),
         );
       }
     })();
@@ -164,7 +164,7 @@ export const Containers = () => {
         onContainerCreated={handleContainerCreated}
         onError={(error) =>
           setContainerError(
-            formatStandardErrorMessageForUI(error, "Failed to create container"),
+            formatAppErrorMessageForUI(error, "Failed to create container"),
           )
         }
       />

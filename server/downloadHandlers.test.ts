@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BackendError } from "./common/errorDefinitions";
+import { AppError } from "../common/appError";
 import { withErrorHandling } from "./common/errorResponse";
 import {
   getDownloadManifestRequest,
@@ -30,13 +30,14 @@ describe("downloadHandlers error handling", () => {
 
   it("should return notFound when archive progress does not exist", async () => {
     downloadMocks.getJobProgress.mockImplementation(() => {
-      throw new BackendError({
+      throw new AppError({
         name: "ArchiveJobNotFoundError",
         code: "notFound",
-        category: "business",
-        source: "backend",
         message: "Job not found, expired, or access denied.",
         statusCode: 404,
+        originError: {
+          source: "app",
+        },
       });
     });
 
@@ -47,28 +48,29 @@ describe("downloadHandlers error handling", () => {
 
     expect(res.send).toHaveBeenCalledWith(404, {
       error: {
+        name: "ArchiveJobNotFoundError",
         code: "notFound",
         message: "Job not found, expired, or access denied.",
         statusCode: 404,
-        category: "business",
-        source: "backend",
-        details: undefined,
-        context: undefined,
-        requestId: undefined,
-        originError: undefined,
+        originError: {
+          source: "app",
+          raw: undefined,
+        },
+        cause: undefined,
       },
     });
   });
 
   it("should return conflict when archive manifest is not ready", async () => {
     downloadMocks.getJobManifest.mockImplementation(() => {
-      throw new BackendError({
+      throw new AppError({
         name: "ArchiveManifestNotReadyError",
         code: "conflict",
-        category: "business",
-        source: "backend",
         message: "Archive manifest not ready yet. Status: preparing",
         statusCode: 409,
+        originError: {
+          source: "app",
+        },
       });
     });
 
@@ -79,15 +81,15 @@ describe("downloadHandlers error handling", () => {
 
     expect(res.send).toHaveBeenCalledWith(409, {
       error: {
+        name: "ArchiveManifestNotReadyError",
         code: "conflict",
         message: "Archive manifest not ready yet. Status: preparing",
         statusCode: 409,
-        category: "business",
-        source: "backend",
-        details: undefined,
-        context: undefined,
-        requestId: undefined,
-        originError: undefined,
+        originError: {
+          source: "app",
+          raw: undefined,
+        },
+        cause: undefined,
       },
     });
   });
@@ -100,15 +102,15 @@ describe("downloadHandlers error handling", () => {
 
     expect(res.send).toHaveBeenCalledWith(400, {
       error: {
+        name: "ValidationError",
         code: "invalidRequest",
         message: "jobId route parameter is required.",
         statusCode: 400,
-        category: "validation",
-        source: "backend",
-        details: undefined,
-        context: undefined,
-        requestId: undefined,
-        originError: undefined,
+        originError: {
+          source: "validation",
+          raw: undefined,
+        },
+        cause: undefined,
       },
     });
   });
