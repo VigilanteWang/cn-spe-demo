@@ -24,7 +24,7 @@ import {
   readGraphToRecord,
   readOptionalString,
 } from "../permissionsCore/permissionGraphReaders";
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 
 /**
  * Step 0 已在当前租户确认 item 显式 invite permission 的 PATCH 稳定可用，

@@ -37,7 +37,7 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。

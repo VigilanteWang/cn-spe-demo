@@ -94,9 +94,7 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to prepare the archive.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").errors).toEqual(["token boom"]);
   });
 
   it("should fail the job when expanding an item fails", async () => {
@@ -121,7 +119,7 @@ describe("download module", () => {
     await waitForJobStatus(jobId, "failed");
 
     expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to expand the selected items.",
+      "expand failed",
     ]);
   });
 
@@ -153,7 +151,7 @@ describe("download module", () => {
     await waitForJobStatus(jobId, "failed");
 
     expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to resolve the download url for item item-1.",
+      "resolve failed",
     ]);
   });
 

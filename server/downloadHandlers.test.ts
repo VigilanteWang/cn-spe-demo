@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BackendError } from "./common/errors";
+import { BackendError } from "./common/errorDefinitions";
 import { withErrorHandling } from "./common/errorResponse";
 import {
   getDownloadManifestRequest,

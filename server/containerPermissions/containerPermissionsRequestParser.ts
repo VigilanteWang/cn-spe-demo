@@ -21,7 +21,7 @@ import {
   readGraphToRecord,
   readRequiredString,
 } from "./containerPermissionsReaders";
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 
 /**
  * 读取并校验前端请求，转成变更集。

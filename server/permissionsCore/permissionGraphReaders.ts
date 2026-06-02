@@ -1,4 +1,4 @@
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 
 /**
  * 读取 Graph 返回值为普通对象。

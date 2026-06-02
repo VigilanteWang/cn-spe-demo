@@ -4,7 +4,8 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { BackendValidationError, toBackendGraphError } from "./common/errors";
+import { BackendValidationError } from "./common/errorDefinitions";
+import { toBackendGraphError } from "./common/errorUtils";
 
 interface IDeleteItemsRequestBody {
   containerId?: unknown;

@@ -49,7 +49,10 @@ import {
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
 import { toApiErrorResponseBody } from "./common/errorResponse";
-import { BackendAuthError, BackendGraphError } from "./common/errors";
+import {
+  BackendAuthError,
+  BackendGraphError,
+} from "./common/errorDefinitions";
 import { serverConfig } from "./config";
 
 /**

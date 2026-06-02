@@ -3,8 +3,8 @@ import {
   BackendGraphError,
   BackendInternalError,
   BackendValidationError,
-  toBackendGraphError,
-} from "../common/errors";
+} from "../common/errorDefinitions";
+import { toBackendGraphError } from "../common/errorUtils";
 
 /**
  * 提取适合写入任务状态的稳定错误文案。

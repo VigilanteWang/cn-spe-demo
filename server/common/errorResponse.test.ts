@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BackendAuthError, BackendError } from "./errors";
+import { BackendAuthError, BackendError } from "./errorDefinitions";
 import {
   normalizeError,
   toApiErrorResponseBody,

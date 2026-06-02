@@ -11,7 +11,7 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../permissionsCore/permissionGraphReaders";
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 
 /**
  * 读取并校验前端请求，转成 item 权限变更集。

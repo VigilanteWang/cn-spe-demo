@@ -7,13 +7,15 @@ import {
   BackendAuthError,
   BackendError,
   BackendInternalError,
+} from "./errorDefinitions";
+import {
   readCategoryFromStatusCode,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
   readOriginError,
   readSourceFromUnknownError,
-} from "./errors";
+} from "./errorUtils";
 
 // 这里维护“HTTP 状态码 -> 前端稳定错误码”的映射，
 // 让上游错误即使来源不同，也能在 API 层收口成统一语义。

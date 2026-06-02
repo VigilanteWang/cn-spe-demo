@@ -1,4 +1,4 @@
-import { BackendValidationError } from "../common/errors";
+import { BackendValidationError } from "../common/errorDefinitions";
 import type { ItemPermissionRoleForUI } from "../../common/contracts/itemPermissionCommonContracts";
 
 /**

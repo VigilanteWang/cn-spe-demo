@@ -18,7 +18,7 @@ describe("previewErrors", () => {
     const error = createPreviewUnavailableError();
 
     expect(error.code).toBe("previewUnavailable");
-    expect(error.category).toBe("api");
+    expect(error.category).toBe("business");
     expect(error.message).toBe("Preview not available for this file.");
   });
 
@@ -26,7 +26,7 @@ describe("previewErrors", () => {
     const error = createPreviewLoadFailedError();
 
     expect(error.code).toBe("previewLoadFailed");
-    expect(error.category).toBe("api");
+    expect(error.category).toBe("business");
     expect(error.message).toBe("Failed to load preview.");
   });
 });

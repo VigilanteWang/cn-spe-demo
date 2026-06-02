@@ -8,15 +8,17 @@ import type {
 } from "../../common/contracts/errorContracts";
 import { readGraphToRecord } from "./containerPermissionsReaders";
 import {
+  type BackendErrorSource,
   BackendError,
-  BackendErrorSource,
   BackendValidationError,
+} from "../common/errorDefinitions";
+import {
   readErrorDetails,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
   readOriginError,
-} from "../common/errors";
+} from "../common/errorUtils";
 
 /**
  * Graph 权限请求失败后，在服务端内部使用的错误类型。

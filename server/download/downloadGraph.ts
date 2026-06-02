@@ -1,6 +1,6 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { createGraphClient } from "../auth";
-import { BackendGraphError } from "../common/errors";
+import { BackendGraphError } from "../common/errorDefinitions";
 import { toDownloadGraphError } from "./downloadErrors";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 

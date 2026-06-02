@@ -8,15 +8,17 @@ import type {
 } from "../../common/contracts/errorContracts";
 import { readGraphToRecord } from "../permissionsCore/permissionGraphReaders";
 import {
+  type BackendErrorSource,
   BackendError,
-  BackendErrorSource,
   BackendValidationError,
+} from "../common/errorDefinitions";
+import {
   readErrorDetails,
   readErrorRequestId,
   readErrorRetryAfterSeconds,
   readErrorStatusCode,
   readOriginError,
-} from "../common/errors";
+} from "../common/errorUtils";
 
 /**
  * 表示 item permission 后端流程里的稳定错误模型。

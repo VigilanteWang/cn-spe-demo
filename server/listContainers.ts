@@ -18,7 +18,7 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { toBackendGraphError } from "./common/errors";
+import { toBackendGraphError } from "./common/errorUtils";
 import { serverConfig } from "./config";
 
 /**

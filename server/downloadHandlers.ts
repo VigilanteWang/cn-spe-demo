@@ -1,6 +1,6 @@
 import { Request, Response } from "restify";
 import { requireContainerManageRequest } from "./auth";
-import { BackendValidationError } from "./common/errors";
+import { BackendValidationError } from "./common/errorDefinitions";
 import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
 
 interface IStartDownloadRequestBody {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BackendError, toBackendGraphError } from "./errors";
+import { BackendError } from "./errorDefinitions";
+import { toBackendGraphError } from "./errorUtils";
 
 const createHeadersLike = (entries: Record<string, string>) => ({
   get: (name: string) => entries[name],
