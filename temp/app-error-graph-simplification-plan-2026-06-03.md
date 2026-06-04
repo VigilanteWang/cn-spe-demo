@@ -1,221 +1,189 @@
-# AppError 与 GraphError 精简改造计划
+# AppError / Graph 错误精简计划复核版（2026-06-05）
 
-## 背景
+## 结论
 
-- 提交 `f35015ece65ba2600977b21f68fc8df883d5baa3` 之后，前后端错误已经统一收敛为共享 `AppError`。
-- 当前问题不在“是否继续统一”，而在于 `common/appError.ts` 对 Graph 错误做了过多猜测性解析，导致：
-  - `AppError` 基类、Graph SDK 适配、通用序列化、UI 文案格式化都挤在同一个文件里。
-  - Graph 错误路径里存在较多 `unknown` 判断、宽松 shape 推断、大小写兼容和多层兜底。
-  - 非 Graph 错误为了贴合统一结构，被额外推断了并不稳定的字段。
+- 这份 change 仍然有效，不应删除。
+- 但它已经不再是“继续做大一统重构”，而是一个更小的 cleanup。
+- `AppError` 主体统一已经完成；现在剩下的是：
+  - 缩减 `common/appError.ts` 里对 Graph 错误的猜测性解析
+  - 清理少量仍保留语义包装名的前端错误壳层
 
-## 本次改造目标
+## 当前已完成、因此不该再作为计划主体的内容
 
-1. 继续维持当前“前后端统一 `AppError` + 共享 `AppErrorShape`/`IErrorResponseBody`”架构。
-2. 非 Graph 错误采用最小归一化策略：
-   - 原始错误里有什么就保留什么。
-   - 没有的字段不强行补齐。
-   - `originError.raw` 负责兜底保存原始错误快照。
-3. Graph 错误采用 SDK 直读策略：
-   - 以 `msgraph-sdk-javascript` 的 `GraphError` 真实结构为准。
-   - 不再为“可能不是 Graph SDK 错误”的变体做大量兼容。
-   - 在保留基本类型安全的前提下，减少 `unknown` 推断和多层 guard。
-4. `common/appError.ts` 拆分职责，避免单文件继续膨胀。
+以下内容已经落地，不应继续按“待实现”写：
 
-## 已确认的现状落点
+### 1. 共享错误 contract 已经统一
 
-### 统一错误边界
-
-- 共享 contract 在 `common/contracts/errorContracts.ts`
+- `common/contracts/errorContracts.ts`
+- 现在只保留：
   - `AppErrorShape`
   - `IOriginErrorInfo`
   - `IErrorResponseBody`
-- 后端统一响应在 `server/common/errorResponse.ts`
-  - `normalizeError(...)`
-  - `toApiErrorResponseBody(...)`
-  - `sendApiError(...)`
-- 前端统一反序列化在 `src/services/apiErrorMapper.ts`
-  - `deserializeAppError(...)`
-  - `readApiErrorResponseSummary(...)`
 
-### 当前 Graph 相关逻辑集中点
+### 2. `src/common/errors.ts` 已经是纯 re-export facade
 
+- 前端已经不再维持独立 `Frontend*` 基类
+
+### 3. `src/services/apiErrorMapper.ts` 已经切到统一反序列化模型
+
+- 结构化错误直接 `deserializeAppError(...)`
+- 不再有旧的 `fallbackCode`
+- 不再按 `response.status` 自动推导稳定 `code`
+
+### 4. 后端旧的 `Backend*` 错误体系已经不再是主路径
+
+- `server/common/errorDefinitions.ts` 已不存在
+- `server/common/errorResponse.ts` 已围绕 `AppError` 做统一收口
+
+### 5. 权限共享 contract 已经不再保留旧的权限错误码体系
+
+- `common/contracts/permissionCommonContracts.ts`
+- 现在只把权限接口错误响应别名到 `IErrorResponseBody`
+
+## 当前仍然有效的问题
+
+### 1. `common/appError.ts` 仍承担过多职责
+
+目前它同时包含：
+
+- `AppError` 类定义
+- 通用 `unknown -> AppError` 归一化
+- Graph 错误形状识别
+- 多路径 header 读取
+- `innerError / innererror` 兼容链
+- 原始错误序列化
+- UI 文案格式化
+
+这会带来两个问题：
+
+- 文件过大，职责边界不清
+- Graph 解析逻辑会继续吸附到“统一错误中心”里，难以收紧
+
+### 2. Graph 错误识别仍然偏猜测式
+
+`common/appError.ts` 当前仍保留多种兼容路径：
+
+- `record.headers`
+- `record.response.headers`
+- `record.responseHeaders`
+- `record.body.headers`
+- `body.error`
+- `record.error`
+- `innerError`
+- `innererror`
+
+以及“只要长得像 GraphError 就按 Graph 处理”的策略。
+
+这与当前目标不一致，因为我们现在更想要的是：
+
+- Graph 入口明确时才做 Graph 读取
+- 非 Graph 错误尽量少猜
+
+### 3. `normalizeError()` / `toAppError()` 仍会对普通未知错误做 Graph 探测
+
+- `server/common/errorResponse.ts`
 - `common/appError.ts`
-  - `extractGraphOriginError(...)`
-  - `readErrorRequestId(...)`
-  - `readErrorRetryAfter(...)`
-  - `readErrorStatusCode(...)`
-  - `readGraphCodePath(...)`
-  - `buildGraphRawSnapshot(...)`
-- 后端 Graph 错误入口
-  - `server/common/appErrorHelpers.ts` 的 `toGraphAppError(...)`
-- 后端兼容层
-  - `server/common/errorUtils.ts`
 
-### 当前前端展示入口
+这意味着很多未知错误即使只是普通对象或普通 `Error`，也会先经过 Graph shape 探测。
 
-- `src/common/errors.ts` 负责把共享错误能力重新导出给前端。
-- UI 直接依赖 `formatAppErrorMessageForUI(...)`，不应把 Graph shape 解析继续下沉到组件层。
+### 4. 前端仍有少量语义包装名残留
 
-## 推荐设计
+这些不再是大问题，但仍属于 cleanup 范围：
 
-### 1. 保留统一 AppError 外壳，不改传输协议
+- `src/services/downloadApi.ts`
+  - `ArchiveRequestError`
+  - `DownloadSaveTargetSelectionCancelledError`
+- `src/components/permissions/services/directoryPrincipalSearch/directoryPrincipalSearchError.ts`
+  - `DirectoryPrincipalSearchAppError`
+- `src/services/itemPermissionApi.ts`
+  - `ItemPermissionApiError` 类型别名
 
-- 保留以下共享结构不变：
-  - `AppError`
-  - `AppErrorShape`
-  - `IOriginErrorInfo`
-  - `IErrorResponseBody`
-- 保留后端响应 envelope：
+这里不是说这些名字一定都要删光，而是需要重新判断：
 
-```ts
-{
-  error: AppErrorShape;
-}
-```
+- 它们是否真的提供了不可替代的业务语义
+- 还是只是统一后遗留的“额外壳”
 
-- 保留前端收到后通过 `deserializeAppError(...)` 还原为运行时 `AppError` 的方式。
+## 更新后的建议范围
 
-### 2. 非 Graph 错误改为最小归一化
+这轮 issue 建议收窄成两个目标。
 
-- 非 Graph 错误统一进入 `toAppError(...)` / `normalizeError(...)` 后，只做这些事情：
-  - `name`：原始错误有就保留，否则回退 `"AppError"`
-  - `message`：原始错误有就保留，否则用调用方 fallback
-  - `code`：仅当原始错误本身有字符串 `code` 时保留
-  - `statusCode`：仅当原始错误本身有可读数值时保留，否则用默认值
-  - `cause`：继续保留原始错误
-  - `originError`：默认写成
+### Goal 1：把 Graph 解析限制在明确的 Graph 边界函数里
 
-```ts
-{
-  source: "app",
-  raw: serializeUnknownCause(error),
-}
-```
+建议方向：
 
-- 不再为了统一模型去额外推断：
-  - `requestId`
-  - `retryAfter`
-  - `codePath`
-  - 任何 Graph 风格字段
+1. 让 `toGraphAppError(...)` 继续作为 Graph 专用入口
+2. 把大部分 Graph shape 读取逻辑从 `common/appError.ts` 挪到独立模块
+3. 收紧 Graph 识别来源，优先只支持当前仓库真实在用的 SDK/响应形状
+4. 非 Graph 路径默认不主动做大量 Graph 风格探测
 
-### 3. Graph 错误改为 SDK 直读
+### Goal 2：清掉少量已经不再必要的包装壳
 
-- 在 Graph 专用模块中定义内部 shape，只按 SDK 已知字段读取：
+优先复核这些点：
 
-```ts
-type GraphSdkErrorShape = {
-  name?: string;
-  message?: string;
-  statusCode?: number;
-  code?: string;
-  requestId?: string;
-  date?: string;
-  headers?: Headers | Record<string, string>;
-  body?: unknown;
-};
-```
+1. `ArchiveRequestError`
+   - 如果只是给 API 错误换名，可直接返回 `AppError`
+2. `ItemPermissionApiError`
+   - 如果只是 `type alias`，可删
+3. `DirectoryPrincipalSearchAppError`
+   - 如果它仍提供稳定 `code` 联合与模块边界，可保留
+   - 如果只是为了保留旧类名，需要评估是否降级成工厂函数
+4. `DownloadSaveTargetSelectionCancelledError`
+   - 这是“用户主动取消”的业务语义名，可能值得保留
+   - 不建议在没有替代判断方式前机械删除
 
-- `toGraphAppError(...)` 继续保留，作为“这里明确在处理 Graph SDK 错误”的边界函数。
-- 进入该函数后：
-  - 直接读取顶层 `statusCode`
-  - 直接读取顶层 `code`
-  - 直接读取顶层 `requestId`
-  - `retryAfter` 只从顶层 `headers` 读取
-  - `raw` 保留 Graph SDK 顶层快照
-- 若 `body` 符合标准 Graph error JSON，再从标准 `error.innerError` 链提取 `codePath`。
-- 不再继续做这些兼容：
-  - `innerError` / `innererror` 双分支兼容
-  - `response.headers` / `responseHeaders` / `body.headers` 多路径兜底
-  - `error.error`、`body.error`、`directError` 多层猜测
-  - “看起来像 GraphError 就按 GraphError 处理”的宽松识别
+## 不建议继续照旧执行的内容
 
-### 4. 拆分 `common/appError.ts`
+以下做法在当前现状下不建议继续原样推进：
 
-- 推荐改为 `common/appError/` 目录：
-  - `AppError.ts`
-  - `appErrorGuards.ts`
-  - `appErrorSerialization.ts`
-  - `appErrorNormalization.ts`
-  - `appErrorUi.ts`
-  - `graphSdkError.ts`
-  - `index.ts`
-- 职责建议：
-  - `AppError.ts`：只放类定义与 `IAppErrorInit`
-  - `appErrorGuards.ts`：只放 `isAppError`
-  - `appErrorSerialization.ts`：只放 `serializeUnknownCause`、`serializeAppError`、`deserializeAppError`
-  - `appErrorNormalization.ts`：只放通用 `toAppError`、`readErrorMessage`、`readErrorStatusCode`
-  - `graphSdkError.ts`：只放 Graph SDK 读取与 `extractGraphOriginError`
-  - `appErrorUi.ts`：只放 `formatAppErrorMessageForUI`
-- 为减少改动面：
-  - `common/appError.ts` 暂时保留为兼容 re-export 层。
-  - `src/common/errors.ts` 继续作为前端 facade，不要求一次性修改全仓 import。
+- 不要再把 issue 定义成“全仓彻底删光所有语义化错误名”
+- 不要把已经完成的 shared contract / `Frontend*` / `Backend*` 删壳重新列成主体任务
+- 不要在本轮顺手改传输协议
+- 不要为了“纯度”删除确实承载用户动作语义的取消类错误
 
-## 共享 contract 建议
+## 更新后的实施顺序
 
-- `common/contracts/errorContracts.ts` 不新增新的共享字段。
-- `IOriginErrorInfo` 继续保持当前最小集合：
+### Step 1：先做 Graph 解析收紧
 
-```ts
-interface IOriginErrorInfo {
-  source?: "microsoft-graph" | "app" | "network" | "validation";
-  raw?: unknown;
-  codePath?: string[];
-  requestId?: string;
-  retryAfter?: number;
-}
-```
+建议改动：
 
-- 本次不为 React、TypeScript、Node 等非 Graph 错误单独扩展共享字段。
+1. 抽 `common/appError/graphSdkError.ts` 或等价模块
+2. 让 `extractGraphOriginError(...)` 只服务于明确 Graph 路径
+3. 收紧这些兼容分支是否仍需要存在：
+   - `responseHeaders`
+   - `body.headers`
+   - `innererror`
+   - `record.error`
 
-## 实施顺序
+### Step 2：再复核残余包装壳
 
-1. 先拆 `common/appError.ts`，但先通过 re-export 保持外部 import 不变。
-2. 再把 Graph 解析逻辑迁移到 `graphSdkError.ts`，删除多余 shape 猜测。
-3. 再收紧 `toAppError(...)` 和 `normalizeError(...)` 的非 Graph 归一化逻辑。
-4. 最后补测试并检查前后端调用点是否仍符合统一 `AppError` 协议。
+建议逐个判定：
 
-## 建议验证
+1. `ArchiveRequestError`
+2. `ItemPermissionApiError`
+3. `DirectoryPrincipalSearchAppError`
+4. `DownloadSaveTargetSelectionCancelledError`
 
-### 后端
+判定标准：
+
+- 是否提供稳定业务语义
+- 是否还有调用方依赖其 `name` / `code` / `instanceof`
+- 删除后是否会让测试和 UI 判断更简单
+
+### Step 3：同步测试到“更少猜测、更少包装”的目标
+
+重点关注：
 
 - `server/common/errors.test.ts`
-  - Graph SDK 错误应直接读出 `statusCode`、`code`、`requestId`、`Retry-After`
-  - 若 `body` 是标准 Graph error JSON，应能提取 `codePath`
-  - 若 `body` 不是标准结构，应停止猜测，但 `raw` 仍完整保留
 - `server/common/errorResponse.test.ts`
-  - 原生 `Error`
-  - 普通对象错误
-  - 字符串 / 非对象抛错
-  - 都应生成统一 `AppError`
+- `src/services/downloadApi.test.ts`
+- `src/components/permissions/services/directoryPrincipalSearch/*.test.ts`
 
-### 前端
+## 建议写入 issue 的任务定义
 
-- `src/services/apiErrorMapper.ts`
-  - 结构化后端错误应能正确反序列化
-  - `Retry-After` header 仍应覆盖到 `originError.retryAfter`
-- 相关调用点验证：
-  - `src/services/backendApi.ts`
-  - `src/components/containers/index.tsx`
-  - `src/components/files/index.tsx`
-  - `src/components/preview/components/PreviewContent.tsx`
+如果要写 GitHub issue，建议标题和范围都聚焦为：
 
-### 类型检查
+- “精简 Graph 错误解析并清理残余 AppError 包装壳”
 
-- `npm test -- --run server/common/errors.test.ts server/common/errorResponse.test.ts`
-- `npx tsc --noEmit`
+而不是继续使用“彻底统一化”这一类表述。
 
-## 需要特别避免的实现方式
-
-- 不要把“统一 AppError”再次做成“所有错误字段都必须被推断出来”的大而全模型。
-- 不要在 Graph 专用入口里继续维护大量“也许不是 SDK GraphError”的兼容分支。
-- 不要为这次重构新增新的错误大类、错误继承树或额外共享协议。
-- 不要让 UI 组件自己再去识别 Graph 错误结构。
-
-## 与昨天文档的关系
-
-- `temp/app-error-unification-handoff-2026-06-02.md` 更偏向“彻底统一化”的大方案。
-- 本文档是这轮更精确的后续方案：
-  - 保留统一 `AppError`
-  - 精简 Graph SDK 处理
-  - 放宽非 Graph 错误的归一化要求
-  - 拆分 `common/appError.ts`
+因为从今天的代码现状看，这已经不是架构改造主工程，而是一个 targeted cleanup。
