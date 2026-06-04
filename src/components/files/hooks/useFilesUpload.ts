@@ -9,24 +9,10 @@ import {
   IUploadProgress,
 } from "../filesTypes";
 import { formatFileSize } from "../filesUtils";
-import { buildUploadFailureSummaryError } from "../services/filesErrors";
-
-/**
- * 文件上传链路里的稳定 Graph/服务错误。
- */
-class FilesUploadError extends AppError {
-  constructor(code: string, message: string, context: Record<string, unknown>) {
-    super({
-      name: "FilesUploadError",
-      code,
-      message,
-      originError: {
-        source: "app",
-      },
-      cause: { context },
-    });
-  }
-}
+import {
+  buildFilesUploadError,
+  buildUploadFailureSummaryError,
+} from "../services/filesErrors";
 
 interface IUseFilesUploadOptions {
   /** 当前容器 ID。 */
@@ -78,7 +64,7 @@ export const useFilesUpload = ({
         return error;
       }
 
-      return new FilesUploadError(
+      return buildFilesUploadError(
         "uploadFileFailed",
         `Failed to upload file ${relativePath}: ${readErrorMessage(
           error,
@@ -168,7 +154,7 @@ export const useFilesUpload = ({
         return newFolder.id as string;
       } catch (error: unknown) {
         const message = readErrorMessage(error, "Unknown upload error.");
-        const createFolderError = new FilesUploadError(
+        const createFolderError = buildFilesUploadError(
           "createFolderFailed",
           `Failed to create folder ${folderName}: ${message}`,
           { folderName },

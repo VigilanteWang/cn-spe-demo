@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  buildDirectoryPrincipalSearchError,
+  DirectoryPrincipalSearchAppError,
   IDirectorySearchGraphClient,
   clearDirectoryPrincipalSearchCache,
   searchDirectoryPrincipals,
@@ -150,7 +150,7 @@ const getSingleRequest = (
 
 describe("directoryPrincipalSearch", () => {
   it("should build stable directory principal search errors", () => {
-    const error = buildDirectoryPrincipalSearchError(
+    const error = new DirectoryPrincipalSearchAppError(
       "invalidSearchSyntax",
       "Search text cannot contain double quotes or backslashes.",
     );

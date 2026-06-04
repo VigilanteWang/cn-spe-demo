@@ -9,9 +9,44 @@ export type DirectoryPrincipalSearchErrorCode =
   | "notFound"
   | "graphFailure";
 
-export type DirectoryPrincipalSearchAppError = AppError & {
-  code?: DirectoryPrincipalSearchErrorCode;
-};
+/**
+ * 目录主体搜索专用错误类型。
+ *
+ * 这里继承统一 `AppError`，把 `code` 收窄为目录搜索可识别的错误码，
+ * 方便调用方通过 `instanceof` 和 `code` 双重方式做稳定分支处理。
+ */
+export class DirectoryPrincipalSearchAppError extends AppError {
+  /**
+   * 错误码，仅限于本模块定义的 DirectoryPrincipalSearchErrorCode。
+   *
+   * 使用 `declare`：仅做类型声明以收窄父类 `AppError` 的 `code` 类型，
+   * 不在运行时代码中重新声明或初始化该字段，避免在子类构造中覆
+   * 盖父类通过 `super(...)` 设置的值（这会导致运行时的意外覆盖）。
+   *
+   * 使用 `readonly`：在类型层面标记不可变，防止创建后被意外赋值，
+   * 保持错误判断分支的稳定性。
+   */
+  declare readonly code?: DirectoryPrincipalSearchErrorCode;
+
+  constructor(
+    code: DirectoryPrincipalSearchErrorCode,
+    message: string,
+    statusCode?: number,
+  ) {
+    super({
+      name: "DirectoryPrincipalSearchError",
+      code,
+      message,
+      statusCode,
+      originError: {
+        source:
+          getDirectorySearchErrorCategory(code) === "validation"
+            ? "validation"
+            : "microsoft-graph",
+      },
+    });
+  }
+}
 
 type DirectorySearchErrorCategory = "validation" | "graph";
 
@@ -26,35 +61,6 @@ const DIRECTORY_SEARCH_ERROR_CATEGORIES: Record<
   notFound: "graph",
   graphFailure: "graph",
 };
-
-/**
- * 构造目录主体验证或 Graph 搜索错误。
- *
- * 这个模块统一保留稳定的错误 name、code 和 statusCode，
- * 方便上层按 code 做分支处理，也便于把最原始的 Graph 错误留在 originError 里。
- *
- * @param code 稳定错误码。
- * @param message 面向界面和日志的错误说明。
- * @param statusCode 可选 HTTP 状态码。
- * @returns 统一的前端错误对象。
- */
-export const buildDirectoryPrincipalSearchError = (
-  code: DirectoryPrincipalSearchErrorCode,
-  message: string,
-  statusCode?: number,
-): DirectoryPrincipalSearchAppError =>
-  new AppError({
-    name: "DirectoryPrincipalSearchError",
-    code,
-    message,
-    statusCode,
-    originError: {
-      source:
-        getDirectorySearchErrorCategory(code) === "validation"
-          ? "validation"
-          : "microsoft-graph",
-    },
-  }) as DirectoryPrincipalSearchAppError;
 
 /**
  * 目录搜索错误同时覆盖输入校验和 Graph 请求失败；
@@ -76,14 +82,14 @@ const getDirectorySearchErrorCategory = (
 export const mapGraphError = (
   error: unknown,
 ): DirectoryPrincipalSearchAppError => {
-  if (error instanceof AppError) {
-    return error as DirectoryPrincipalSearchAppError;
+  if (error instanceof DirectoryPrincipalSearchAppError) {
+    return error;
   }
 
   const statusCode = readGraphStatusCode(error);
 
   if (statusCode === 401) {
-    return buildDirectoryPrincipalSearchError(
+    return new DirectoryPrincipalSearchAppError(
       "unauthorized",
       "Directory search authentication expired. Please sign in again.",
       statusCode,
@@ -91,7 +97,7 @@ export const mapGraphError = (
   }
 
   if (statusCode === 403) {
-    return buildDirectoryPrincipalSearchError(
+    return new DirectoryPrincipalSearchAppError(
       "forbidden",
       "The current account does not have permission to read directory objects.",
       statusCode,
@@ -99,14 +105,14 @@ export const mapGraphError = (
   }
 
   if (statusCode === 404) {
-    return buildDirectoryPrincipalSearchError(
+    return new DirectoryPrincipalSearchAppError(
       "notFound",
       "No matching directory principal was found.",
       statusCode,
     );
   }
 
-  return buildDirectoryPrincipalSearchError(
+  return new DirectoryPrincipalSearchAppError(
     "graphFailure",
     `Microsoft Graph directory search failed: ${readGraphErrorMessage(error)}`,
     statusCode,

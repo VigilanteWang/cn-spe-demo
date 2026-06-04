@@ -30,9 +30,8 @@ export type {
 } from "./directoryPrincipalSearchTypes";
 
 export type { DirectoryPrincipalSearchErrorCode } from "./directoryPrincipalSearchError";
-export type { DirectoryPrincipalSearchAppError } from "./directoryPrincipalSearchError";
 
-export { buildDirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
+export { DirectoryPrincipalSearchAppError } from "./directoryPrincipalSearchError";
 export { createDirectorySearchPlan } from "./directoryPrincipalSearchPlan";
 
 // 这个在模块作用域内，首次载入，建立单例

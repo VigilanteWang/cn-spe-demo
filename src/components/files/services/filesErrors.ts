@@ -25,6 +25,29 @@ interface IUploadFailureEntry {
 }
 
 /**
+ * 构造文件上传链路里的稳定前端错误对象。
+ *
+ * @param code 稳定错误码。
+ * @param message 面向界面和日志的错误说明。
+ * @param context 需要附带到错误对象里的上下文。
+ * @returns 可被 files UI 稳定消费的上传错误。
+ */
+export const buildFilesUploadError = (
+  code: string,
+  message: string,
+  context: Record<string, unknown>,
+): AppError =>
+  new AppError({
+    name: "FilesUploadError",
+    code,
+    message,
+    originError: {
+      source: "app",
+    },
+    cause: { context },
+  });
+
+/**
  * 将 files 模块里的未知错误归一化为稳定前端错误对象。
  *
  * 如果上游已经抛出了标准化业务错误，则直接复用；
