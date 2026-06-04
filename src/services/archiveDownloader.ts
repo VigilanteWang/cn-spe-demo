@@ -23,26 +23,6 @@ import {
 } from "../common/types";
 
 /**
- * 归档下载过程中单个文件的下载错误。
- */
-export class ArchiveItemDownloadError extends AppError {
-  readonly relativePath: string;
-
-  constructor(relativePath: string, statusCode: number) {
-    super({
-      name: "ArchiveItemDownloadError",
-      code: "downloadItemFailed",
-      message: `Failed to download ${relativePath}. HTTP ${statusCode}`,
-      statusCode,
-      originError: {
-        source: "network",
-      },
-    });
-    this.relativePath = relativePath;
-  }
-}
-
-/**
  * 将 Uint8Array 安全转换为标准 ArrayBuffer。
  * @param chunk 需要转换的二进制块。
  * @returns 可稳定用于 writable.write 的 ArrayBuffer。
@@ -437,10 +417,18 @@ export const downloadArchiveFromManifest = (
 
               if (!response.ok) {
                 // HTTP 返回失败时，直接中断整个归档流程。
-                throw new ArchiveItemDownloadError(
-                  item.relativePath,
-                  response.status,
-                );
+                throw new AppError({
+                  name: "ArchiveItemDownloadError",
+                  code: "downloadItemFailed",
+                  message: `Failed to download ${item.relativePath}. HTTP ${response.status}`,
+                  statusCode: response.status,
+                  originError: {
+                    source: "network",
+                  },
+                  cause: {
+                    relativePath: item.relativePath,
+                  },
+                });
               }
 
               if (!response.body) {

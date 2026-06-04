@@ -1,61 +1,89 @@
 import { AppError } from "../../../../common/errors.ts";
 import { readRecord } from "./directoryPrincipalSearchObjectUtils";
 
-/**
- * Graph 搜索失败时抛出的业务化错误。
- *
- * message 统一使用英文，便于和 Microsoft Graph / SDK 原始错误放在一起排查；
- * code 保持稳定，方便 UI 做本地化或分支处理。
- */
-export class DirectoryPrincipalSearchError extends AppError {
-  constructor(code: string, message: string, statusCode?: number) {
-    super({
-      name: "DirectoryPrincipalSearchError",
-      code,
-      message,
-      statusCode,
-      originError: {
-        source:
-          getDirectorySearchErrorCategory(code) === "validation"
-            ? "validation"
-            : "microsoft-graph",
-      },
-    });
-  }
-}
+export type DirectoryPrincipalSearchErrorCode =
+  | "emptyQuery"
+  | "invalidSearchSyntax"
+  | "unauthorized"
+  | "forbidden"
+  | "notFound"
+  | "graphFailure";
 
-/**
- * 目录搜索错误同时覆盖输入校验和 Graph 请求失败，
- * 因此这里按 code 映射成更稳定的错误类别。
- */
-const getDirectorySearchErrorCategory = (code: string) => {
-  if (code === "emptyQuery" || code === "invalidSearchSyntax") {
-    return "validation" as const;
-  }
+export type DirectoryPrincipalSearchAppError = AppError & {
+  code?: DirectoryPrincipalSearchErrorCode;
+};
 
-  return "graph" as const;
+type DirectorySearchErrorCategory = "validation" | "graph";
+
+const DIRECTORY_SEARCH_ERROR_CATEGORIES: Record<
+  DirectoryPrincipalSearchErrorCode,
+  DirectorySearchErrorCategory
+> = {
+  emptyQuery: "validation",
+  invalidSearchSyntax: "validation",
+  unauthorized: "graph",
+  forbidden: "graph",
+  notFound: "graph",
+  graphFailure: "graph",
 };
 
 /**
- * 为目录搜索错误推导稳定来源。
- */
-/**
- * 把 Graph SDK 抛出的 unknown 错误映射为本模块的稳定错误类型。
+ * 构造目录主体验证或 Graph 搜索错误。
  *
- * 本模块不手写 429 retry loop，因为 Graph SDK/MGT client 已经有 RetryHandler；
- * 这里处理的是 SDK 重试之后仍然失败的最终错误。
+ * 这个模块统一保留稳定的错误 name、code 和 statusCode，
+ * 方便上层按 code 做分支处理，也便于把最原始的 Graph 错误留在 originError 里。
+ *
+ * @param code 稳定错误码。
+ * @param message 面向界面和日志的错误说明。
+ * @param statusCode 可选 HTTP 状态码。
+ * @returns 统一的前端错误对象。
+ */
+export const buildDirectoryPrincipalSearchError = (
+  code: DirectoryPrincipalSearchErrorCode,
+  message: string,
+  statusCode?: number,
+): DirectoryPrincipalSearchAppError =>
+  new AppError({
+    name: "DirectoryPrincipalSearchError",
+    code,
+    message,
+    statusCode,
+    originError: {
+      source:
+        getDirectorySearchErrorCategory(code) === "validation"
+          ? "validation"
+          : "microsoft-graph",
+    },
+  }) as DirectoryPrincipalSearchAppError;
+
+/**
+ * 目录搜索错误同时覆盖输入校验和 Graph 请求失败；
+ * 因此这里按 code 映射更稳定的错误类别。
+ */
+const getDirectorySearchErrorCategory = (
+  code: DirectoryPrincipalSearchErrorCode,
+): DirectorySearchErrorCategory => DIRECTORY_SEARCH_ERROR_CATEGORIES[code];
+
+/**
+ * 将 Graph SDK 抛出的 unknown 错误映射为稳定错误对象。
+ *
+ * 本模块不处理 429 retry loop，因为 Graph SDK / MGT client 已经内置重试；
+ * 这里处理的是重试后仍然失败的最终错误。
+ *
+ * @param error Graph SDK、HTTP 或其他未知错误对象。
+ * @returns 可直接向上抛出的统一错误。
  */
 export const mapGraphError = (
   error: unknown,
-): DirectoryPrincipalSearchError => {
-  if (error instanceof DirectoryPrincipalSearchError) {
-    return error;
+): DirectoryPrincipalSearchAppError => {
+  if (error instanceof AppError) {
+    return error as DirectoryPrincipalSearchAppError;
   }
 
   const statusCode = readGraphStatusCode(error);
 
   if (statusCode === 401) {
-    return new DirectoryPrincipalSearchError(
+    return buildDirectoryPrincipalSearchError(
       "unauthorized",
       "Directory search authentication expired. Please sign in again.",
       statusCode,
@@ -63,7 +91,7 @@ export const mapGraphError = (
   }
 
   if (statusCode === 403) {
-    return new DirectoryPrincipalSearchError(
+    return buildDirectoryPrincipalSearchError(
       "forbidden",
       "The current account does not have permission to read directory objects.",
       statusCode,
@@ -71,14 +99,14 @@ export const mapGraphError = (
   }
 
   if (statusCode === 404) {
-    return new DirectoryPrincipalSearchError(
+    return buildDirectoryPrincipalSearchError(
       "notFound",
       "No matching directory principal was found.",
       statusCode,
     );
   }
 
-  return new DirectoryPrincipalSearchError(
+  return buildDirectoryPrincipalSearchError(
     "graphFailure",
     `Microsoft Graph directory search failed: ${readGraphErrorMessage(error)}`,
     statusCode,

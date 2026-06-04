@@ -4,14 +4,11 @@ import type {
   IContainerPermissionEntryForUI,
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
-import type { AppError } from "../common/errors.ts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
 import {
   buildPermissionApiError,
   mapPermissionEntriesToTabs,
 } from "./permissionApiShared";
-
-export type ContainerPermissionApiError = AppError;
 
 /**
  * 加载指定容器的当前权限列表。

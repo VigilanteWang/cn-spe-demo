@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../../common/errors.ts";
 import { useFilesArchiveDownload } from "./useFilesArchiveDownload";
 
 const {
@@ -16,7 +17,6 @@ const {
 }));
 
 vi.mock("../../../services/downloadApi", () => ({
-  DownloadSaveTargetSelectionCancelledError: class extends Error {},
   startDownload: startDownloadMock,
   selectDownloadSaveTarget: selectDownloadSaveTargetMock,
   getDownloadProgress: getDownloadProgressMock,
@@ -120,6 +120,46 @@ describe("useFilesArchiveDownload", () => {
     expect(result.current.downloadProgress.backendProgress?.status).toBe(
       "failed",
     );
+    expect(getDownloadManifestMock).not.toHaveBeenCalled();
+  });
+
+  it("should show a concise cancellation message when the save picker is cancelled", async () => {
+    selectDownloadSaveTargetMock.mockRejectedValue(
+      new AppError({
+        name: "DownloadSaveTargetSelectionCancelledError",
+        code: "downloadCancelled",
+        message: "Download cancelled by user.",
+        originError: {
+          source: "app",
+        },
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useFilesArchiveDownload({
+        containerId: "container-a",
+        driveItems: [
+          {
+            id: "folder-a",
+            name: "Folder A",
+            isFolder: true,
+          },
+        ] as never,
+        selectedRows: new Set(["folder-a"]),
+        onDirectDownload: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.onToolbarDownloadClick();
+    });
+
+    expect(result.current.downloadProgress.phase).toBe("failed");
+    expect(result.current.downloadProgress.errorMessage).toBe(
+      "Download cancelled.",
+    );
+    expect(startDownloadMock).not.toHaveBeenCalled();
+    expect(getDownloadProgressMock).not.toHaveBeenCalled();
     expect(getDownloadManifestMock).not.toHaveBeenCalled();
   });
 });

@@ -13,30 +13,30 @@ import type {
 export { type IItemPermissionChangeSetFromUI as IItemPermissionChangeSet } from "../../../../common/contracts/itemPermissionCommonContracts";
 
 /**
- * 表示 item 权限草稿差异计算阶段的前端校验错误。
+ * 构造 item 权限草稿校验错误。
  *
- * 这个错误会把问题定位到具体 entry，方便调用方在草稿列表里高亮出错项。
+ * 这里保留统一的错误名称和上下文，方便上层按 code 区分问题类型，
+ * 同时还能通过 cause 定位到具体 entry。
+ *
+ * @param code 稳定错误码，用于区分不同校验问题。
+ * @param message 面向界面和日志的错误说明。
+ * @param entryId 出错的权限行 id。
+ * @returns 统一的前端校验错误对象。
  */
-export class ItemPermissionValidationError extends AppError {
-  /**
-   * 创建一个带 entryId 上下文的草稿校验错误。
-   *
-   * @param code 稳定错误码，供上层区分错误类型。
-   * @param message 面向界面和日志的错误说明。
-   * @param entryId 出错的权限行 id。
-   */
-  constructor(code: string, message: string, entryId: string) {
-    super({
-      name: "ItemPermissionValidationError",
-      code,
-      message,
-      originError: {
-        source: "validation",
-      },
-      cause: { entryId },
-    });
-  }
-}
+export const buildItemPermissionValidationError = (
+  code: string,
+  message: string,
+  entryId: string,
+): AppError =>
+  new AppError({
+    name: "ItemPermissionValidationError",
+    code,
+    message,
+    originError: {
+      source: "validation",
+    },
+    cause: { entryId },
+  });
 
 interface IRequiredFieldErrorOptions {
   code: string;
@@ -70,7 +70,8 @@ export const computeItemPermissionChanges = (
   for (const tab of ["people", "groups"] as const) {
     const originalEntries = originalEntriesByTab[tab];
     const draftEntries = draftEntriesByTab[tab];
-    // 用 entry id 建索引，后面就能用 O(1) 方式判断“新增 / 修改 / 删除”。
+
+    // 用 entry id 建索引，后面就能用 O(1) 判断“新增 / 修改 / 删除”。
     const originalEntryById = new Map(
       originalEntries.map((entry) => [entry.id, entry] as const),
     );
@@ -87,7 +88,7 @@ export const computeItemPermissionChanges = (
         continue;
       }
 
-      // 当前实现只把 role 变化视为 update，其他字段默认认为是只读展示数据。
+      // 当前实现只把 role 变化视作 update，其它字段默认是只读展示数据。
       if (originalEntry.role !== draftEntry.role) {
         // 先挡住 inherited / readonly 行，避免前端构造出不该写回的更新。
         ensureEntryIsEditable(
@@ -139,7 +140,7 @@ export const computeItemPermissionChanges = (
 };
 
 /**
- * 把前端权限模型，转换成新增权限所需的change模型。
+ * 把前端权限模型，转换成新增权限所需的 change 模型。
  *
  * @param entry 草稿中的单条权限行。
  * @returns 可写入 create 变更集合的对象。
@@ -177,7 +178,7 @@ const readRecipientFromEntry = (
 
   // create 或重新构造 update 时至少要能拿到一个可识别的 recipient。
   if (!recipientObjectId && !recipientEmail) {
-    throw new ItemPermissionValidationError(
+    throw buildItemPermissionValidationError(
       "missingRecipient",
       "Cannot create or recreate item permission: missing recipientObjectId and recipientEmail.",
       entry.id,
@@ -191,11 +192,11 @@ const readRecipientFromEntry = (
 };
 
 /**
- * 确保权限行允许更新。
+ * 断言权限行允许更新。
  *
  * @param entry 待更新的权限行。
  * @param operation 当前要执行的操作说明。
- * @throws 当权限行继承自父级或被标记为只读时抛出错误。
+ * @throws 当行继承自父级或被标记为只读时抛出错误。
  */
 const ensureEntryIsEditable = (
   entry: IItemPermissionEntry,
@@ -203,7 +204,7 @@ const ensureEntryIsEditable = (
 ) => {
   // 继承行和只读行都不应该进入 update 变更集。
   if (entry.isInherited || !entry.isEditable) {
-    throw new ItemPermissionValidationError(
+    throw buildItemPermissionValidationError(
       "readonlyPermission",
       `Cannot ${operation}: entry ${entry.id} is readonly.`,
       entry.id,
@@ -216,7 +217,7 @@ const ensureEntryIsEditable = (
  *
  * @param entry 待删除的权限行。
  * @param operation 当前要执行的操作说明。
- * @throws 当权限行继承自父级或被标记为不可删除时抛出错误。
+ * @throws 当行继承自父级或被标记为不可删除时抛出错误。
  */
 const ensureEntryIsRemovable = (
   entry: IItemPermissionEntry,
@@ -224,7 +225,7 @@ const ensureEntryIsRemovable = (
 ) => {
   // 删除保护和更新保护分开封装，便于未来按产品规则分别收紧。
   if (entry.isInherited || !entry.isRemovable) {
-    throw new ItemPermissionValidationError(
+    throw buildItemPermissionValidationError(
       "readonlyPermission",
       `Cannot ${operation}: entry ${entry.id} is readonly.`,
       entry.id,
@@ -249,7 +250,7 @@ const requireEntryField = (
     return value;
   }
 
-  throw new ItemPermissionValidationError(
+  throw buildItemPermissionValidationError(
     requiredFieldErrorOptions.code,
     `Cannot ${requiredFieldErrorOptions.operation}: missing ${requiredFieldErrorOptions.fieldName}.`,
     requiredFieldErrorOptions.entryId,

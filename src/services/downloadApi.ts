@@ -1,5 +1,5 @@
 /**
- * 下载准备 API 模块
+ * 下载准备 API 模块。
  *
  * 本模块封装后端 ZIP 归档任务相关的所有 REST 调用：
  * - 启动下载准备任务（startDownload）
@@ -44,31 +44,8 @@ export interface IJobProgress {
 }
 
 /**
- * 用户取消下载保存目标选择时抛出的稳定错误。
+ * 根据浏览器响应构造归档 API 请求错误。
  *
- * 当 showSaveFilePicker 弹窗被用户关闭时抛出，
- * 调用方应捕获此错误并中止整个下载流程。
- */
-export class DownloadSaveTargetSelectionCancelledError extends AppError {
-  /**
-   * 创建一个“用户主动取消下载保存”的稳定错误。
-   */
-  constructor() {
-    super({
-      name: "DownloadSaveTargetSelectionCancelledError",
-      code: "downloadCancelled",
-      message: "Download cancelled by user.",
-      originError: {
-        source: "app",
-      },
-    });
-  }
-}
-
-/**
- * 根据后端响应构造归档 API 请求错误。
- *
- * @param code 前端稳定错误码。
  * @param operation 当前失败的操作名。
  * @param response 原始 HTTP 响应对象。
  * @returns 统一的前端 API 错误对象。
@@ -124,6 +101,7 @@ export async function startDownload(
     const data = await response.json();
     return data.jobId as string;
   }
+
   throw await buildArchiveRequestError("startDownload", response);
 }
 
@@ -149,6 +127,7 @@ export async function getDownloadProgress(
     // 这里直接把后端 JSON 映射成强类型进度对象，供页面驱动进度条和状态文案。
     return (await response.json()) as IJobProgress;
   }
+
   throw await buildArchiveRequestError("getDownloadProgress", response);
 }
 
@@ -174,17 +153,18 @@ export async function getDownloadManifest(
     // manifest 是前端流式下载和压缩 ZIP 的最小输入，不需要再额外拼接 Graph 数据。
     return (await response.json()) as IArchiveManifest;
   }
+
   throw await buildArchiveRequestError("getDownloadManifest", response);
 }
 
 /**
- * 在用户点击手势上下文中预先弹出保存窗口。
+ * 在用户点击手势中预先打开保存窗口。
  *
- * 这样可以避免在异步轮询回调中调用 showSaveFilePicker 导致手势校验失败。
+ * 这样可以避免在异步轮询回调中调用 `showSaveFilePicker` 导致手势校验失败。
  *
- * @param filename 建议下载文件名
- * @returns 归档输出目标（含文件名和可写流）
- * @throws 用户取消时抛出 DownloadSaveTargetSelectionCancelledError
+ * @param filename 建议下载文件名。
+ * @returns 归档输出目标。
+ * @throws 用户取消时抛出 `AppError`。
  */
 export async function selectDownloadSaveTarget(
   filename: string,
@@ -222,8 +202,17 @@ export async function selectDownloadSaveTarget(
   } catch (error: unknown) {
     // 用户取消保存对话框时，不应继续后续下载流程
     if (error instanceof Error && error.name === "AbortError") {
-      throw new DownloadSaveTargetSelectionCancelledError();
+      throw new AppError({
+        name: "DownloadSaveTargetSelectionCancelledError",
+        code: "downloadCancelled",
+        message: "Download cancelled by user.",
+        originError: {
+          source: "app",
+        },
+        cause: error,
+      });
     }
+
     throw error;
   }
 }

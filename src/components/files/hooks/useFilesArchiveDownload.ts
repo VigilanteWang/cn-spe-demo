@@ -6,7 +6,6 @@ import {
 } from "../../../common/errors.ts";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
-  DownloadSaveTargetSelectionCancelledError,
   getDownloadManifest,
   getDownloadProgress,
   type IJobProgress,
@@ -415,7 +414,7 @@ export const useFilesArchiveDownload = ({
         createDownloadProgressState({
           phase: "failed",
           errorMessage:
-            error instanceof DownloadSaveTargetSelectionCancelledError
+            error instanceof AppError && error.code === "downloadCancelled"
               ? "Download cancelled."
               : formatAppErrorMessageForUI(
                   error,

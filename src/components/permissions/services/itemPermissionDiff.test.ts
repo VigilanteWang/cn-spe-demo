@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IItemPermissionEntry } from "../models/itemPermissionModels";
 import {
   computeItemPermissionChanges,
-  ItemPermissionValidationError,
+  buildItemPermissionValidationError,
 } from "./itemPermissionDiff";
 
 /**
@@ -34,6 +34,27 @@ const createPermissionEntry = (
  * 验证前端 diff 逻辑会把草稿拆成 create/update/remove，并阻止 inherited 只读行写回。
  */
 describe("computeItemPermissionChanges", () => {
+  it("should build stable item permission validation errors", () => {
+    const error = buildItemPermissionValidationError(
+      "missingRecipient",
+      "Cannot create or recreate item permission: missing recipientObjectId and recipientEmail.",
+      "people:user-megan-bowen",
+    );
+
+    expect(error).toMatchObject({
+      name: "ItemPermissionValidationError",
+      code: "missingRecipient",
+      message:
+        "Cannot create or recreate item permission: missing recipientObjectId and recipientEmail.",
+      originError: {
+        source: "validation",
+      },
+      cause: {
+        entryId: "people:user-megan-bowen",
+      },
+    });
+  });
+
   it("should split draft changes into create, update and remove buckets", () => {
     const originalEntriesByTab = {
       people: [createPermissionEntry({ role: "Writer" })],
@@ -141,7 +162,7 @@ describe("computeItemPermissionChanges", () => {
           groups: [],
         },
       ),
-    ).toThrowError(ItemPermissionValidationError);
+    ).toThrowError("readonly");
 
     expect(() =>
       computeItemPermissionChanges(

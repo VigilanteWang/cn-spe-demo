@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DirectoryPrincipalSearchError,
+  buildDirectoryPrincipalSearchError,
   IDirectorySearchGraphClient,
   clearDirectoryPrincipalSearchCache,
   searchDirectoryPrincipals,
@@ -149,6 +149,22 @@ const getSingleRequest = (
 };
 
 describe("directoryPrincipalSearch", () => {
+  it("should build stable directory principal search errors", () => {
+    const error = buildDirectoryPrincipalSearchError(
+      "invalidSearchSyntax",
+      "Search text cannot contain double quotes or backslashes.",
+    );
+
+    expect(error).toMatchObject({
+      name: "DirectoryPrincipalSearchError",
+      code: "invalidSearchSyntax",
+      message: "Search text cannot contain double quotes or backslashes.",
+      originError: {
+        source: "validation",
+      },
+    });
+  });
+
   beforeEach(() => {
     clearDirectoryPrincipalSearchCache();
     vi.useFakeTimers();
@@ -424,10 +440,8 @@ describe("directoryPrincipalSearch", () => {
     Object.assign(failure, { statusCode: 400 });
     const graphClient = new FakeGraphClient(new Map([["/users", failure]]));
 
-    await expect(search(graphClient, "Adele")).rejects.toBeInstanceOf(
-      DirectoryPrincipalSearchError,
-    );
     await expect(search(graphClient, "Adele")).rejects.toMatchObject({
+      name: "DirectoryPrincipalSearchError",
       code: "graphFailure",
       statusCode: 400,
     });

@@ -1,4 +1,4 @@
-import { DirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
+import { buildDirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
 
 /**
  * 这是个 目录搜索输入进行规范化与识别 工具模块
@@ -61,7 +61,7 @@ export const escapeODataStringLiteral = (value: string): string =>
  */
 export const escapeSearchQueryText = (value: string): string => {
   if (/["\\]/.test(value)) {
-    throw new DirectoryPrincipalSearchError(
+    throw buildDirectoryPrincipalSearchError(
       "invalidSearchSyntax",
       "Search text cannot contain double quotes or backslashes.",
     );
