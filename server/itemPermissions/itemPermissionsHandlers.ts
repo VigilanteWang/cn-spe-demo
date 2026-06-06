@@ -1,5 +1,4 @@
 import { Request, Response } from "restify";
-import { serializeAppError } from "../../common/appError";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -22,15 +21,13 @@ import {
 } from "../permissionsCore/permissionGraphReaders";
 import {
   createValidationError,
-  toGraphAppError,
+  sendGraphRequest,
 } from "../common/appErrorHelpers";
-import { readGraphErrorMessage } from "../common/errorUtils";
 
 /**
  * Step 0 已在当前租户确认 item 显式 invite permission 的 PATCH 稳定可用，
  * 因此当前正式实现直接走 PATCH。
- *
- * 如果未来租户/Graph 行为发生变化，再切回 replace 即可。
+ * 如果未来租户或 Graph 行为发生变化，再切回 replace 即可。
  */
 const ITEM_PERMISSION_UPDATE_MODE: "patch" | "replace" = "patch";
 
@@ -60,21 +57,15 @@ export const listItemPermissionsFromGraph = async (
     );
   }
 
-  try {
-    /** 先通过 OBO 把前端令牌交换成可访问 Microsoft Graph 的令牌。 */
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
-    /** 基于 Graph 令牌创建链式请求客户端。 */
-    const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
-    /** 读取当前项及父项权限，并统一映射成前端响应模型。 */
-    const responseBody = await fetchMapItemPermissionsFromGraphToResponse(
-      graphClient,
-      driveId,
-      itemId,
-    );
-    res.send(200, responseBody);
-  } catch (error: unknown) {
-    sendItemPermissionMappedGraphError(res, error);
-  }
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const responseBody = await fetchMapItemPermissionsFromGraphToResponse(
+    graphClient,
+    driveId,
+    itemId,
+  );
+
+  res.send(200, responseBody);
 };
 
 /**
@@ -112,25 +103,17 @@ export const applyItemPermissionsToGraph = async (
     );
   }
 
-  try {
-    /** 写权限前同样需要先换取 Graph 令牌。 */
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
-    /** 构建本次写操作使用的 Graph 客户端。 */
-    const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
 
-    /** 先按变更集把 Graph 中的权限状态更新到目标结果。 */
-    await applyItemPermissionChangeSet(graphClient, driveId, itemId, changeSet);
+  await applyItemPermissionChangeSet(graphClient, driveId, itemId, changeSet);
 
-    /** 写回成功后重新读取一次，确保前端拿到的是后端确认后的真实状态。 */
-    const responseBody = await fetchMapItemPermissionsFromGraphToResponse(
-      graphClient,
-      driveId,
-      itemId,
-    );
-    res.send(200, responseBody);
-  } catch (error: unknown) {
-    sendItemPermissionMappedGraphError(res, error);
-  }
+  const responseBody = await fetchMapItemPermissionsFromGraphToResponse(
+    graphClient,
+    driveId,
+    itemId,
+  );
+  res.send(200, responseBody);
 };
 
 /**
@@ -146,31 +129,24 @@ export const fetchMapItemPermissionsFromGraphToResponse = async (
   driveId: string,
   itemId: string,
 ): Promise<IItemPermissionsResponseFromApi> => {
-  try {
-    /** 先读取当前 item 的显式权限列表。 */
-    const currentPermissions = await readItemPermissions(
-      graphClient,
-      driveId,
-      itemId,
-    );
-    /** 再补充父项 id，用于后续判断哪些权限属于 inherited。 */
-    const parentItemId = await readComparableParentItemId(
-      graphClient,
-      driveId,
-      itemId,
-    );
-    /** 只有存在父项时才继续读取父项权限，避免无意义请求。 */
-    const parentPermissions = parentItemId
-      ? await tryReadParentPermissions(graphClient, driveId, parentItemId)
-      : undefined;
+  const currentPermissions = await readItemPermissions(
+    graphClient,
+    driveId,
+    itemId,
+  );
+  const parentItemId = await readComparableParentItemId(
+    graphClient,
+    driveId,
+    itemId,
+  );
+  const parentPermissions = parentItemId
+    ? await tryReadParentPermissions(graphClient, driveId, parentItemId)
+    : undefined;
 
-    return mapGraphItemPermissionsToResponse({
-      currentPermissions,
-      parentPermissions,
-    });
-  } catch (error: unknown) {
-    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
-  }
+  return mapGraphItemPermissionsToResponse({
+    currentPermissions,
+    parentPermissions,
+  });
 };
 
 /**
@@ -188,26 +164,51 @@ export const applyItemPermissionChangeSet = async (
   itemId: string,
   changeSet: IItemPermissionChangeSetFromUI,
 ): Promise<void> => {
-  try {
-    /** 先执行删除，避免旧权限残留影响后续更新或新增。 */
-    for (const removeChange of changeSet.remove) {
-      await graphClient
-        .api(
-          getSingleItemPermissionGraphPath(
-            driveId,
-            itemId,
-            removeChange.permissionId,
-          ),
-        )
-        .version("v1.0")
-        .delete();
+  for (const removeChange of changeSet.remove) {
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(
+            getSingleItemPermissionGraphPath(
+              driveId,
+              itemId,
+              removeChange.permissionId,
+            ),
+          )
+          .version("v1.0")
+          .delete(),
+      "Unable to remove item permissions.",
+      500,
+    );
+  }
+
+  for (const updateChange of changeSet.update) {
+    if (ITEM_PERMISSION_UPDATE_MODE === "patch") {
+      const nextRole = mapUiItemPermissionRoleToGraph(updateChange.role);
+
+      await sendGraphRequest(
+        () =>
+          graphClient
+            .api(
+              getSingleItemPermissionGraphPath(
+                driveId,
+                itemId,
+                updateChange.permissionId,
+              ),
+            )
+            .version("v1.0")
+            .patch({
+              roles: [nextRole],
+            }),
+        "Unable to update item permissions.",
+        500,
+      );
+      continue;
     }
 
-    /** 再处理更新，保持与前端编辑语义一致。 */
-    for (const updateChange of changeSet.update) {
-      if (ITEM_PERMISSION_UPDATE_MODE === "patch") {
-        /** 当前租户已验证可直接 PATCH roles，因此优先走最小改动路径。 */
-        await graphClient
+    await sendGraphRequest(
+      () =>
+        graphClient
           .api(
             getSingleItemPermissionGraphPath(
               driveId,
@@ -216,57 +217,37 @@ export const applyItemPermissionChangeSet = async (
             ),
           )
           .version("v1.0")
-          .patch({
-            roles: [mapUiItemPermissionRoleToGraph(updateChange.role)],
-          });
-        continue;
-      }
+          .delete(),
+      "Unable to update item permissions.",
+      500,
+    );
 
-      /** 如果未来 PATCH 不稳定，则回退成 delete + invite 的兼容写法。 */
-      await graphClient
-        .api(
-          getSingleItemPermissionGraphPath(
-            driveId,
-            itemId,
-            updateChange.permissionId,
-          ),
-        )
-        .version("v1.0")
-        .delete();
-      await graphClient
-        .api(getItemInviteGraphPath(driveId, itemId))
-        .version("v1.0")
-        .post(newGraphInvitePermissionBody(updateChange));
-    }
+    const inviteBody = newGraphInvitePermissionBody(updateChange);
 
-    /** 最后补齐新增权限，避免和更新/删除流程相互干扰。 */
-    for (const createChange of changeSet.create) {
-      await graphClient
-        .api(getItemInviteGraphPath(driveId, itemId))
-        .version("v1.0")
-        .post(newGraphInvitePermissionBody(createChange));
-    }
-  } catch (error: unknown) {
-    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(getItemInviteGraphPath(driveId, itemId))
+          .version("v1.0")
+          .post(inviteBody),
+      "Unable to update item permissions.",
+      500,
+    );
   }
-};
 
-/**
- * 把 Graph 或内部异常统一映射成 itemPermissions API 的错误响应。
- *
- * @param res Restify 响应对象。
- * @param error 原始异常对象。
- */
-const sendItemPermissionMappedGraphError = (res: Response, error: unknown) => {
-  /** 先把原始异常转成前端约定的稳定错误结构。 */
-  const mappedError = toGraphAppError(error, readGraphErrorMessage(error), 500);
-  if (mappedError.originError?.retryAfter !== undefined) {
-    res.header("Retry-After", String(mappedError.originError.retryAfter));
+  for (const createChange of changeSet.create) {
+    const inviteBody = newGraphInvitePermissionBody(createChange);
+
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(getItemInviteGraphPath(driveId, itemId))
+          .version("v1.0")
+          .post(inviteBody),
+      "Unable to create item permissions.",
+      500,
+    );
   }
-  res.send(
-    mappedError.statusCode ?? 500,
-    { error: serializeAppError(mappedError) },
-  );
 };
 
 /**
@@ -306,12 +287,15 @@ const readItemPermissions = async (
   driveId: string,
   itemId: string,
 ): Promise<unknown[]> => {
-  /** 调用 `/permissions` 端点读取当前 item 的显式权限。 */
-  const response = await graphClient
-    .api(getItemPermissionsGraphPath(driveId, itemId))
-    .version("v1.0")
-    .get();
-  /** 把 Graph 返回值收敛成 record，后续再安全读取 `value`。 */
+  const response = await sendGraphRequest(
+    () =>
+      graphClient
+        .api(getItemPermissionsGraphPath(driveId, itemId))
+        .version("v1.0")
+        .get(),
+    "Unable to read item permissions.",
+    500,
+  );
   const responseRecord = readGraphToRecord(response);
   const permissionItems = responseRecord.value;
   /** Graph 返回异常结构时保守降级为空数组，避免上层遍历报错。 */
@@ -331,12 +315,15 @@ const readComparableParentItemId = async (
   driveId: string,
   itemId: string,
 ): Promise<string | undefined> => {
-  /** 只选择 `parentReference`，减少不必要字段传输。 */
-  const response = await graphClient
-    .api(`${getItemBaseGraphPath(driveId, itemId)}?$select=parentReference`)
-    .version("v1.0")
-    .get();
-  /** 从 Graph 响应中提取父项引用对象。 */
+  const response = await sendGraphRequest(
+    () =>
+      graphClient
+        .api(`${getItemBaseGraphPath(driveId, itemId)}?$select=parentReference`)
+        .version("v1.0")
+        .get(),
+    "Unable to read item parent reference.",
+    500,
+  );
   const responseRecord = readGraphToRecord(response);
   const parentReference = readGraphToRecord(responseRecord.parentReference);
   const parentPath = readOptionalString(parentReference.path);

@@ -82,3 +82,18 @@ export const toGraphAppError = (
     },
   });
 };
+
+/**
+ * 执行一次真正的 Graph / SDK 调用，并在失败时统一收口成 GraphError。
+ */
+export const sendGraphRequest = async <T>(
+  operation: () => Promise<T>,
+  failureMessage: string,
+  defaultStatusCode = 502,
+): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error: unknown) {
+    throw toGraphAppError(error, failureMessage, defaultStatusCode);
+  }
+};

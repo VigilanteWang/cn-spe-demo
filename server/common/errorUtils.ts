@@ -1,7 +1,6 @@
 import {
   AppError,
   extractGraphOriginError,
-  readErrorMessage,
   readErrorRequestId,
   readErrorRetryAfter,
   readErrorStatusCode,
@@ -9,8 +8,7 @@ import {
 import type { IOriginErrorInfo } from "../../common/contracts/errorContracts";
 
 /**
- * 从未知错误对象中提取 Graph 调试信息。
- *
+ * 从未知错误对象中提取 Graph 来源信息。
  * 这里保留旧函数名，避免其他后端模块重复实现。
  */
 export const readOriginError = (
@@ -46,12 +44,6 @@ export { readErrorStatusCode };
  * 兼容旧命名，继续暴露重试秒数读取 helper。
  */
 export const readErrorRetryAfterSeconds = readErrorRetryAfter;
-
-export const readGraphErrorMessage = (error: unknown): string =>
-  readErrorMessage(
-    error,
-    "The request still failed after the SDK retry policy completed.",
-  );
 
 /**
  * 判断当前错误是否已经是后端统一错误。
