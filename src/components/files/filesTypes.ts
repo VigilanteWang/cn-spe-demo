@@ -1,7 +1,7 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IArchiveClientProgress, IContainer } from "../../common/types";
 import type { IJobProgress } from "../../services/downloadApi";
-import type { AppError } from "../../common/errors.ts";
+import type { AppError } from "../../../common/appError";
 
 /**
  * Files 入口组件属性。

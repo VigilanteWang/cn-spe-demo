@@ -2,7 +2,7 @@ import { Link, ProgressBar, Text, tokens } from "@fluentui/react-components";
 import {
   formatAppErrorMessageForUI,
   type AppError,
-} from "../../../common/errors.ts";
+} from "../../../../common/appError";
 import { IDownloadProgress, IUploadProgress } from "../filesTypes";
 
 interface IFilesProgressProps {

@@ -15,13 +15,13 @@
  */
 
 import { IAbortRequestOptions, sendAuthorizedRequest } from "./apiClient";
-import { AppError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import {
   IArchiveManifest,
   IArchiveSaveTarget,
   IShowSaveFilePickerWindow,
 } from "../common/types";
-import { readApiErrorResponseSummary } from "./apiErrorMapper";
+import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
 
 /**
  * ZIP 归档任务的进度信息。

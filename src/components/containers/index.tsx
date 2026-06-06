@@ -35,7 +35,7 @@ import type {
   SelectionEvents,
 } from "@fluentui/react-combobox";
 import { IContainer } from "../../common/types";
-import { formatAppErrorMessageForUI } from "../../common/errors.ts";
+import { formatAppErrorMessageForUI } from "../../../common/appError";
 import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";

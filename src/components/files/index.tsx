@@ -35,7 +35,7 @@ import { ItemPermissionDialog } from "../permissions";
 import {
   formatAppErrorMessageForUI,
   type AppError,
-} from "../../common/errors.ts";
+} from "../../../common/appError";
 import {
   buildDeletePartialFailureError,
   normalizeFilesOperationError,

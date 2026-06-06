@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Providers } from "@microsoft/mgt-element";
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
-import { AppError, readErrorMessage } from "../../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../../../common/appError";
 import {
   IFileWithRelativePath,
   IFilesUploadItem,

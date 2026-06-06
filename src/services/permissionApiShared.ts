@@ -1,7 +1,7 @@
-import { AppError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import type { IPermissionEntryBaseForUI } from "../../common/contracts/permissionCommonContracts";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
-import { readApiErrorResponseSummary } from "./apiErrorMapper";
+import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
 
 /**
  * 把权限数组重新按 `people/groups` 页签结构分组。

@@ -1,4 +1,4 @@
-import { formatAppErrorMessageForUI } from "../../../common/errors.ts";
+import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type { IPermissionEntryBaseForUI } from "../../../../common/contracts/permissionCommonContracts";
 import type {
   IPermissionPrincipalCandidate,

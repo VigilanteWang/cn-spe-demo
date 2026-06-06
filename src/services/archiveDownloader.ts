@@ -13,7 +13,7 @@
  * - 可观测：关键阶段持续上报 downloaded/zipped/progress
  */
 import { AsyncZipDeflate, Zip } from "fflate";
-import { AppError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import { IAbortRequestOptions } from "./apiClient";
 import {
   IArchiveClientProgress,

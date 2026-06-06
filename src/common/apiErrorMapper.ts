@@ -1,4 +1,4 @@
-import { AppError, deserializeAppError } from "../common/errors.ts";
+import { AppError, deserializeAppError } from "../../common/appError";
 import type {
   AppErrorShape,
   IErrorResponseBody,
@@ -9,10 +9,9 @@ interface IReadApiErrorResponseOptions {
 }
 
 /**
- * 判断任意 JSON 是否满足统一 API 错误响应体的最小结构。
- *
+ * 判断任意 JSON 是否满足统一错误对象的最小结构。
  * @param value 待校验的未知值。
- * @returns 如果值满足统一错误响应体的最小结构，则返回 `true`。
+ * @returns 如果值满足统一错误对象的最小结构，则返回 `true`。
  */
 const isAppErrorShape = (value: unknown): value is AppErrorShape => {
   if (typeof value !== "object" || value === null) {
@@ -29,7 +28,6 @@ const isAppErrorShape = (value: unknown): value is AppErrorShape => {
 
 /**
  * 判断任意 JSON 是否满足统一 API 错误响应体的最小结构。
- *
  * @param value 待校验的未知值。
  * @returns 如果值满足统一错误响应体的最小结构，则返回 `true`。
  */
@@ -45,7 +43,6 @@ const isApiErrorResponseBody = (
 
 /**
  * 从失败响应头中读取 `Retry-After` 秒数。
- *
  * 统一只从 header 读取，避免在 body 中继续复制节流字段。
  */
 const readRetryAfterFromHeaders = (headers: Headers): number | undefined => {
@@ -62,7 +59,6 @@ const readRetryAfterFromHeaders = (headers: Headers): number | undefined => {
 
 /**
  * 尝试读取后端返回的结构化错误响应体。
- *
  * @param response 失败的 Fetch 响应对象。
  * @returns 结构化错误响应体；无法解析时返回 `null`。
  */
@@ -79,7 +75,6 @@ export const tryReadApiErrorResponse = async (
 
 /**
  * 将失败响应转换成统一 `AppError`。
- *
  * @param response 失败的 Fetch 响应对象。
  * @param options 读取错误时使用的兜底配置。
  * @returns 可直接向上抛出的统一错误实例。

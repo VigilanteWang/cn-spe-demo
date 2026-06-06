@@ -6,7 +6,7 @@ import {
 import {
   AppError,
   formatAppErrorMessageForUI,
-} from "../../../common/errors.ts";
+} from "../../../../common/appError";
 
 /**
  * 共享权限弹窗差异结果需要满足的最小结构。

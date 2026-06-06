@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import { useFilesArchiveDownload } from "./useFilesArchiveDownload";
 
 const {

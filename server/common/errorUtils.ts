@@ -1,6 +1,7 @@
 import {
   AppError,
   extractGraphOriginError,
+  readErrorMessage,
   readErrorRequestId,
   readErrorRetryAfter,
   readErrorStatusCode,
@@ -45,6 +46,12 @@ export { readErrorStatusCode };
  * 兼容旧命名，继续暴露重试秒数读取 helper。
  */
 export const readErrorRetryAfterSeconds = readErrorRetryAfter;
+
+export const readGraphErrorMessage = (error: unknown): string =>
+  readErrorMessage(
+    error,
+    "The request still failed after the SDK retry policy completed.",
+  );
 
 /**
  * 判断当前错误是否已经是后端统一错误。

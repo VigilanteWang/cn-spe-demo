@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../../common/errors.ts";
+import { AppError } from "../../../common/appError";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
 import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
 import {

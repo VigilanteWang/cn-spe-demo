@@ -12,10 +12,10 @@
  * - POST /api/deleteItems      - 批量删除文件/文件夹
  */
 
-import { AppError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
-import { readApiErrorResponseSummary } from "./apiErrorMapper";
+import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
 
 /**
  * 批量删除操作的返回结果。

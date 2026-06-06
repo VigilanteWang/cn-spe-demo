@@ -3,7 +3,7 @@ import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
-import type { AppError } from "../common/errors.ts";
+import type { AppError } from "../../common/appError";
 import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
 import {
   buildPermissionApiError,

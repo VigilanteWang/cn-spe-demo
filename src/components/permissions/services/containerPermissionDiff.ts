@@ -1,4 +1,4 @@
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import type {
   IContainerPermissionChangeSetFromUI,
   IContainerPermissionCreateChange,

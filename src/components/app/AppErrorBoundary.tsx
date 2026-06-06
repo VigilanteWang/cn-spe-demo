@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { AppError, readErrorMessage } from "../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../../common/appError";
 
 /**
  * 教学总览：

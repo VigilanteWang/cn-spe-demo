@@ -1,4 +1,4 @@
-import { AppError } from "./errors.ts";
+import { AppError } from "../../common/appError";
 
 /**
  * 前端配置管理模块

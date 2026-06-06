@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import { PreviewContent } from "./PreviewContent";
 
 describe("PreviewContent", () => {

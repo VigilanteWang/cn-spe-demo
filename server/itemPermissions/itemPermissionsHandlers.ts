@@ -1,4 +1,5 @@
 import { Request, Response } from "restify";
+import { serializeAppError } from "../../common/appError";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -12,11 +13,6 @@ import {
   mapGraphItemPermissionsToResponse,
   newGraphInvitePermissionBody,
 } from "./itemPermissionsCommonAdapters";
-import {
-  getItemPermissionsApiErrorResponseStatus,
-  mapItemPermissionsGraphError,
-  toItemPermissionsApiErrorResponseBody,
-} from "./itemPermissionsError";
 import type { IPermissionGraphClient } from "../permissionsCore/permissionGraphContracts";
 import { mapUiItemPermissionRoleToGraph } from "./itemPermissionRoleMapper";
 import { parseItemPermissionChangeSet } from "./itemPermissionsRequestParser";
@@ -24,7 +20,11 @@ import {
   readGraphToRecord,
   readOptionalString,
 } from "../permissionsCore/permissionGraphReaders";
-import { createValidationError } from "../common/appErrorHelpers";
+import {
+  createValidationError,
+  toGraphAppError,
+} from "../common/appErrorHelpers";
+import { readGraphErrorMessage } from "../common/errorUtils";
 
 /**
  * Step 0 已在当前租户确认 item 显式 invite permission 的 PATCH 稳定可用，
@@ -169,7 +169,7 @@ export const fetchMapItemPermissionsFromGraphToResponse = async (
       parentPermissions,
     });
   } catch (error: unknown) {
-    throw mapItemPermissionsGraphError(error);
+    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
   }
 };
 
@@ -247,7 +247,7 @@ export const applyItemPermissionChangeSet = async (
         .post(newGraphInvitePermissionBody(createChange));
     }
   } catch (error: unknown) {
-    throw mapItemPermissionsGraphError(error);
+    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
   }
 };
 
@@ -259,13 +259,13 @@ export const applyItemPermissionChangeSet = async (
  */
 const sendItemPermissionMappedGraphError = (res: Response, error: unknown) => {
   /** 先把原始异常转成前端约定的稳定错误结构。 */
-  const mappedError = mapItemPermissionsGraphError(error);
+  const mappedError = toGraphAppError(error, readGraphErrorMessage(error), 500);
   if (mappedError.originError?.retryAfter !== undefined) {
     res.header("Retry-After", String(mappedError.originError.retryAfter));
   }
   res.send(
-    getItemPermissionsApiErrorResponseStatus(mappedError),
-    toItemPermissionsApiErrorResponseBody(mappedError),
+    mappedError.statusCode ?? 500,
+    { error: serializeAppError(mappedError) },
   );
 };
 

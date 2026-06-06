@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Providers } from "@microsoft/mgt-element";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { AppError } from "../../common/errors.ts";
+import { AppError } from "../../../common/appError";
 import { Files } from "./index";
 
 const {

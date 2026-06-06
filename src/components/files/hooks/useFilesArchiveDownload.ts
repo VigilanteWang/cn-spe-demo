@@ -3,7 +3,7 @@ import { SelectionItemId } from "@fluentui/react-components";
 import {
   AppError,
   formatAppErrorMessageForUI,
-} from "../../../common/errors.ts";
+} from "../../../../common/appError";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
   getDownloadManifest,

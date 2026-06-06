@@ -2,7 +2,7 @@
 import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import { PreviewDialogFrame } from "./PreviewDialogFrame";
 
 const renderFrame = (

@@ -12,6 +12,7 @@
  * 它负责组织流程，但尽量不直接承载 Graph 结构转换或字段解析细节。
  */
 import { Request, Response } from "restify";
+import { serializeAppError } from "../../common/appError";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -25,11 +26,6 @@ import {
   newGraphCreatePermissionBody,
   mapGraphPermissionToEntryOnUI,
 } from "./containerPermissionsCommonAdapters";
-import {
-  getContainerPermissionsApiErrorResponseStatus,
-  mapContainerPermissionsGraphError,
-  toContainerPermissionsApiErrorResponseBody,
-} from "./containerPermissionsError";
 import type { IGraphClient } from "./containerPermissionsInternalContracts";
 import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
 import { parseContainerPermissionChangeSet } from "./containerPermissionsRequestParser";
@@ -37,7 +33,11 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
-import { createValidationError } from "../common/appErrorHelpers";
+import {
+  createValidationError,
+  toGraphAppError,
+} from "../common/appErrorHelpers";
+import { readGraphErrorMessage } from "../common/errorUtils";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。
@@ -164,7 +164,7 @@ export const fetchMapContainerPermissionFromGraphToEntries = async (
     return permissionItems.map(mapGraphPermissionToEntryOnUI);
   } catch (error: unknown) {
     // 将原始 Graph/SDK 错误映射成项目内稳定错误类型。
-    throw mapContainerPermissionsGraphError(error);
+    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
   }
 };
 
@@ -221,7 +221,7 @@ export const applyContainerPermissionChangeSet = async (
         .post(newGraphCreatePermissionBody(createChange));
     }
   } catch (error: unknown) {
-    throw mapContainerPermissionsGraphError(error);
+    throw toGraphAppError(error, readGraphErrorMessage(error), 500);
   }
 };
 
@@ -235,13 +235,13 @@ const sendContainerPermissionMappedGraphError = (
   res: Response,
   error: unknown,
 ) => {
-  const mappedError = mapContainerPermissionsGraphError(error);
+  const mappedError = toGraphAppError(error, readGraphErrorMessage(error), 500);
   if (mappedError.originError?.retryAfter !== undefined) {
     res.header("Retry-After", String(mappedError.originError.retryAfter));
   }
   res.send(
-    getContainerPermissionsApiErrorResponseStatus(mappedError),
-    toContainerPermissionsApiErrorResponseBody(mappedError),
+    mappedError.statusCode ?? 500,
+    { error: serializeAppError(mappedError) },
   );
 };
 

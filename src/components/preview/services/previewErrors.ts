@@ -1,4 +1,4 @@
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 
 /**
  * 构造“缺少预览目标”的稳定校验错误。

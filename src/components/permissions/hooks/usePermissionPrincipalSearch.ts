@@ -1,6 +1,6 @@
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { useEffect, useRef, useState } from "react";
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import type {
   IPermissionPrincipalCandidate,
   PermissionTabValue,

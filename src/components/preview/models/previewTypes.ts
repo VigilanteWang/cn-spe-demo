@@ -1,5 +1,5 @@
 import type { IDriveItemExtended } from "../../../common/types";
-import type { AppError } from "../../../common/errors.ts";
+import type { AppError } from "../../../../common/appError";
 
 /**
  * Preview 模块对页面层暴露的属性接口。

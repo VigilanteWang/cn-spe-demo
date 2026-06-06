@@ -1,4 +1,4 @@
-import { AppError, readErrorMessage } from "../../../common/errors.ts";
+import { AppError, readErrorMessage } from "../../../../common/appError";
 
 /**
  * 统一描述 files 模块里一次失败操作的标准化错误选项。

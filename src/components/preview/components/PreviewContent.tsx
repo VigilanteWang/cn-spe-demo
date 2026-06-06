@@ -2,7 +2,7 @@ import { Spinner } from "@fluentui/react-components";
 import {
   formatAppErrorMessageForUI,
   type AppError,
-} from "../../../common/errors.ts";
+} from "../../../../common/appError";
 import { usePreviewStyles } from "./previewStyles";
 import type { IPreviewContentState } from "../models/previewTypes";
 

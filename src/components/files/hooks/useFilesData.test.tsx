@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { Providers } from "@microsoft/mgt-element";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 
 import { useFilesData } from "./useFilesData";
 

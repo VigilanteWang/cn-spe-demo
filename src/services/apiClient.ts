@@ -10,7 +10,7 @@
  */
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
-import { AppError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import { clientConfig } from "../common/config";
 import * as Scopes from "../common/scopes";
 
