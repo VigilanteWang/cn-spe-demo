@@ -3,14 +3,11 @@ import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
-import type { AppError } from "../../common/appError";
 import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
 import {
   buildPermissionApiError,
   mapPermissionEntriesToTabs,
 } from "./permissionApiShared";
-
-export type ItemPermissionApiError = AppError;
 
 /**
  * 加载指定 item 的当前权限列表。
