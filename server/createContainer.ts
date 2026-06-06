@@ -20,9 +20,8 @@ import {
 } from "./auth";
 import {
   createValidationError,
-  toGraphAppError,
+  sendGraphRequest,
 } from "./common/appErrorHelpers";
-import { AppError } from "../common/appError";
 import { serverConfig } from "./config";
 
 /**
@@ -39,42 +38,29 @@ export const createContainer = async (req: Request, res: Response) => {
   /** 所有创建操作都先经过统一权限校验。 */
   const authorizationResult = await requireContainerManageRequest(req);
 
-  try {
-    /** API 令牌需要先交换成 Microsoft Graph 可接受的令牌。 */
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
-
-    /** 使用统一工厂创建 Graph 客户端，保持调用方式一致。 */
-    const graphClient = createGraphClient(graphToken);
-
-    /**
-     * 请求体只允许前端控制名称和描述。
-     * 容器类型由服务端配置决定，避免客户端绕过约束。
-     */
-    if (
-      typeof req.body?.displayName !== "string" ||
-      !req.body.displayName.trim()
-    ) {
-      throw createValidationError("displayName is required.");
-    }
-
-    const containerRequestData = {
-      displayName: req.body.displayName.trim(),
-      description: req.body?.description ? req.body.description : "",
-      containerTypeId: serverConfig.containerTypeId,
-    };
-
-    const graphResponse = await graphClient
-      .api("/storage/fileStorage/containers")
-      .version("v1.0")
-      .post(containerRequestData);
-
-    res.send(200, graphResponse);
-    return;
-  } catch (error: unknown) {
-    if (error instanceof AppError && error.statusCode === 400) {
-      throw error;
-    }
-
-    throw toGraphAppError(error, "Failed to create container.");
+  if (
+    typeof req.body?.displayName !== "string" ||
+    !req.body.displayName.trim()
+  ) {
+    throw createValidationError("displayName is required.");
   }
+
+  const containerRequestData = {
+    displayName: req.body.displayName.trim(),
+    description: req.body?.description ? req.body.description : "",
+    containerTypeId: serverConfig.containerTypeId,
+  };
+
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken);
+  const createContainerRequest = graphClient
+    .api("/storage/fileStorage/containers")
+    .version("v1.0");
+
+  const graphResponse = await sendGraphRequest(
+    () => createContainerRequest.post(containerRequestData),
+    "Failed to create container.",
+  );
+
+  res.send(200, graphResponse);
 };

@@ -20,13 +20,13 @@ vi.mock("./config", () => ({
 describe("listContainers error handling", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-  });
-
-  it("should return throttled error metadata for Graph 429 failures", async () => {
     authMocks.requireContainerManageRequest.mockResolvedValue({
       token: "user-token",
     });
     authMocks.getGraphOBOToken.mockResolvedValue("graph-token");
+  });
+
+  it("should return throttled error metadata for Graph 429 failures", async () => {
     authMocks.createGraphClient.mockReturnValue({
       api: vi.fn().mockReturnValue({
         version: vi.fn().mockReturnValue({
@@ -55,7 +55,6 @@ describe("listContainers error handling", () => {
       expect.objectContaining({
         error: expect.objectContaining({
           name: "GraphError",
-          code: undefined,
           message: "Retry attempts exhausted",
           statusCode: 429,
           originError: expect.objectContaining({
@@ -67,5 +66,39 @@ describe("listContainers error handling", () => {
       }),
     );
     expect(res.header).toHaveBeenCalledWith("Retry-After", "12");
+  });
+
+  it("should keep local request-construction failures out of GraphError", async () => {
+    authMocks.createGraphClient.mockReturnValue({
+      api: vi.fn().mockReturnValue({
+        version: vi.fn().mockReturnValue({
+          filter: vi.fn(() => {
+            throw new Error("filter build failed");
+          }),
+        }),
+      }),
+    });
+
+    const req = {} as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
+
+    await withErrorHandling(listContainers)(req, res);
+
+    expect(res.send).toHaveBeenCalledWith(
+      500,
+      expect.objectContaining({
+        error: expect.objectContaining({
+          name: "Error",
+          message: "filter build failed",
+          statusCode: 500,
+        }),
+      }),
+    );
+    expect(res.send).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error: expect.objectContaining({ name: "GraphError" }),
+      }),
+    );
   });
 });

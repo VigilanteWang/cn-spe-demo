@@ -8,7 +8,6 @@ import {
   createArchiveTooLargeError,
   createArchiveTooManyFilesError,
   getDownloadJobFailureMessage,
-  toDownloadGraphError,
   validateDownloadJobInput,
 } from "./downloadErrors";
 import {
@@ -153,15 +152,8 @@ async function processJob(
   // 给前端一个最初始的可见提示，表示任务已经开始工作。
   job.currentItem = "Initialising...";
 
-  let graphToken: string;
-  try {
-    // 先把当前 API token 换成可访问 Graph 的 OBO token。
-    graphToken = await getGraphOBOToken(userToken);
-  } catch (error: unknown) {
-    throw toDownloadGraphError(error, "Unable to prepare the archive.");
-  }
-
   // 用换到的 Graph token 创建后续目录读取和文件解析要用的客户端。
+  const graphToken = await getGraphOBOToken(userToken);
   const graphClient = createGraphClient(graphToken);
 
   // 接下来先把“文件 + 文件夹混合选择”展开成纯文件列表。

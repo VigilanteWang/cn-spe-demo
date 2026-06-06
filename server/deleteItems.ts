@@ -6,7 +6,7 @@ import {
 } from "./auth";
 import {
   createValidationError,
-  toGraphAppError,
+  sendGraphRequest,
 } from "./common/appErrorHelpers";
 
 interface IDeleteItemsRequestBody {
@@ -35,32 +35,31 @@ export const deleteItems = async (req: Request, res: Response) => {
     );
   }
 
-  try {
-    const graphToken = await getGraphOBOToken(authResult.token);
-    const graphClient = createGraphClient(graphToken);
+  const graphToken = await getGraphOBOToken(authResult.token);
+  const graphClient = createGraphClient(graphToken);
+  const successful: string[] = [];
+  const failed: Array<{ id: string; reason: string }> = [];
 
-    const successful: string[] = [];
-    const failed: Array<{ id: string; reason: string }> = [];
-
-    // 顺序删除可以降低瞬时并发，减少 Graph 节流和竞争失败的概率。
-    for (const itemId of itemIds) {
-      try {
-        await graphClient
-          .api(`/drives/${containerId}/items/${itemId}`)
-          .delete();
-        successful.push(itemId);
-      } catch (error: unknown) {
-        failed.push({
-          id: itemId,
-          reason: getSafeDeleteFailureReason(error),
-        });
-      }
+  // 顺序删除可以降低瞬时并发，减少 Graph 节流和竞争失败的概率。
+  for (const itemId of itemIds) {
+    try {
+      const deleteRequest = graphClient.api(
+        `/drives/${containerId}/items/${itemId}`,
+      );
+      await sendGraphRequest(
+        () => deleteRequest.delete(),
+        "Unable to delete the selected items.",
+      );
+      successful.push(itemId);
+    } catch (error: unknown) {
+      failed.push({
+        id: itemId,
+        reason: getSafeDeleteFailureReason(error),
+      });
     }
-
-    res.send(200, { successful, failed });
-  } catch (error: unknown) {
-    throw toGraphAppError(error, "Unable to delete the selected items.");
   }
+
+  res.send(200, { successful, failed });
 };
 
 /**

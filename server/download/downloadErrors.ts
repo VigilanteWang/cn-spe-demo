@@ -2,7 +2,6 @@ import { AppError } from "../../common/appError";
 import {
   createInternalError,
   createValidationError,
-  toGraphAppError,
 } from "../common/appErrorHelpers";
 
 /**
@@ -22,18 +21,6 @@ export const getDownloadJobFailureMessage = (
 
   return fallbackMessage;
 };
-
-/**
- * 统一构造下载模块里的 Graph 错误。
- *
- * @param error 原始 Graph 异常。
- * @param failureMessage 面向调用方的默认错误文案。
- * @returns 统一的 Graph 错误对象。
- */
-export const toDownloadGraphError = (
-  error: unknown,
-  failureMessage: string,
-): AppError => toGraphAppError(error, failureMessage);
 
 /**
  * 构造“任务不存在或不可访问”错误。

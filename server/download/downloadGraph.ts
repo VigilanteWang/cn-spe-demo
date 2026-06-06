@@ -1,7 +1,11 @@
+import {
+  RedirectHandlerOptions,
+  ResponseType,
+} from "@microsoft/microsoft-graph-client";
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
-import { createGraphClient } from "../auth";
 import { AppError } from "../../common/appError";
-import { toDownloadGraphError } from "./downloadErrors";
+import { createGraphClient } from "../auth";
+import { sendGraphRequest } from "../common/appErrorHelpers";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;
@@ -40,59 +44,44 @@ export const flattenDriveItems = async (
  */
 export const resolveDownloadUrl = async (
   graphClient: DownloadGraphClient,
-  graphToken: string,
+  _graphToken: string,
   driveId: string,
   itemId: string,
 ): Promise<string> => {
-  try {
-    const item = (await graphClient
-      .api(`/drives/${driveId}/items/${itemId}`)
-      .get()) as GraphDriveItemWithDownloadUrl;
+  const itemRequest = graphClient.api(`/drives/${driveId}/items/${itemId}`);
+  const item = (await sendGraphRequest(
+    () => itemRequest.get(),
+    `Unable to resolve the download url for item ${itemId}.`,
+  )) as GraphDriveItemWithDownloadUrl;
 
-    // 如果 Graph 已直接返回临时下载直链，就优先复用，少走一次兜底请求。
-    if (item["@microsoft.graph.downloadUrl"]) {
-      return item["@microsoft.graph.downloadUrl"];
-    }
-  } catch (error: unknown) {
-    throw toDownloadGraphError(
-      error,
-      `Unable to resolve the download url for item ${itemId}.`,
-    );
+  if (item["@microsoft.graph.downloadUrl"]) {
+    return item["@microsoft.graph.downloadUrl"];
   }
 
-  try {
-    // 某些场景下 Graph 不返回 downloadUrl，这时通过 /content 的 302 Location 兜底获取。
-    const contentEndpoint = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/content`;
-    const response = await fetch(contentEndpoint, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${graphToken}` },
-      redirect: "manual",
-    });
+  // 这里显式关闭 SDK 默认的 redirect 跟随，保留 302 响应头里的 location。
+  const contentRequest = graphClient
+    .api(`/drives/${driveId}/items/${itemId}/content`)
+    .responseType(ResponseType.RAW)
+    .middlewareOptions([new RedirectHandlerOptions(0, () => false)]);
+  const response = await sendGraphRequest(
+    () => contentRequest.get(),
+    `Unable to resolve the download url for item ${itemId}.`,
+  );
 
-    const location = response.headers.get("location");
-    if (location) {
-      return location;
-    }
-
-    throw new AppError({
-      name: "DownloadUrlNotFoundError",
-      message: `Unable to resolve the download url for item ${itemId}.`,
-      statusCode: response.status,
-      originError: {
-        source: "microsoft-graph",
-      },
-      cause: { driveId, itemId },
-    });
-  } catch (error: unknown) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
-    throw toDownloadGraphError(
-      error,
-      `Unable to resolve the download url for item ${itemId}.`,
-    );
+  const location = response.headers.get("location");
+  if (location) {
+    return location;
   }
+
+  throw new AppError({
+    name: "DownloadUrlNotFoundError",
+    message: `Unable to resolve the download url for item ${itemId}.`,
+    statusCode: response.status,
+    originError: {
+      source: "microsoft-graph",
+    },
+    cause: { driveId, itemId },
+  });
 };
 
 /**
@@ -111,16 +100,13 @@ async function expandItem(
   basePath: string,
   result: FlatFile[],
 ): Promise<void> {
-  let item: DriveItem;
-
-  try {
-    item = (await graphClient
-      .api(`/drives/${driveId}/items/${itemId}`)
-      .select("id,name,folder,file,size")
-      .get()) as DriveItem;
-  } catch (error: unknown) {
-    throw toDownloadGraphError(error, "Unable to expand the selected items.");
-  }
+  const itemRequest = graphClient
+    .api(`/drives/${driveId}/items/${itemId}`)
+    .select("id,name,folder,file,size");
+  const item = (await sendGraphRequest(
+    () => itemRequest.get(),
+    "Unable to expand the selected items.",
+  )) as DriveItem;
 
   const itemName = item.name ?? "";
   if (item.folder) {
@@ -164,16 +150,16 @@ async function expandFolder(
   let endpoint: string | null = `/drives/${driveId}/items/${folderId}/children`;
 
   while (endpoint) {
-    let page: { value?: DriveItem[]; "@odata.nextLink"?: string };
-
-    try {
-      page = await graphClient
-        .api(endpoint)
-        .select("id,name,folder,file,size")
-        .get();
-    } catch (error: unknown) {
-      throw toDownloadGraphError(error, "Unable to expand the selected items.");
-    }
+    const pageRequest = graphClient
+      .api(endpoint)
+      .select("id,name,folder,file,size");
+    const page = (await sendGraphRequest(
+      () => pageRequest.get(),
+      "Unable to expand the selected items.",
+    )) as {
+      value?: DriveItem[];
+      "@odata.nextLink"?: string;
+    };
 
     const children = page.value ?? [];
 
