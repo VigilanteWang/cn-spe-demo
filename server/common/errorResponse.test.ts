@@ -36,12 +36,14 @@ describe("toApiErrorResponseBody", () => {
         code: "serviceUnavailable",
         message: "Temporarily unavailable.",
         statusCode: 503,
-        cause: { operation: "listContainers" },
+        details: [{ operation: "listContainers" }],
         originError: {
           source: "microsoft-graph",
           requestId: "req-503",
           retryAfter: 9,
-          raw: { status: 503 },
+          cause: Object.assign(new Error("upstream failed"), {
+            status: 503,
+          }),
         },
       }),
     );
@@ -52,14 +54,19 @@ describe("toApiErrorResponseBody", () => {
         code: "serviceUnavailable",
         message: "Temporarily unavailable.",
         statusCode: 503,
-        cause: {
-          operation: "listContainers",
-        },
+        details: [
+          {
+            operation: "listContainers",
+          },
+        ],
         originError: {
           source: "microsoft-graph",
           requestId: "req-503",
           retryAfter: 9,
-          raw: {
+          cause: {
+            name: "Error",
+            message: "upstream failed",
+            stack: expect.any(String),
             status: 503,
           },
         },
@@ -85,9 +92,9 @@ describe("withErrorHandling", () => {
         statusCode: 401,
         originError: {
           source: "app",
-          raw: undefined,
+          cause: undefined,
         },
-        cause: undefined,
+        details: undefined,
       },
     });
   });

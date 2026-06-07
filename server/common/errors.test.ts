@@ -58,7 +58,7 @@ describe("toGraphAppError", () => {
     expect(mappedError.originError).toMatchObject({
       source: "microsoft-graph",
       codePath: ["serviceUnavailable", "timeout"],
-      raw: {
+      cause: {
         code: "serviceUnavailable",
       },
     });
@@ -93,18 +93,15 @@ describe("toGraphAppError", () => {
 
   it("should map Graph request failures inside sendGraphRequest", async () => {
     await expect(
-      sendGraphRequest(
-        async () => {
-          throw Object.assign(new Error("Too many requests"), {
-            statusCode: 429,
-            headers: createHeadersLike({
-              "Retry-After": "9",
-              "request-id": "exec-429",
-            }),
-          });
-        },
-        "Unable to read item permissions.",
-      ),
+      sendGraphRequest(async () => {
+        throw Object.assign(new Error("Too many requests"), {
+          statusCode: 429,
+          headers: createHeadersLike({
+            "Retry-After": "9",
+            "request-id": "exec-429",
+          }),
+        });
+      }, "Unable to read item permissions."),
     ).rejects.toMatchObject({
       name: "GraphError",
       message: "Too many requests",

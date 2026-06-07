@@ -54,9 +54,9 @@ describe("downloadHandlers error handling", () => {
         statusCode: 404,
         originError: {
           source: "app",
-          raw: undefined,
+          cause: undefined,
         },
-        cause: undefined,
+        details: undefined,
       },
     });
   });
@@ -87,9 +87,9 @@ describe("downloadHandlers error handling", () => {
         statusCode: 409,
         originError: {
           source: "app",
-          raw: undefined,
+          cause: undefined,
         },
-        cause: undefined,
+        details: undefined,
       },
     });
   });
@@ -108,9 +108,9 @@ describe("downloadHandlers error handling", () => {
         statusCode: 400,
         originError: {
           source: "validation",
-          raw: undefined,
+          cause: undefined,
         },
-        cause: undefined,
+        details: undefined,
       },
     });
   });

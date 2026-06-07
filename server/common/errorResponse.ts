@@ -1,9 +1,8 @@
 import type { Request, Response } from "restify";
 import {
   AppError,
-  extractGraphOriginError,
+  ensureErrorCause,
   readErrorMessage,
-  readErrorStatusCode,
   serializeAppError,
 } from "../../common/appError";
 import type { IErrorResponseBody } from "../../common/contracts/errorContracts";
@@ -44,11 +43,14 @@ export const normalizeError = (error: unknown): AppError => {
     return error;
   }
 
-  const statusCode = readErrorStatusCode(error) ?? 500;
+  const statusCode = 500;
   const errorRecord =
     typeof error === "object" && error !== null
       ? (error as Record<string, unknown>)
       : null;
+  const fallbackMessage =
+    statusToDefaultMessageMap[statusCode] ??
+    "An unexpected server error occurred.";
 
   return new AppError({
     name:
@@ -59,14 +61,11 @@ export const normalizeError = (error: unknown): AppError => {
       errorRecord && typeof errorRecord.code === "string"
         ? errorRecord.code
         : undefined,
-    message: readErrorMessage(
-      error,
-      statusToDefaultMessageMap[statusCode] ??
-        "An unexpected server error occurred.",
-    ),
+    message: readErrorMessage(error, fallbackMessage),
     statusCode,
-    originError: extractGraphOriginError(error),
-    cause: error,
+    originError: {
+      cause: ensureErrorCause(error, fallbackMessage, "AppError"),
+    },
   });
 };
 

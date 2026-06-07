@@ -131,7 +131,7 @@ export const createArchiveTooManyFilesError = (
     originError: {
       source: "app",
     },
-    cause: { totalFiles, maxFiles },
+    details: [{ totalFiles, maxFiles }],
   });
 
 /**
@@ -149,5 +149,5 @@ export const createArchiveTooLargeError = (maxBytes: number): AppError =>
     originError: {
       source: "app",
     },
-    cause: { maxBytes },
+    details: [{ maxBytes }],
   });

@@ -35,7 +35,7 @@ export const buildContainerPermissionValidationError = (
     originError: {
       source: "validation",
     },
-    cause: { entryId },
+    details: [{ entryId }],
   });
 
 interface IRequiredFieldErrorOptions {

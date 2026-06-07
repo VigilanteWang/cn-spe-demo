@@ -2,9 +2,9 @@ import {
   DirectoryPrincipalSearchCache,
   getDirectorySearchResultTtlMs,
 } from "./directoryPrincipalSearchCache";
+import { AppError } from "../../../../../common/appError";
 import { EMPTY_RESULT_TTL_MS } from "./directoryPrincipalSearchConstants";
 import { mapGraphError } from "./directoryPrincipalSearchError";
-import type { DirectoryPrincipalSearchAppError } from "./directoryPrincipalSearchError";
 import { createDirectorySearchPlan } from "./directoryPrincipalSearchPlan";
 import {
   IDirectoryPrincipalSearchResult,
@@ -31,7 +31,7 @@ export type {
 
 export type { DirectoryPrincipalSearchErrorCode } from "./directoryPrincipalSearchError";
 
-export { DirectoryPrincipalSearchAppError } from "./directoryPrincipalSearchError";
+export { createDirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
 export { createDirectorySearchPlan } from "./directoryPrincipalSearchPlan";
 
 // 这个在模块作用域内，首次载入，建立单例
@@ -127,6 +127,5 @@ export const searchDirectoryPrincipals = async ({
  * 401/403 不会造成 cache key 冲突，但通常意味着当前身份上下文已经失效或变化，
  * 这里清理缓存属于主动失效处理，而不是为了阻止 key 重复。
  */
-const shouldClearCacheForError = (
-  error: DirectoryPrincipalSearchAppError,
-): boolean => error.code === "unauthorized" || error.code === "forbidden";
+const shouldClearCacheForError = (error: AppError): boolean =>
+  error.code === "unauthorized" || error.code === "forbidden";

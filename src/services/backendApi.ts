@@ -12,7 +12,6 @@
  * - POST /api/deleteItems      - 批量删除文件/文件夹
  */
 
-import { AppError } from "../../common/appError";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
 import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
@@ -26,32 +25,6 @@ export interface IDeleteItemsResult {
   successful: string[]; // 成功删除的文件 ID 列表
   failed: Array<{ id: string; reason: string }>; // 失败的文件 ID 及原因
 }
-
-/**
- * 根据响应构造容器 API 请求错误。
- *
- * @param code 后端错误无法解析时使用的兜底错误码。
- * @param operation 调用场景名称，用于生成兜底错误文案。
- * @param response 后端返回的失败响应。
- * @returns 统一的后端请求错误实例。
- */
-const buildBackendRequestError = async (
-  operation: string,
-  response: Response,
-): Promise<AppError> => {
-  const appError = await readApiErrorResponseSummary(response, {
-    operationLabel: operation,
-  });
-
-  return new AppError({
-    name: "BackendRequestError",
-    code: appError.code,
-    message: appError.message,
-    statusCode: appError.statusCode,
-    originError: appError.originError,
-    cause: appError.cause,
-  });
-};
 
 /**
  * 列出当前用户可访问的所有容器。
@@ -75,7 +48,9 @@ export async function listContainers(): Promise<IContainer[]> {
     // Graph API 把集合包在 value 数组里返回；空集合时返回空数组而非 undefined
     return (body.value as IContainer[]) ?? [];
   }
-  throw await buildBackendRequestError("listContainers", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "listContainers",
+  });
 }
 
 /**
@@ -107,7 +82,9 @@ export async function createContainer(
   if (response.ok) {
     return (await response.json()) as IContainer;
   }
-  throw await buildBackendRequestError("createContainer", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "createContainer",
+  });
 }
 
 /**
@@ -133,5 +110,7 @@ export async function deleteItems(
   if (response.ok) {
     return (await response.json()) as IDeleteItemsResult;
   }
-  throw await buildBackendRequestError("deleteItems", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "deleteItems",
+  });
 }

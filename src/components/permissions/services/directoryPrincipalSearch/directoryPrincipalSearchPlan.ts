@@ -1,5 +1,5 @@
 import {
-  DirectoryPrincipalSearchAppError,
+  createDirectoryPrincipalSearchError,
   mapGraphError,
 } from "./directoryPrincipalSearchError";
 import {
@@ -39,7 +39,7 @@ export const createDirectorySearchPlan = (
 
   // 规范化后仍为空，说明输入只有空白字符，后续任何 Graph 请求都没有意义。
   if (!normalizedQuery) {
-    throw new DirectoryPrincipalSearchAppError(
+    throw createDirectoryPrincipalSearchError(
       "emptyQuery",
       "Please enter a user or group search term.",
     );

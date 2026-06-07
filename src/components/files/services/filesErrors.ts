@@ -44,7 +44,7 @@ export const buildFilesUploadError = (
     originError: {
       source: "app",
     },
-    cause: { context },
+    details: [context],
   });
 
 /**
@@ -71,8 +71,12 @@ export const normalizeFilesOperationError = (
     message: readErrorMessage(error, options.fallbackMessage),
     originError: {
       source: "app",
+      cause:
+        error instanceof Error
+          ? error
+          : new Error(readErrorMessage(error, options.fallbackMessage)),
     },
-    cause: options.context ? { error, context: options.context } : error,
+    details: options.context ? [options.context] : undefined,
   });
 };
 
@@ -105,15 +109,17 @@ export const buildUploadFailureSummaryError = (
     originError: {
       source: "app",
     },
-    cause: {
-      failedUploads: failedUploads.map(
-        ({ relativePath, error: uploadError }) => ({
-          relativePath,
-          code: uploadError.code,
-          message: uploadError.message,
-        }),
-      ),
-    },
+    details: [
+      {
+        failedUploads: failedUploads.map(
+          ({ relativePath, error: uploadError }) => ({
+            relativePath,
+            code: uploadError.code,
+            message: uploadError.message,
+          }),
+        ),
+      },
+    ],
   });
 };
 
@@ -142,6 +148,6 @@ export const buildDeletePartialFailureError = (
     originError: {
       source: "app",
     },
-    cause: { failedItems },
+    details: [{ failedItems }],
   });
 };

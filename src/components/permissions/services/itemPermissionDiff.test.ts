@@ -49,9 +49,7 @@ describe("computeItemPermissionChanges", () => {
       originError: {
         source: "validation",
       },
-      cause: {
-        entryId: "people:user-megan-bowen",
-      },
+      details: [{ entryId: "people:user-megan-bowen" }],
     });
   });
 

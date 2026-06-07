@@ -27,7 +27,7 @@ vi.mock(
 );
 
 vi.mock("../../services/itemPermissionApi", () => {
-  class PermissionApiError extends Error {
+  class _PermissionApiError extends Error {
     readonly code: string;
 
     readonly retryAfterSeconds?: number;
@@ -55,7 +55,6 @@ vi.mock("../../services/itemPermissionApi", () => {
   }
 
   return {
-    ItemPermissionApiError: PermissionApiError,
     listItemPermissions: vi.fn(),
     applyItemPermissionChanges: vi.fn(),
   };

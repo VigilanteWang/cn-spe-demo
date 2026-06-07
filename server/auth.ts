@@ -44,7 +44,7 @@ import jwksClient from "jwks-rsa";
 import { Request } from "restify";
 // Node 18+ 已内置 fetch，无需 isomorphic-fetch polyfill；Node 20 LTS 完全支持
 import type { IErrorResponseBody } from "../common/contracts/errorContracts";
-import { AppError } from "../common/appError";
+import { AppError, ensureErrorCause } from "../common/appError";
 import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
@@ -527,9 +527,9 @@ export const authorizeContainerManageRequest = async (
           code: "unauthorized",
           message: `Invalid access token: ${message}`,
           statusCode: 401,
-          cause: error,
           originError: {
             source: "app",
+            cause: ensureErrorCause(error, message, "AuthError"),
           },
         }),
       ),
@@ -558,7 +558,7 @@ export const requireContainerManageRequest = async (
     message: authorizationResult.body.error.message,
     statusCode: authorizationResult.status,
     originError: authorizationResult.body.error.originError,
-    cause: authorizationResult.body.error.cause,
+    details: authorizationResult.body.error.details,
   });
 };
 

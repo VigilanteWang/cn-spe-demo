@@ -38,9 +38,9 @@ describe("deleteItems error handling", () => {
         statusCode: 400,
         originError: {
           source: "validation",
-          raw: undefined,
+          cause: undefined,
         },
-        cause: undefined,
+        details: undefined,
       },
     });
   });

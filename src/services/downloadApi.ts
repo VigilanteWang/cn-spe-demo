@@ -15,7 +15,7 @@
  */
 
 import { IAbortRequestOptions, sendAuthorizedRequest } from "./apiClient";
-import { AppError } from "../../common/appError";
+import { AppError, ensureErrorCause } from "../../common/appError";
 import {
   IArchiveManifest,
   IArchiveSaveTarget,
@@ -42,31 +42,6 @@ export interface IJobProgress {
   totalBytes: number; // 总字节（后端阶段）
   errors: string[]; // 严格失败模式下的致命错误列表
 }
-
-/**
- * 根据浏览器响应构造归档 API 请求错误。
- *
- * @param operation 当前失败的操作名。
- * @param response 原始 HTTP 响应对象。
- * @returns 统一的前端 API 错误对象。
- */
-const buildArchiveRequestError = async (
-  operation: string,
-  response: Response,
-): Promise<AppError> => {
-  const appError = await readApiErrorResponseSummary(response, {
-    operationLabel: operation,
-  });
-
-  return new AppError({
-    name: "ArchiveRequestError",
-    code: appError.code,
-    message: appError.message,
-    statusCode: appError.statusCode,
-    originError: appError.originError,
-    cause: appError.cause,
-  });
-};
 
 /**
  * 启动下载准备任务。
@@ -102,7 +77,9 @@ export async function startDownload(
     return data.jobId as string;
   }
 
-  throw await buildArchiveRequestError("startDownload", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "startDownload",
+  });
 }
 
 /**
@@ -128,7 +105,9 @@ export async function getDownloadProgress(
     return (await response.json()) as IJobProgress;
   }
 
-  throw await buildArchiveRequestError("getDownloadProgress", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "getDownloadProgress",
+  });
 }
 
 /**
@@ -154,7 +133,9 @@ export async function getDownloadManifest(
     return (await response.json()) as IArchiveManifest;
   }
 
-  throw await buildArchiveRequestError("getDownloadManifest", response);
+  throw await readApiErrorResponseSummary(response, {
+    operationLabel: "getDownloadManifest",
+  });
 }
 
 /**
@@ -208,8 +189,12 @@ export async function selectDownloadSaveTarget(
         message: "Download cancelled by user.",
         originError: {
           source: "app",
+          cause: ensureErrorCause(
+            error,
+            "Download cancelled by user.",
+            "AbortError",
+          ),
         },
-        cause: error,
       });
     }
 

@@ -14,7 +14,7 @@ describe("backendApi", () => {
       new Response(
         JSON.stringify({
           error: {
-            name: "BackendRequestError",
+            name: "GraphError",
             code: "throttled",
             message: "Container request was throttled.",
             statusCode: 429,
@@ -35,7 +35,7 @@ describe("backendApi", () => {
     );
 
     await expect(listContainers()).rejects.toMatchObject({
-      name: "BackendRequestError",
+      name: "GraphError",
       code: "throttled",
       message: "Container request was throttled.",
       statusCode: 429,

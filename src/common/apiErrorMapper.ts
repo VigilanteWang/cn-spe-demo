@@ -103,7 +103,7 @@ export const readApiErrorResponseSummary = async (
         ...appError.originError,
         retryAfter,
       },
-      cause: appError.cause,
+      details: appError.details,
     });
   }
 

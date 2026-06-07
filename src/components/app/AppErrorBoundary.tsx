@@ -1,6 +1,10 @@
 import React from "react";
 import { Button, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { AppError, readErrorMessage } from "../../../common/appError";
+import {
+  AppError,
+  ensureErrorCause,
+  readErrorMessage,
+} from "../../../common/appError";
 
 /**
  * 教学总览：
@@ -74,9 +78,13 @@ export class AppErrorBoundary extends React.Component<
         name: "ReactRenderError",
         code: "renderError",
         message: readErrorMessage(error, "The application failed to render."),
-        cause: error,
         originError: {
           source: "app",
+          cause: ensureErrorCause(
+            error,
+            "The application failed to render.",
+            "ReactRenderError",
+          ),
         },
       }),
     };

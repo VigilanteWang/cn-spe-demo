@@ -425,9 +425,7 @@ export const downloadArchiveFromManifest = (
                   originError: {
                     source: "network",
                   },
-                  cause: {
-                    relativePath: item.relativePath,
-                  },
+                  details: [{ relativePath: item.relativePath }],
                 });
               }
 

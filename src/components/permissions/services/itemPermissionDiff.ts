@@ -16,7 +16,7 @@ export { type IItemPermissionChangeSetFromUI as IItemPermissionChangeSet } from 
  * 构造 item 权限草稿校验错误。
  *
  * 这里保留统一的错误名称和上下文，方便上层按 code 区分问题类型，
- * 同时还能通过 cause 定位到具体 entry。
+ * 同时还能通过 details 定位到具体 entry。
  *
  * @param code 稳定错误码，用于区分不同校验问题。
  * @param message 面向界面和日志的错误说明。
@@ -35,7 +35,7 @@ export const buildItemPermissionValidationError = (
     originError: {
       source: "validation",
     },
-    cause: { entryId },
+    details: [{ entryId }],
   });
 
 interface IRequiredFieldErrorOptions {

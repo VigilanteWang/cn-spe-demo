@@ -10,7 +10,7 @@
  */
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
-import { AppError } from "../../common/appError";
+import { AppError, ensureErrorCause } from "../../common/appError";
 import { clientConfig } from "../common/config";
 import * as Scopes from "../common/scopes";
 
@@ -69,14 +69,12 @@ export async function getApiAccessToken(): Promise<string> {
       statusCode: 401,
       originError: {
         source: "app",
+        cause: ensureErrorCause(
+          error,
+          "Failed to get access token.",
+          "ApiClientError",
+        ),
       },
-      cause:
-        error instanceof Error
-          ? {
-              name: error.name,
-              message: error.message,
-            }
-          : { message: "Unknown token acquisition error" },
     });
   }
 }

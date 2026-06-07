@@ -2,7 +2,7 @@
  * 这个文件先把 Graph 返回的 unknown narrowing 成对象，再逐个字段做类型判断，
  * 这样才能安全读取 user/group 的 id、displayName、mail、upn、groupTypes 等属性。
  */
-import { DirectoryPrincipalSearchAppError } from "./directoryPrincipalSearchError";
+import { createDirectoryPrincipalSearchError } from "./directoryPrincipalSearchError";
 import {
   readOptionalBoolean,
   readOptionalString,
@@ -141,7 +141,7 @@ const readRequiredString = (value: unknown, entityName: string): string => {
     return value;
   }
 
-  throw new DirectoryPrincipalSearchAppError(
+  throw createDirectoryPrincipalSearchError(
     "graphFailure",
     `${entityName} response is missing the required id field.`,
   );

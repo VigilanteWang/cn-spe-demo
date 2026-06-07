@@ -5,7 +5,7 @@ import {
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { AppError } from "../../common/appError";
 import { createGraphClient } from "../auth";
-import { sendGraphRequest } from "../common/appErrorHelpers";
+import { sendGraphRequest, toGraphAppError } from "../common/appErrorHelpers";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;
@@ -80,7 +80,7 @@ export const resolveDownloadUrl = async (
     originError: {
       source: "microsoft-graph",
     },
-    cause: { driveId, itemId },
+    details: [{ driveId, itemId }],
   });
 };
 
@@ -156,7 +156,16 @@ async function expandFolder(
     const page = (await sendGraphRequest(
       () => pageRequest.get(),
       "Unable to expand the selected items.",
-    )) as {
+    ).catch((error: unknown) => {
+      throw toGraphAppError(
+        error,
+        "Unable to expand the selected items.",
+        502,
+        {
+          details: [{ driveId, folderId }],
+        },
+      );
+    })) as {
       value?: DriveItem[];
       "@odata.nextLink"?: string;
     };

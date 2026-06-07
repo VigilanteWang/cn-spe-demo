@@ -14,7 +14,7 @@ describe("downloadApi", () => {
       new Response(
         JSON.stringify({
           error: {
-            name: "ArchiveRequestError",
+            name: "GraphError",
             code: "throttled",
             message: "Archive preparation was throttled.",
             statusCode: 429,
@@ -37,7 +37,7 @@ describe("downloadApi", () => {
     await expect(
       startDownload("container-a", ["item-a"]),
     ).rejects.toMatchObject({
-      name: "ArchiveRequestError",
+      name: "GraphError",
       code: "throttled",
       message: "Archive preparation was throttled.",
       statusCode: 429,
@@ -60,7 +60,7 @@ describe("downloadApi", () => {
     );
 
     await expect(getDownloadProgress("job-a")).rejects.toMatchObject({
-      name: "ArchiveRequestError",
+      name: "AppError",
       message: "getDownloadProgress failed: 500",
       statusCode: 500,
     });

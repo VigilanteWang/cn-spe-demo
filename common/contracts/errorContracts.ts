@@ -11,6 +11,20 @@ export type AppErrorSource =
   | "validation";
 
 /**
+ * 可跨 HTTP 传输的原始异常快照。
+ *
+ * 运行时 `originError.cause` 优先保存真正的 `Error`；
+ * 序列化后允许降级为这个 plain object 结构，不要求恢复原型链。
+ */
+export interface ISerializedErrorCause {
+  name?: string;
+  message?: string;
+  stack?: string;
+  cause?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * 对原始错误来源做最小必要收敛后的调试信息。
  *
  * 这个对象默认会直接透传到前端 DevTools，
@@ -18,7 +32,7 @@ export type AppErrorSource =
  */
 export interface IOriginErrorInfo {
   source?: AppErrorSource;
-  raw?: unknown;
+  cause?: Error | ISerializedErrorCause;
   codePath?: string[];
   requestId?: string;
   retryAfter?: number;
@@ -27,7 +41,7 @@ export interface IOriginErrorInfo {
 /**
  * 前后端统一错误对象形状。
  *
- * `cause` 会在跨 HTTP 传输时做最佳努力序列化，
+ * `details` 会在跨 HTTP 传输时做最佳努力序列化，
  * 不保证保留原始原型链。
  */
 export interface AppErrorShape {
@@ -36,7 +50,7 @@ export interface AppErrorShape {
   code?: string;
   statusCode?: number;
   originError?: IOriginErrorInfo;
-  cause?: unknown;
+  details?: unknown[];
 }
 
 /**

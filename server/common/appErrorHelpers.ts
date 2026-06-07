@@ -1,13 +1,10 @@
-import {
-  AppError,
-  extractGraphOriginError,
-  toAppError,
-} from "../../common/appError";
+import { AppError, ensureErrorCause } from "../../common/appError";
+import { sendGraphRequest, toGraphAppError } from "../../common/graphError";
 
 /**
  * 创建后端输入校验错误。
  *
- * 这类错误来自我们自己的请求边界，因此显式标记为 validation。
+ * 这类错误来自我们自己的请求边界，因此显式标记为 `validation`。
  */
 export const createValidationError = (message: string): AppError =>
   new AppError({
@@ -55,45 +52,11 @@ export const createInternalError = (
     statusCode: options?.statusCode ?? 500,
     originError: {
       source: "app",
-    },
-    cause: options?.cause,
-  });
-
-/**
- * 将 Microsoft Graph 或其下游请求失败收口为统一 `AppError`。
- *
- * 这里不再按状态码推导仓库自定义 code，只保留原始错误自带的 code。
- */
-export const toGraphAppError = (
-  error: unknown,
-  failureMessage: string,
-  defaultStatusCode = 502,
-): AppError => {
-  if (error instanceof AppError) {
-    return error;
-  }
-
-  return toAppError(error, {
-    defaultName: "GraphError",
-    defaultMessage: failureMessage,
-    defaultStatusCode,
-    originError: extractGraphOriginError(error) ?? {
-      source: "microsoft-graph",
+      cause:
+        options?.cause === undefined
+          ? undefined
+          : ensureErrorCause(options.cause, message, "InternalError"),
     },
   });
-};
 
-/**
- * 执行一次真正的 Graph / SDK 调用，并在失败时统一收口成 GraphError。
- */
-export const sendGraphRequest = async <T>(
-  operation: () => Promise<T>,
-  failureMessage: string,
-  defaultStatusCode = 502,
-): Promise<T> => {
-  try {
-    return await operation();
-  } catch (error: unknown) {
-    throw toGraphAppError(error, failureMessage, defaultStatusCode);
-  }
-};
+export { sendGraphRequest, toGraphAppError };

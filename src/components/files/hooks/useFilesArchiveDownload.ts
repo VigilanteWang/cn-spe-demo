@@ -61,9 +61,7 @@ const buildArchivePreparationError = (
     originError: {
       source: "app",
     },
-    cause: {
-      errors: rawErrors,
-    },
+    details: [{ errors: rawErrors }],
   });
 };
 
