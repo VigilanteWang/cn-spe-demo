@@ -1,7 +1,4 @@
-import type {
-  AppErrorShape,
-  IOriginErrorInfo,
-} from "./contracts/errorContracts";
+import type { AppErrorShape, IOriginError } from "./contracts/errorContracts";
 
 /**
  * 统一应用错误基类。
@@ -14,7 +11,7 @@ export class AppError extends Error {
 
   readonly statusCode?: number;
 
-  readonly originError?: IOriginErrorInfo;
+  readonly originError?: IOriginError;
 
   readonly details?: unknown[];
 

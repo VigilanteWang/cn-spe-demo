@@ -30,7 +30,7 @@ export interface ISerializedErrorCause {
  * 这个对象默认会直接透传到前端 DevTools，
  * 因此这里优先保留可排查性，而不是做过度裁剪。
  */
-export interface IOriginErrorInfo {
+export interface IOriginError {
   source?: AppErrorSource;
   cause?: Error | ISerializedErrorCause;
   codePath?: string[];
@@ -49,7 +49,7 @@ export interface AppErrorShape {
   message: string;
   code?: string;
   statusCode?: number;
-  originError?: IOriginErrorInfo;
+  originError?: IOriginError;
   details?: unknown[];
 }
 

@@ -7,7 +7,7 @@ import {
   readString,
   serializeUnknownCause,
 } from "./appError";
-import type { IOriginErrorInfo } from "./contracts/errorContracts";
+import type { IOriginError } from "./contracts/errorContracts";
 
 /**
  * 收集当前错误对象上实际使用到的 Graph 响应头容器。
@@ -288,7 +288,7 @@ const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
 export const extractGraphOriginError = (
   error: unknown,
   fallbackMessage = "Unknown Microsoft Graph error.",
-): IOriginErrorInfo | undefined => {
+): IOriginError | undefined => {
   const codePath = readGraphCodePath(error);
   const requestId = readGraphRequestId(error);
   const retryAfter = readGraphRetryAfter(error);
