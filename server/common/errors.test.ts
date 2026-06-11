@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { AppError } from "../../common/appError";
 import { sendGraphRequest, toGraphAppError } from "./appErrorHelpers";
 
-const createHeadersLike = (entries: Record<string, string>) => ({
-  get: (name: string) => entries[name],
-});
+const createHeadersLike = (entries: Record<string, string>) =>
+  new Headers(entries);
 
 describe("toGraphAppError", () => {
   it("should preserve Retry-After and request id from 429 responses", () => {
@@ -22,24 +21,6 @@ describe("toGraphAppError", () => {
     expect(mappedError.statusCode).toBe(429);
     expect(mappedError.originError?.retryAfter).toBe(12);
     expect(mappedError.originError?.requestId).toBe("req-429");
-  });
-
-  it("should fall back to response headers when the first header container is empty", () => {
-    const mappedError = toGraphAppError(
-      Object.assign(new Error("Retry attempts exhausted"), {
-        statusCode: 429,
-        headers: {},
-        response: {
-          headers: createHeadersLike({
-            "Retry-After": "7",
-            "request-id": "response-req-429",
-          }),
-        },
-      }),
-    );
-
-    expect(mappedError.originError?.retryAfter).toBe(7);
-    expect(mappedError.originError?.requestId).toBe("response-req-429");
   });
 
   it("should preserve Graph code path and raw diagnostics when available", () => {

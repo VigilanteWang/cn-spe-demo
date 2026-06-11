@@ -10,42 +10,22 @@ import {
 import type { IOriginError } from "./contracts/errorContracts";
 
 /**
- * 收集当前错误对象上实际使用到的 Graph 响应头容器。
- *
- * 这里仅保留 SDK 实例常见的 `headers` 与 `response.headers`，
- * 不再继续兼容其他历史形态。
- */
-const readGraphHeaderCandidates = (error: unknown): unknown[] => {
-  const record = readRecord(error);
-  const responseRecord = readRecord(record.response);
-
-  return [record.headers, responseRecord.headers].filter(
-    (candidate): candidate is unknown => candidate !== undefined,
-  );
-};
-
-/**
  * 按优先级从 Graph 错误承载的响应头中读取指定字段。
  */
 const readGraphHeaderValue = (
   error: unknown,
   headerName: string,
 ): string | undefined => {
-  for (const headersCandidate of readGraphHeaderCandidates(error)) {
-    const headersRecord = readRecord(headersCandidate);
-    const directValue = headersRecord[headerName];
+  const headersCandidate = readRecord(error).headers;
+  if (typeof Headers !== "undefined" && headersCandidate instanceof Headers) {
+    const value = headersCandidate.get(headerName);
+    return typeof value === "string" && value ? value : undefined;
+  }
 
-    if (typeof directValue === "string" && directValue) {
-      return directValue;
-    }
+  const directValue = readRecord(headersCandidate)[headerName];
 
-    const getCandidate = headersRecord.get;
-    if (typeof getCandidate === "function") {
-      const value = getCandidate.call(headersCandidate, headerName);
-      if (typeof value === "string" && value) {
-        return value;
-      }
-    }
+  if (typeof directValue === "string" && directValue) {
+    return directValue;
   }
 
   return undefined;
@@ -84,11 +64,7 @@ export const readGraphStatusCode = (error: unknown): number | undefined => {
   const record = readRecord(error);
   const innerError = readGraphInnerError(error);
 
-  return (
-    readNumberLike(record.statusCode) ??
-    readNumberLike(readRecord(record.response).status) ??
-    readNumberLike(innerError.status)
-  );
+  return readNumberLike(record.statusCode) ?? readNumberLike(innerError.status);
 };
 
 /**
@@ -193,25 +169,6 @@ const serializeGraphHeadersCandidate = (
     return Object.keys(nextHeaders).length > 0 ? nextHeaders : undefined;
   }
 
-  const knownHeaders = [
-    "Retry-After",
-    "retry-after",
-    "request-id",
-    "client-request-id",
-  ];
-  const getCandidate = headersRecord.get;
-
-  if (typeof getCandidate === "function") {
-    const nextHeaders: Record<string, string> = {};
-    for (const headerName of knownHeaders) {
-      const value = getCandidate.call(headersCandidate, headerName);
-      if (typeof value === "string" && value) {
-        nextHeaders[headerName] = value;
-      }
-    }
-    return Object.keys(nextHeaders).length > 0 ? nextHeaders : undefined;
-  }
-
   return undefined;
 };
 
@@ -226,10 +183,7 @@ const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
       : {};
 
   const record = readRecord(error);
-  const headers =
-    readGraphHeaderCandidates(error)
-      .map((candidate) => serializeGraphHeadersCandidate(candidate))
-      .find((candidate) => candidate !== undefined) ?? undefined;
+  const headers = serializeGraphHeadersCandidate(record.headers);
 
   const causeSnapshot: Record<string, unknown> = {
     ...errorRecord,
