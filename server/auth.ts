@@ -49,7 +49,7 @@ import {
   SPEMBEDDED_CONTAINER_MANAGE,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
-import { createAuthError, toGraphAppError } from "./common/appErrorHelpers";
+import { createAuthError, createInternalError } from "./common/appErrorHelpers";
 import { toApiErrorResponseBody } from "./common/errorResponse";
 import { serverConfig } from "./config";
 
@@ -611,11 +611,10 @@ export const getGraphOBOToken = async (token: string): Promise<string> => {
 
     return oboGraphToken;
   } catch (error: unknown) {
-    throw toGraphAppError(
-      error,
-      "Unable to generate Microsoft Graph OBO token.",
-      502,
-    );
+    throw createInternalError("Unable to generate Microsoft Graph OBO token.", {
+      statusCode: 502,
+      cause: error,
+    });
   }
 };
 

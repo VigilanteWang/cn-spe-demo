@@ -32,20 +32,24 @@ const readGraphHeaderValue = (
 };
 
 /**
- * 读取 Graph 风格错误对象里的主错误节点。
+ * 读取 GraphError 的原始 body。
  *
- * 对照 SDK 的 `GraphError`，这里优先读取 `body.error`，
- * 其次兼容直接传入 `{ error: ... }` 的场景。
+ * 当前仓库运行时里，`error.body` 可能已经是
+ * `{ code, message, innerError }` 结构本身，
+ * 也可能是同结构的 JSON 字符串。
  */
-const readGraphErrorRecord = (error: unknown): Record<string, unknown> => {
+const readGraphBodyRecord = (error: unknown): Record<string, unknown> => {
   const record = readRecord(error);
-  const bodyError = readRecord(readRecord(record.body).error);
 
-  if (Object.keys(bodyError).length > 0) {
-    return bodyError;
+  if (typeof record.body === "string" && record.body) {
+    try {
+      return readRecord(JSON.parse(record.body) as unknown);
+    } catch {
+      return {};
+    }
   }
 
-  return readRecord(record.error);
+  return readRecord(record.body);
 };
 
 /**
@@ -55,7 +59,7 @@ const readGraphErrorRecord = (error: unknown): Record<string, unknown> => {
  * 不再为 `innererror` 等大小写变体增加额外分支。
  */
 const readGraphInnerError = (error: unknown): Record<string, unknown> =>
-  readRecord(readGraphErrorRecord(error).innerError);
+  readRecord(readGraphBodyRecord(error).innerError);
 
 /**
  * 读取 Graph 错误对应的 HTTP 状态码。
@@ -111,7 +115,7 @@ export const readGraphErrorMessage = (
     return error.message;
   }
 
-  const graphError = readGraphErrorRecord(error);
+  const graphError = readGraphBodyRecord(error);
   const graphMessage = readString(graphError.message);
   if (graphMessage) {
     return graphMessage;
@@ -127,7 +131,7 @@ export const readGraphErrorMessage = (
  */
 export const readGraphCodePath = (error: unknown): string[] | undefined => {
   const codePath: string[] = [];
-  let cursor: Record<string, unknown> | undefined = readGraphErrorRecord(error);
+  let cursor: Record<string, unknown> | undefined = readGraphBodyRecord(error);
 
   while (cursor && Object.keys(cursor).length > 0) {
     const code = readString(cursor.code);
@@ -246,7 +250,7 @@ export const extractGraphOriginError = (
   const codePath = readGraphCodePath(error);
   const requestId = readGraphRequestId(error);
   const retryAfter = readGraphRetryAfter(error);
-  const graphRecord = readGraphErrorRecord(error);
+  const graphRecord = readGraphBodyRecord(error);
   const innerError = readGraphInnerError(error);
   const name =
     error instanceof Error ? error.name : readString(readRecord(error).name);

@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withErrorHandling } from "./common/errorResponse";
 import { listContainers } from "./listContainers";
 
-const createHeadersLike = (entries: Record<string, string>) => ({
-  get: (name: string) => entries[name],
-});
+const createHeadersLike = (entries: Record<string, string>) =>
+  new Headers(entries);
 
 const authMocks = vi.hoisted(() => ({
   requireContainerManageRequest: vi.fn(),
@@ -45,10 +44,10 @@ describe("listContainers error handling", () => {
       }),
     });
 
-    const req = {} as never;
-    const res = { send: vi.fn(), header: vi.fn() } as never;
+    const req = {};
+    const res = { send: vi.fn(), header: vi.fn() };
 
-    await withErrorHandling(listContainers)(req, res);
+    await withErrorHandling(listContainers)(req as never, res as never);
 
     expect(res.send).toHaveBeenCalledWith(
       429,
@@ -79,10 +78,10 @@ describe("listContainers error handling", () => {
       }),
     });
 
-    const req = {} as never;
-    const res = { send: vi.fn(), header: vi.fn() } as never;
+    const req = {};
+    const res = { send: vi.fn(), header: vi.fn() };
 
-    await withErrorHandling(listContainers)(req, res);
+    await withErrorHandling(listContainers)(req as never, res as never);
 
     expect(res.send).toHaveBeenCalledWith(
       500,

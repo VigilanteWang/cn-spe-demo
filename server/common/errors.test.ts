@@ -15,6 +15,7 @@ describe("toGraphAppError", () => {
           "request-id": "req-429",
         }),
       }),
+      "Unable to list containers.",
     );
 
     expect(mappedError.code).toBeUndefined();
@@ -23,18 +24,21 @@ describe("toGraphAppError", () => {
     expect(mappedError.originError?.requestId).toBe("req-429");
   });
 
-  it("should preserve Graph code path and raw diagnostics when available", () => {
-    const mappedError = toGraphAppError({
-      error: {
-        code: "serviceUnavailable",
-        innerError: {
-          code: "timeout",
-          message: "The upstream request timed out.",
-          status: 503,
-        },
+  it("should preserve Graph code path and raw diagnostics from body json", () => {
+    const mappedError = toGraphAppError(
+      {
+        body: JSON.stringify({
+          code: "serviceUnavailable",
+          message: "temporary outage",
+          innerError: {
+            code: "timeout",
+            message: "The upstream request timed out.",
+            status: 503,
+          },
+        }),
       },
-      message: "temporary outage",
-    });
+      "temporary outage",
+    );
 
     expect(mappedError.originError).toMatchObject({
       source: "microsoft-graph",
