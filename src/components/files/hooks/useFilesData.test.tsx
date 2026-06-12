@@ -104,7 +104,6 @@ describe("useFilesData", () => {
         message: "Items request was throttled.",
         originError: {
           retryAfter: 9,
-          requestId: "req-files-load",
         },
       }),
     );

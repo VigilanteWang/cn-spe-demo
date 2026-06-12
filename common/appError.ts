@@ -160,7 +160,7 @@ export const serializeUnknownCause = (
       serializedError.stack = value.stack;
     }
 
-    // Error 上的自定义可枚举字段（如 code/requestId）一并保留。
+    // Error 上的自定义可枚举字段（如 code）一并保留。
     for (const key of Object.keys(errorRecord)) {
       serializedError[key] = serializeUnknownCause(errorRecord[key], seen);
     }

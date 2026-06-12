@@ -39,7 +39,6 @@ describe("toApiErrorResponseBody", () => {
         details: [{ operation: "listContainers" }],
         originError: {
           source: "microsoft-graph",
-          requestId: "req-503",
           retryAfter: 9,
           cause: Object.assign(new Error("upstream failed"), {
             status: 503,
@@ -61,7 +60,6 @@ describe("toApiErrorResponseBody", () => {
         ],
         originError: {
           source: "microsoft-graph",
-          requestId: "req-503",
           retryAfter: 9,
           cause: {
             name: "Error",

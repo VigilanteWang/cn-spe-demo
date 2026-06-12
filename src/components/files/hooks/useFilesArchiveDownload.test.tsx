@@ -42,7 +42,6 @@ describe("useFilesArchiveDownload", () => {
       Object.assign(new Error("Archive request was throttled."), {
         code: "throttled",
         retryAfterSeconds: 6,
-        requestId: "req-archive-429",
       }),
     );
 

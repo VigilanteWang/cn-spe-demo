@@ -598,7 +598,6 @@ ContainerPermissionApiError
 如果后端返回了：
 
 - `retryAfterSeconds`
-- `requestId`
 
 前端会把它拼进错误文案里。
 

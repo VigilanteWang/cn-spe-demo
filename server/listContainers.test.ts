@@ -58,7 +58,6 @@ describe("listContainers error handling", () => {
           statusCode: 429,
           originError: expect.objectContaining({
             source: "microsoft-graph",
-            requestId: "req-429",
             retryAfter: 12,
           }),
         }),

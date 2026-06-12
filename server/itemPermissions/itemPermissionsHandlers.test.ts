@@ -244,10 +244,10 @@ describe("listItemPermissionsFromGraph", () => {
         get: async () => {
           throw Object.assign(new Error("Retry attempts exhausted"), {
             statusCode: 429,
-            headers: {
+            headers: new Headers({
               "Retry-After": "11",
               "request-id": "item-graph-429",
-            },
+            }),
           });
         },
         post: async () => undefined,

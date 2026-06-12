@@ -32,8 +32,6 @@ vi.mock("../../services/itemPermissionApi", () => {
 
     readonly retryAfterSeconds?: number;
 
-    readonly requestId?: string;
-
     readonly statusCode?: number;
 
     constructor(
@@ -41,7 +39,6 @@ vi.mock("../../services/itemPermissionApi", () => {
       message: string,
       options?: {
         retryAfterSeconds?: number;
-        requestId?: string;
         statusCode?: number;
       },
     ) {
@@ -49,7 +46,6 @@ vi.mock("../../services/itemPermissionApi", () => {
       this.name = "PermissionApiError";
       this.code = code;
       this.retryAfterSeconds = options?.retryAfterSeconds;
-      this.requestId = options?.requestId;
       this.statusCode = options?.statusCode;
     }
   }

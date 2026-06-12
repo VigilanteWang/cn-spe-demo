@@ -20,7 +20,6 @@ describe("backendApi", () => {
             statusCode: 429,
             originError: {
               source: "microsoft-graph",
-              requestId: "req-backend-429",
             },
           },
         }),
@@ -41,7 +40,6 @@ describe("backendApi", () => {
       statusCode: 429,
       originError: {
         source: "microsoft-graph",
-        requestId: "req-backend-429",
         retryAfter: 15,
       },
     });

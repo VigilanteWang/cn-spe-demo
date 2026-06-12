@@ -17,6 +17,21 @@ const readGraphHeaderValue = (
   headerName: string,
 ): string | undefined => {
   const headersCandidate = readRecord(error).headers;
+
+  if (
+    typeof headersCandidate === "object" &&
+    headersCandidate !== null &&
+    "get" in headersCandidate &&
+    typeof (headersCandidate as { get: unknown }).get === "function"
+  ) {
+    const value = (
+      headersCandidate as {
+        get: (name: string) => string | null | undefined;
+      }
+    ).get(headerName);
+    return typeof value === "string" && value ? value : undefined;
+  }
+
   if (typeof Headers !== "undefined" && headersCandidate instanceof Headers) {
     const value = headersCandidate.get(headerName);
     return typeof value === "string" && value ? value : undefined;
@@ -63,34 +78,14 @@ const readGraphInnerError = (error: unknown): Record<string, unknown> =>
 
 /**
  * 读取 Graph 错误对应的 HTTP 状态码。
+ *
+ * Microsoft Graph SDK 会把 `rawResponse.status`
+ * 放到 `GraphError.statusCode`，因此这里只信任外层错误对象，
+ * 不从 `body` / `innerError` 里反推 HTTP 状态。
  */
 export const readGraphStatusCode = (error: unknown): number | undefined => {
   const record = readRecord(error);
-  const innerError = readGraphInnerError(error);
-
-  return readNumberLike(record.statusCode) ?? readNumberLike(innerError.status);
-};
-
-/**
- * 读取 Graph 错误里的请求 ID。
- *
- * SDK 会把 `request-id` 处理成 `requestId`，
- * 这里优先读取头部，再读取实例字段，最后回退到原始 `innerError`。
- */
-export const readGraphRequestId = (error: unknown): string | undefined => {
-  const headerRequestId =
-    readGraphHeaderValue(error, "request-id") ??
-    readGraphHeaderValue(error, "client-request-id");
-
-  if (headerRequestId) {
-    return headerRequestId;
-  }
-
-  const record = readRecord(error);
-  return (
-    readString(record.requestId) ??
-    readString(readGraphInnerError(error)["request-id"])
-  );
+  return readNumberLike(record.statusCode);
 };
 
 /**
@@ -218,11 +213,6 @@ const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
     causeSnapshot.code = graphCode;
   }
 
-  const requestId = readGraphRequestId(error);
-  if (requestId) {
-    causeSnapshot.requestId = requestId;
-  }
-
   const date =
     readRecord(error).date ?? readGraphInnerError(error).date ?? undefined;
   if (date !== undefined) {
@@ -248,7 +238,6 @@ export const extractGraphOriginError = (
   fallbackMessage = "Unknown Microsoft Graph error.",
 ): IOriginError | undefined => {
   const codePath = readGraphCodePath(error);
-  const requestId = readGraphRequestId(error);
   const retryAfter = readGraphRetryAfter(error);
   const graphRecord = readGraphBodyRecord(error);
   const innerError = readGraphInnerError(error);
@@ -257,7 +246,7 @@ export const extractGraphOriginError = (
 
   const looksLikeGraphError =
     (codePath && codePath.length > 0) ||
-    requestId !== undefined ||
+    retryAfter !== undefined ||
     Object.keys(graphRecord).length > 0 ||
     Object.keys(innerError).length > 0 ||
     name === "GraphError" ||
@@ -275,7 +264,6 @@ export const extractGraphOriginError = (
       "GraphError",
     ),
     codePath,
-    requestId,
     retryAfter,
   };
 };

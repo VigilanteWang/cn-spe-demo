@@ -20,7 +20,6 @@ describe("downloadApi", () => {
             statusCode: 429,
             originError: {
               source: "microsoft-graph",
-              requestId: "req-download-429",
             },
           },
         }),
@@ -43,7 +42,6 @@ describe("downloadApi", () => {
       statusCode: 429,
       originError: {
         source: "microsoft-graph",
-        requestId: "req-download-429",
         retryAfter: 9,
       },
     });

@@ -168,7 +168,6 @@ describe("Containers", () => {
       {
         code: "throttled",
         retryAfterSeconds: 8,
-        requestId: "req-containers-429",
       },
     );
     listContainersMock.mockRejectedValue(error);

@@ -32,7 +32,7 @@ export const listItemPermissions = async (
     },
   );
 
-  // 非 2xx 时统一走共享错误映射，保留 requestId / retry-after 等上下文。
+  // 非 2xx 时统一走共享错误映射，保留 retry-after 等稳定上下文。
   if (!response.ok) {
     throw await buildPermissionApiError(response, "Item permission request");
   }

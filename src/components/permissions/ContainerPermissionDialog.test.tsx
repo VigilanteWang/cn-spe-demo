@@ -397,7 +397,6 @@ describe("ContainerPermissionDialog", () => {
         statusCode: 429,
         originError: {
           retryAfter: 12,
-          requestId: "req-429",
         },
       }),
     );

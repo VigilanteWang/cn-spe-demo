@@ -6,7 +6,7 @@ const createHeadersLike = (entries: Record<string, string>) =>
   new Headers(entries);
 
 describe("toGraphAppError", () => {
-  it("should preserve Retry-After and request id from 429 responses", () => {
+  it("should preserve Retry-After from 429 responses", () => {
     const mappedError = toGraphAppError(
       Object.assign(new Error("Retry attempts exhausted"), {
         statusCode: 429,
@@ -21,7 +21,6 @@ describe("toGraphAppError", () => {
     expect(mappedError.code).toBeUndefined();
     expect(mappedError.statusCode).toBe(429);
     expect(mappedError.originError?.retryAfter).toBe(12);
-    expect(mappedError.originError?.requestId).toBe("req-429");
   });
 
   it("should preserve Graph code path and raw diagnostics from body json", () => {
@@ -47,6 +46,24 @@ describe("toGraphAppError", () => {
         code: "serviceUnavailable",
       },
     });
+  });
+
+  it("should not infer HTTP statusCode from body innerError", () => {
+    const mappedError = toGraphAppError(
+      {
+        body: JSON.stringify({
+          code: "serviceUnavailable",
+          message: "temporary outage",
+          innerError: {
+            code: "timeout",
+            status: 503,
+          },
+        }),
+      },
+      "temporary outage",
+    );
+
+    expect(mappedError.statusCode).toBe(502);
   });
 
   it("should preserve the original Graph message when no richer payload is available", () => {
@@ -94,7 +111,6 @@ describe("toGraphAppError", () => {
       originError: {
         source: "microsoft-graph",
         retryAfter: 9,
-        requestId: "exec-429",
       },
     });
   });

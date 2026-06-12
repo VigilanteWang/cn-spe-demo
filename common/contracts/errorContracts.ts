@@ -34,7 +34,6 @@ export interface IOriginError {
   source?: AppErrorSource;
   cause?: Error | ISerializedErrorCause;
   codePath?: string[];
-  requestId?: string;
   retryAfter?: number;
 }
 
