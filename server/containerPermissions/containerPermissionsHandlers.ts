@@ -12,6 +12,7 @@
  * 它负责组织流程，但尽量不直接承载 Graph 结构转换或字段解析细节。
  */
 import { Request, Response } from "restify";
+import { sendGraphRequest } from "../../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -32,10 +33,7 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
-import {
-  createValidationError,
-  sendGraphRequest,
-} from "../common/appErrorHelpers";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。

@@ -8,6 +8,7 @@ import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
+import { sendGraphRequest } from "../../common/graphError";
 import {
   mapGraphItemPermissionsToResponse,
   newGraphInvitePermissionBody,
@@ -19,10 +20,7 @@ import {
   readGraphToRecord,
   readOptionalString,
 } from "../permissionsCore/permissionGraphReaders";
-import {
-  createValidationError,
-  sendGraphRequest,
-} from "../common/appErrorHelpers";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * Step 0 已在当前租户确认 item 显式 invite permission 的 PATCH 稳定可用，

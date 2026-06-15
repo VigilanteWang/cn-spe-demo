@@ -20,8 +20,12 @@ const readGraphHeaderValue = (
   error: unknown,
   headerName: string,
 ): string | undefined => {
+  // Graph SDK 抛出的错误通常会把响应头挂在 `error.headers` 上，
+  // 所以先从外层错误对象里拿这个候选值，再决定按哪种形态读取。
   const headersCandidate = readRecord(error).headers;
 
+  // 优先兼容“像 Headers 一样带有 get 方法”的对象；
+  // 这能覆盖真实 `Headers` 实例，也能覆盖测试里常见的最小 mock。
   if (
     typeof headersCandidate === "object" &&
     headersCandidate !== null &&
@@ -36,11 +40,15 @@ const readGraphHeaderValue = (
     return typeof value === "string" && value ? value : undefined;
   }
 
+  // 如果运行时里真的拿到标准 `Headers`，就按官方 API 再读一次。
+  // 这一层和上面的 duck typing 重叠，但能把“真实类型”路径写得更明确。
   if (typeof Headers !== "undefined" && headersCandidate instanceof Headers) {
     const value = headersCandidate.get(headerName);
     return typeof value === "string" && value ? value : undefined;
   }
 
+  // 最后再兜底普通对象形态，兼容少量直接写成
+  // `{ "Retry-After": "12" }` 这种 header mock。
   const directValue = readRecord(headersCandidate)[headerName];
 
   if (typeof directValue === "string" && directValue) {
@@ -61,8 +69,11 @@ const readGraphHeaderValue = (
  * @returns 解析后的 body 对象；无法解析时返回空对象。
  */
 const readGraphBodyRecord = (error: unknown): Record<string, unknown> => {
+  // 先把 unknown 收口成普通对象，后续读取 `body` 时就不用到处判空。
   const record = readRecord(error);
 
+  // 有些运行时/测试会把 body 存成 JSON 字符串；
+  // 这里先尝试解析，失败就把它当成“没有可读 body”，避免抛出二次异常。
   if (typeof record.body === "string" && record.body) {
     try {
       return readRecord(JSON.parse(record.body) as unknown);
@@ -71,6 +82,7 @@ const readGraphBodyRecord = (error: unknown): Record<string, unknown> => {
     }
   }
 
+  // 其余情况按“body 已经是对象”处理；不是对象时 `readRecord` 会回空对象。
   return readRecord(record.body);
 };
 
@@ -84,6 +96,7 @@ const readGraphBodyRecord = (error: unknown): Record<string, unknown> => {
  * @returns `innerError` 对应的对象；缺失时返回空对象。
  */
 const readGraphInnerError = (error: unknown): Record<string, unknown> =>
+  // `innerError` 是 Graph 规范错误体里继续往下挖诊断信息的标准入口。
   readRecord(readGraphBodyRecord(error).innerError);
 
 /**
@@ -97,6 +110,7 @@ const readGraphInnerError = (error: unknown): Record<string, unknown> =>
  * @returns 可解析的 HTTP 状态码；缺失时返回 undefined。
  */
 export const readGraphStatusCode = (error: unknown): number | undefined => {
+  // 这里只认外层 `statusCode`，避免把业务错误体里的其他数字误当成 HTTP 状态。
   const record = readRecord(error);
   return readNumberLike(record.statusCode);
 };
@@ -108,10 +122,12 @@ export const readGraphStatusCode = (error: unknown): number | undefined => {
  * @returns 可解析的秒数；缺失时返回 undefined。
  */
 export const readGraphRetryAfter = (error: unknown): number | undefined => {
+  // 先读标准大小写，再兼容小写 header，避免不同环境下的大小写差异导致丢信息。
   const headerValue =
     readGraphHeaderValue(error, "Retry-After") ??
     readGraphHeaderValue(error, "retry-after");
 
+  // 最终统一转成 number，方便上层直接做退避或展示。
   return readNumberLike(headerValue);
 };
 
@@ -126,16 +142,20 @@ export const readGraphErrorMessage = (
   error: unknown,
   fallbackMessage: string,
 ): string => {
+  // 对真正的 Error 实例，优先相信它已经整理好的 `message`。
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
+  // 非 Error 值再回退到 Graph body 里找服务端 message，
+  // 这样像 `{ body: "{...}" }` 这种输入也能读到可展示文案。
   const graphError = readGraphBodyRecord(error);
   const graphMessage = readString(graphError.message);
   if (graphMessage) {
     return graphMessage;
   }
 
+  // 最后回退到通用错误读取逻辑，保证一定有稳定文案返回。
   return readErrorMessage(error, fallbackMessage);
 };
 
@@ -149,18 +169,22 @@ export const readGraphErrorMessage = (
  */
 export const readGraphCodePath = (error: unknown): string[] | undefined => {
   const codePath: string[] = [];
+  // 从最外层 body 开始，后面沿着 `innerError` 一层层往下走。
   let cursor: Record<string, unknown> | undefined = readGraphBodyRecord(error);
 
+  // 只要当前层还是非空对象，就继续尝试收集 code 并推进到下一层。
   while (cursor && Object.keys(cursor).length > 0) {
     const code = readString(cursor.code);
     if (code) {
       codePath.push(code);
     }
 
+    // Graph 的规范嵌套链路只有 `innerError`，这里不额外猜别的字段名。
     const nextCursor = readRecord(cursor.innerError);
     cursor = Object.keys(nextCursor).length > 0 ? nextCursor : undefined;
   }
 
+  // 没读到任何 code 时返回 undefined，而不是空数组，方便上层用“有无值”判断。
   return codePath.length > 0 ? codePath : undefined;
 };
 
@@ -322,6 +346,7 @@ export const extractGraphOriginError = (
   error: unknown,
   fallbackMessage = "Unknown Microsoft Graph error.",
 ): IOriginError | undefined => {
+  // 先把后面要复用的 Graph 诊断片段统一读出来，避免分支里重复解析 body / headers。
   const codePath = readGraphCodePath(error);
   const retryAfter = readGraphRetryAfter(error);
   const graphRecord = readGraphBodyRecord(error);
@@ -329,6 +354,8 @@ export const extractGraphOriginError = (
   const name =
     error instanceof Error ? error.name : readString(readRecord(error).name);
 
+  // 这里做的是“像不像 Graph 错误”的启发式判断，而不是严格类型校验。
+  // 只要命中任一 Graph 特征，就值得把它标记成 microsoft-graph 来源并保留诊断信息。
   const looksLikeGraphError =
     (codePath && codePath.length > 0) ||
     retryAfter !== undefined ||
@@ -337,10 +364,13 @@ export const extractGraphOriginError = (
     name === "GraphError" ||
     readRecord(error).body !== undefined;
 
+  // 如果完全看不出 Graph 痕迹，就交给上层走普通错误路径，避免误标来源。
   if (!looksLikeGraphError) {
     return undefined;
   }
 
+  // 一旦确认像 Graph 错误，就把原始异常包装成稳定 `cause`，
+  // 同时把 Graph 专属诊断字段单独挂出来，方便后续 HTTP 序列化和日志消费。
   return {
     source: "microsoft-graph",
     cause: ensureErrorCause(
@@ -370,15 +400,19 @@ export const toGraphAppError = (
     details?: unknown[];
   },
 ): AppError => {
+  // 已经是统一 AppError 时直接复用，避免重复包裹导致信息被覆盖。
   if (error instanceof AppError) {
     return error;
   }
 
+  // 优先尝试抽出 Graph 专属诊断；如果抽不出来，也至少保留一个稳定的 `cause`。
   const originError = extractGraphOriginError(error, failureMessage) ?? {
     source: "microsoft-graph" as const,
     cause: ensureErrorCause(error, failureMessage, "GraphError"),
   };
 
+  // 这里把未知 Graph 失败统一收口成仓库里的 `AppError` 契约，
+  // 让后端响应、前端消费和测试断言都围绕同一种错误模型工作。
   return new AppError({
     name: "GraphError",
     code: readString(readRecord(error).code) ?? originError.codePath?.[0],
@@ -403,8 +437,10 @@ export const sendGraphRequest = async <T>(
   defaultStatusCode = 502,
 ): Promise<T> => {
   try {
+    // 成功路径完全透传原始结果，不在这里引入额外包装。
     return await operation();
   } catch (error: unknown) {
+    // 只有失败路径才统一映射成 `GraphError` 风格的 `AppError`。
     throw toGraphAppError(error, failureMessage, defaultStatusCode);
   }
 };

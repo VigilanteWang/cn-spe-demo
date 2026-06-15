@@ -4,11 +4,9 @@ import type {
   IContainerPermissionEntryForUI,
   IContainerPermissionsResponseFromApi,
 } from "../../common/contracts/containerPermissionCommonContracts";
+import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 import type { PermissionEntriesByTab } from "../components/permissions/models/permissionSharedModels";
-import {
-  buildPermissionApiError,
-  mapPermissionEntriesToTabs,
-} from "./permissionApiShared";
+import { mapPermissionEntriesToTabs } from "./permissionApiShared";
 
 /**
  * 加载指定容器的当前权限列表。
@@ -33,10 +31,9 @@ export const listContainerPermissions = async (
 
   // 非 2xx 时统一走共享错误映射，保证和 item 权限接口一致的错误形状。
   if (!response.ok) {
-    throw await buildPermissionApiError(
-      response,
-      "Container permission request",
-    );
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Container permission request",
+    });
   }
 
   // 成功后把后端扁平 entries 映射成前端页签需要的分组结构。
@@ -76,10 +73,9 @@ export const applyContainerPermissionChanges = async (
 
   // apply 失败时沿用共享错误模型，保证列表请求和写回请求的错误体验一致。
   if (!response.ok) {
-    throw await buildPermissionApiError(
-      response,
-      "Container permission apply request",
-    );
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Container permission apply request",
+    });
   }
 
   // 成功后以后端确认结果为准，避免前端继续依赖旧草稿状态。

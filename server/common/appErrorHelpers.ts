@@ -1,5 +1,4 @@
 import { AppError, ensureErrorCause } from "../../common/appError";
-import { sendGraphRequest, toGraphAppError } from "../../common/graphError";
 
 /**
  * 创建后端输入校验错误。
@@ -58,5 +57,3 @@ export const createInternalError = (
           : ensureErrorCause(options.cause, message, "InternalError"),
     },
   });
-
-export { sendGraphRequest, toGraphAppError };

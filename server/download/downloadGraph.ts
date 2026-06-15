@@ -4,8 +4,8 @@ import {
 } from "@microsoft/microsoft-graph-client";
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { AppError } from "../../common/appError";
+import { sendGraphRequest, toGraphAppError } from "../../common/graphError";
 import { createGraphClient } from "../auth";
-import { sendGraphRequest, toGraphAppError } from "../common/appErrorHelpers";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
 type DownloadGraphClient = ReturnType<typeof createGraphClient>;

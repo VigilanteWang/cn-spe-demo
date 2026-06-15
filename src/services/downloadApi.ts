@@ -21,7 +21,7 @@ import {
   IArchiveSaveTarget,
   IShowSaveFilePickerWindow,
 } from "../common/types";
-import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
+import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 
 /**
  * ZIP 归档任务的进度信息。
@@ -77,7 +77,7 @@ export async function startDownload(
     return data.jobId as string;
   }
 
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "startDownload",
   });
 }
@@ -105,7 +105,7 @@ export async function getDownloadProgress(
     return (await response.json()) as IJobProgress;
   }
 
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "getDownloadProgress",
   });
 }
@@ -133,7 +133,7 @@ export async function getDownloadManifest(
     return (await response.json()) as IArchiveManifest;
   }
 
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "getDownloadManifest",
   });
 }

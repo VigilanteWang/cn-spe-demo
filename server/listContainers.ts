@@ -13,12 +13,12 @@
  */
 
 import { Request, Response } from "restify";
+import { sendGraphRequest } from "../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { sendGraphRequest } from "./common/appErrorHelpers";
 import { serverConfig } from "./config";
 
 /**

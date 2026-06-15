@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AppError } from "../../common/appError";
-import { createAuthError, toGraphAppError } from "./appErrorHelpers";
+import { toGraphAppError } from "../../common/graphError";
+import { createAuthError } from "./appErrorHelpers";
 import {
   normalizeError,
   toApiErrorResponseBody,
@@ -28,6 +29,18 @@ describe("normalizeError", () => {
     expect(normalizedError.code).toBeUndefined();
     expect(normalizedError.statusCode).toBe(409);
     expect(normalizedError.message).toBe("Archive manifest not ready yet.");
+  });
+
+  it("should preserve the original numeric statusCode even when it is not 4xx/5xx", () => {
+    const normalizedError = normalizeError({
+      statusCode: 302,
+      message: "Graph client surfaced a redirect response.",
+    });
+
+    expect(normalizedError.statusCode).toBe(302);
+    expect(normalizedError.message).toBe(
+      "Graph client surfaced a redirect response.",
+    );
   });
 });
 

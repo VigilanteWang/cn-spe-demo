@@ -14,7 +14,7 @@
 
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
-import { readApiErrorResponseSummary } from "../common/apiErrorMapper";
+import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 
 /**
  * 批量删除操作的返回结果。
@@ -48,7 +48,7 @@ export async function listContainers(): Promise<IContainer[]> {
     // Graph API 把集合包在 value 数组里返回；空集合时返回空数组而非 undefined
     return (body.value as IContainer[]) ?? [];
   }
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "listContainers",
   });
 }
@@ -82,7 +82,7 @@ export async function createContainer(
   if (response.ok) {
     return (await response.json()) as IContainer;
   }
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "createContainer",
   });
 }
@@ -110,7 +110,7 @@ export async function deleteItems(
   if (response.ok) {
     return (await response.json()) as IDeleteItemsResult;
   }
-  throw await readApiErrorResponseSummary(response, {
+  throw await mapApiErrorResponseToAppError(response, {
     operationLabel: "deleteItems",
   });
 }

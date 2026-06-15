@@ -3,11 +3,9 @@ import type {
   IItemPermissionChangeSetFromUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
+import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
-import {
-  buildPermissionApiError,
-  mapPermissionEntriesToTabs,
-} from "./permissionApiShared";
+import { mapPermissionEntriesToTabs } from "./permissionApiShared";
 
 /**
  * 加载指定 item 的当前权限列表。
@@ -34,7 +32,9 @@ export const listItemPermissions = async (
 
   // 非 2xx 时统一走共享错误映射，保留 retry-after 等稳定上下文。
   if (!response.ok) {
-    throw await buildPermissionApiError(response, "Item permission request");
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Item permission request",
+    });
   }
 
   // 响应体先还原成共享合同，再按权限页签需要的结构重新分组。
@@ -77,10 +77,9 @@ export const applyItemPermissionChanges = async (
 
   // apply 失败时沿用共享错误模型，保证列表请求和写回请求的错误体验一致。
   if (!response.ok) {
-    throw await buildPermissionApiError(
-      response,
-      "Item permission apply request",
-    );
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Item permission apply request",
+    });
   }
 
   // 成功后以后端确认结果为准，避免前端继续依赖旧草稿状态。

@@ -52,12 +52,7 @@ export const normalizeError = (error: unknown): AppError => {
     errorRecord === null
       ? undefined
       : readNumberLike(errorRecord.statusCode ?? errorRecord.status);
-  const statusCode =
-    candidateStatusCode !== undefined &&
-    candidateStatusCode >= 400 &&
-    candidateStatusCode <= 599
-      ? candidateStatusCode
-      : 500;
+  const statusCode = candidateStatusCode ?? 500;
   const fallbackMessage =
     statusToDefaultMessageMap[statusCode] ??
     "An unexpected server error occurred.";

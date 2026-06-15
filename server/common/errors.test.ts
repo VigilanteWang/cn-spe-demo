@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "../../common/appError";
-import { sendGraphRequest, toGraphAppError } from "./appErrorHelpers";
+import { sendGraphRequest, toGraphAppError } from "../../common/graphError";
 
 const createHeadersLike = (entries: Record<string, string>) =>
   new Headers(entries);
