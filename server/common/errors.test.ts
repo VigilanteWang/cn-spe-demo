@@ -77,6 +77,30 @@ describe("toGraphAppError", () => {
     expect(mappedError.message).toBe("Retry attempts exhausted");
   });
 
+  it("should keep a real Graph Error instance before HTTP serialization", () => {
+    const rawDate = new Date("2026-06-15T11:43:13.000Z");
+    const rawHeaders = createHeadersLike({
+      "request-id": "req-keep-error",
+      date: "Mon, 15 Jun 2026 11:43:13 GMT",
+    });
+    const mappedError = toGraphAppError(
+      Object.assign(new Error("Graph request failed"), {
+        statusCode: 503,
+        headers: rawHeaders,
+        date: rawDate,
+      }),
+      "Unable to create container.",
+    );
+
+    expect(mappedError.originError?.cause).toBeInstanceOf(Error);
+    expect(mappedError.originError?.cause).toMatchObject({
+      message: "Graph request failed",
+      statusCode: 503,
+      headers: rawHeaders,
+      date: rawDate,
+    });
+  });
+
   it("should keep an existing graph error instance", () => {
     const existingError = new AppError({
       name: "ExistingError",

@@ -1,4 +1,5 @@
 import type { AppErrorShape, IOriginError } from "./contracts/errorContracts";
+import { buildGraphCauseSnapshot } from "./graphError";
 
 /**
  * 统一应用错误基类。
@@ -100,7 +101,7 @@ export const isAppError = (value: unknown): value is AppError =>
  * @param seen 用于记录访问过对象的 WeakSet，避免循环引用导致无限递归。
  * @returns 可安全传输或记录的纯数据结构。
  */
-export const serializeUnknownCause = (
+export const serializeUnknownValue = (
   value: unknown,
   seen = new WeakSet<object>(),
 ): unknown => {
@@ -135,6 +136,11 @@ export const serializeUnknownCause = (
     return String(value);
   }
 
+  if (value instanceof Date) {
+    // Date 统一转成 ISO 字符串，避免后续 JSON 序列化时退化成空对象。
+    return value.toISOString();
+  }
+
   // 已访问过同一对象，说明进入了循环引用路径，直接返回占位符中断递归。
   if (seen.has(value)) {
     return "[Circular]";
@@ -145,7 +151,7 @@ export const serializeUnknownCause = (
 
   if (Array.isArray(value)) {
     // 数组逐项递归序列化，并复用同一个 seen 做环检测。
-    return value.map((item) => serializeUnknownCause(item, seen));
+    return value.map((item) => serializeUnknownValue(item, seen));
   }
 
   if (value instanceof Error) {
@@ -162,13 +168,13 @@ export const serializeUnknownCause = (
 
     // Error 上的自定义可枚举字段（如 code）一并保留。
     for (const key of Object.keys(errorRecord)) {
-      serializedError[key] = serializeUnknownCause(errorRecord[key], seen);
+      serializedError[key] = serializeUnknownValue(errorRecord[key], seen);
     }
 
     // 单独兜底读取 cause，兼容某些情况下 cause 不在可枚举键中的场景。
     const nestedCause = "cause" in errorRecord ? errorRecord.cause : undefined;
     if (nestedCause !== undefined) {
-      serializedError.cause = serializeUnknownCause(nestedCause, seen);
+      serializedError.cause = serializeUnknownValue(nestedCause, seen);
     }
 
     return serializedError;
@@ -179,7 +185,7 @@ export const serializeUnknownCause = (
 
   // 普通对象按键递归序列化，确保每个字段都可安全传输。
   for (const [key, entryValue] of Object.entries(record)) {
-    serializedRecord[key] = serializeUnknownCause(entryValue, seen);
+    serializedRecord[key] = serializeUnknownValue(entryValue, seen);
   }
 
   return serializedRecord;
@@ -212,7 +218,7 @@ export const ensureErrorCause = (
   wrappedError.name = readString(record.name) ?? fallbackName;
 
   // 把任意输入先规整成可序列化对象，再尝试并入 Error 实例。
-  const serializedValue = serializeUnknownCause(value);
+  const serializedValue = serializeUnknownValue(value);
   if (
     typeof serializedValue === "object" &&
     serializedValue !== null &&
@@ -249,17 +255,22 @@ export const serializeAppError = (error: AppError): AppErrorShape => ({
             // 仅当 originError.cause 存在时才做深度序列化。
             error.originError.cause === undefined
               ? undefined
-              : // cause 可能是 Error、普通对象或其他值，统一走安全序列化。
-                (serializeUnknownCause(error.originError.cause) as
-                  | Error
-                  | Record<string, unknown>),
+              : error.originError.source === "microsoft-graph" &&
+                  typeof error.originError.cause === "object" &&
+                  error.originError.cause !== null
+                ? // Graph cause 在 HTTP 边界统一投影成稳定的 plain object。
+                  buildGraphCauseSnapshot(error.originError.cause)
+                : // 非 Graph cause 继续走通用兜底序列化。
+                  (serializeUnknownValue(error.originError.cause) as
+                    | Error
+                    | Record<string, unknown>),
         },
   details:
     // details 可选；存在时逐项规整，避免异常值破坏响应结构。
     error.details === undefined
       ? undefined
       : // details 为 unknown[]，逐项序列化后可稳定用于日志与 HTTP 传输。
-        error.details.map((detail) => serializeUnknownCause(detail)),
+        error.details.map((detail) => serializeUnknownValue(detail)),
 });
 
 /**

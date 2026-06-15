@@ -5,7 +5,7 @@ import {
   readNumberLike,
   readRecord,
   readString,
-  serializeUnknownCause,
+  serializeUnknownValue,
 } from "./appError";
 import type { IOriginError } from "./contracts/errorContracts";
 
@@ -225,20 +225,32 @@ const serializeGraphHeadersCandidate = (
  * @param error 任意待分析的 Graph 异常值。
  * @returns 适合挂入 `originError.cause` 的纯数据快照。
  */
-const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
-  const serializedError = serializeUnknownCause(error);
+export const buildGraphCauseSnapshot = (
+  error: unknown,
+): Record<string, unknown> => {
+  // 先把原始异常尽量序列化成“纯数据”，避免后面把函数、循环引用、
+  // 原型方法等不稳定内容直接塞进快照里。
+  const serializedError = serializeUnknownValue(error);
+  // `serializeUnknownValue` 的返回值可能是原始值、数组或对象；
+  // 这里只有对象才能作为快照底稿展开，其它情况统一退回空对象。
   const errorRecord =
     typeof serializedError === "object" && serializedError !== null
       ? (serializedError as Record<string, unknown>)
       : {};
 
+  // 这里重新读取“原始错误对象视图”，是为了继续按字段做结构化提取。
+  // `serializedError` 负责“可序列化”，`record` 负责“可按属性安全读取”，
+  // 两者职责不同，所以这里保留一份原始对象入口更清晰。
   const record = readRecord(error);
+  // headers 需要单独拍平成字符串字典，避免把 `Headers` 实例或 mock 原样带出去。
   const headers = serializeGraphHeadersCandidate(record.headers);
 
+  // 先以序列化后的原始错误为底稿，尽量保留已有上下文。
   const causeSnapshot: Record<string, unknown> = {
     ...errorRecord,
   };
 
+  // name 优先读原始字段；如果输入本身就是 Error，再回退到 Error.name。
   const name =
     readString(record.name) ??
     (error instanceof Error && error.name ? error.name : undefined);
@@ -246,6 +258,7 @@ const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
     causeSnapshot.name = name;
   }
 
+  // message 统一走 Graph 专用读取逻辑，优先拿到对业务更有意义的文案。
   const message = readGraphErrorMessage(
     error,
     "Unknown Microsoft Graph error.",
@@ -254,30 +267,47 @@ const buildGraphCauseSnapshot = (error: unknown): Record<string, unknown> => {
     causeSnapshot.message = message;
   }
 
+  // statusCode 只保留可解析的 HTTP 状态码，方便后续排查 Graph 响应失败原因。
   const statusCode = readGraphStatusCode(error);
   if (statusCode !== undefined) {
     causeSnapshot.statusCode = statusCode;
   }
 
+  // Graph 错误码链里最外层的 code 通常最适合作为本次错误的主 code。
   const graphCode = readGraphCodePath(error)?.[0];
   if (graphCode) {
     causeSnapshot.code = graphCode;
   }
 
-  const date =
-    readRecord(error).date ?? readGraphInnerError(error).date ?? undefined;
-  if (date !== undefined) {
-    causeSnapshot.date = serializeUnknownCause(date);
+  // date 优先取外层错误对象，其次回退到 Graph `innerError.date`，
+  // 再序列化后写入快照，保证值可以稳定跨层传输。
+  const outerDate = record.date;
+  const innerDate = readGraphInnerError(error).date;
+  const dateCandidate =
+    outerDate instanceof Date
+      ? outerDate
+      : typeof outerDate === "string" && outerDate
+        ? outerDate
+        : innerDate instanceof Date
+          ? innerDate
+          : typeof innerDate === "string" && innerDate
+            ? innerDate
+            : undefined;
+  if (dateCandidate !== undefined) {
+    causeSnapshot.date = serializeUnknownValue(dateCandidate);
   }
 
+  // body 是 Graph 返回的原始负载，单独保留有助于还原服务端真实响应。
   if (record.body !== undefined) {
-    causeSnapshot.body = serializeUnknownCause(record.body);
+    causeSnapshot.body = serializeUnknownValue(record.body);
   }
 
+  // 只有成功提取到稳定 headers 时才写入，避免制造空壳字段。
   if (headers) {
     causeSnapshot.headers = headers;
   }
 
+  // 最终返回的是一个纯数据快照，专门给 `originError.cause` 挂载使用。
   return causeSnapshot;
 };
 
