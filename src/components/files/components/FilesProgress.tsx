@@ -137,7 +137,7 @@ export const FilesProgress = ({
 
       {(downloadProgress.isActive ||
         downloadProgress.isCompleted ||
-        downloadProgress.errorMessage ||
+        downloadProgress.error ||
         downloadProgress.isAborted) && (
         <div className={progressContainerClassName}>
           {(downloadProgress.isActive || downloadProgress.isCompleted) && (

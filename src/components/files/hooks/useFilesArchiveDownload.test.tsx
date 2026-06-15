@@ -65,9 +65,17 @@ describe("useFilesArchiveDownload", () => {
     });
 
     expect(result.current.downloadProgress.phase).toBe("failed");
-    expect(result.current.downloadProgress.errorMessage).toBe(
-      "Error: Archive request was throttled.",
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "Error",
+      message: "Archive request was throttled.",
+    });
+    expect(result.current.downloadProgress.error?.originError?.cause).toBeInstanceOf(
+      Error,
     );
+    expect(
+      (result.current.downloadProgress.error?.originError?.cause as Error)
+        .message,
+    ).toBe("Archive request was throttled.");
     expect(getDownloadProgressMock).not.toHaveBeenCalled();
     expect(getDownloadManifestMock).not.toHaveBeenCalled();
   });
@@ -86,7 +94,14 @@ describe("useFilesArchiveDownload", () => {
       currentItem: "Folder A",
       preparedBytes: 0,
       totalBytes: 0,
-      errors: ["Folder A failed", "Folder B failed"],
+      error: new AppError({
+        name: "ArchivePreparationError",
+        code: "archivePreparationFailed",
+        message: "Folder A failed; Folder B failed",
+        originError: {
+          source: "app",
+        },
+      }),
     });
 
     const { result } = renderHook(() =>
@@ -113,9 +128,11 @@ describe("useFilesArchiveDownload", () => {
     });
 
     expect(result.current.downloadProgress.phase).toBe("failed");
-    expect(result.current.downloadProgress.errorMessage).toBe(
-      "ArchivePreparationError: Folder A failed; Folder B failed",
-    );
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "ArchivePreparationError",
+      message: "Folder A failed; Folder B failed",
+      code: "archivePreparationFailed",
+    });
     expect(result.current.downloadProgress.backendProgress?.status).toBe(
       "failed",
     );
@@ -123,6 +140,8 @@ describe("useFilesArchiveDownload", () => {
   });
 
   it("should show a concise cancellation message when the save picker is cancelled", async () => {
+    const pickerAbortCause = new Error("Picker aborted.");
+
     selectDownloadSaveTargetMock.mockRejectedValue(
       new AppError({
         name: "DownloadSaveTargetSelectionCancelledError",
@@ -130,6 +149,7 @@ describe("useFilesArchiveDownload", () => {
         message: "Download cancelled by user.",
         originError: {
           source: "app",
+          cause: pickerAbortCause,
         },
       }),
     );
@@ -154,8 +174,13 @@ describe("useFilesArchiveDownload", () => {
     });
 
     expect(result.current.downloadProgress.phase).toBe("failed");
-    expect(result.current.downloadProgress.errorMessage).toBe(
-      "Download cancelled.",
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "DownloadCancelled",
+      message: "Download cancelled.",
+      code: "downloadCancelled",
+    });
+    expect(result.current.downloadProgress.error?.originError?.cause).toBe(
+      pickerAbortCause,
     );
     expect(startDownloadMock).not.toHaveBeenCalled();
     expect(getDownloadProgressMock).not.toHaveBeenCalled();

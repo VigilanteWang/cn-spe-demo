@@ -63,4 +63,47 @@ describe("downloadApi", () => {
       statusCode: 500,
     });
   });
+
+  it("should deserialize structured progress errors into runtime AppError", async () => {
+    sendAuthorizedRequestMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: "failed",
+          processedFiles: 1,
+          totalFiles: 2,
+          currentItem: "Folder A",
+          preparedBytes: 0,
+          totalBytes: 0,
+          error: {
+            name: "ArchivePreparationError",
+            code: "archivePreparationFailed",
+            message: "Folder A failed.",
+            statusCode: 409,
+            originError: {
+              source: "app",
+            },
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+
+    await expect(getDownloadProgress("job-a")).resolves.toMatchObject({
+      status: "failed",
+      error: {
+        name: "ArchivePreparationError",
+        code: "archivePreparationFailed",
+        message: "Folder A failed.",
+        statusCode: 409,
+        originError: {
+          source: "app",
+        },
+      },
+    });
+  });
 });

@@ -60,8 +60,8 @@ export interface IDownloadProgress {
   clientProgress: IArchiveClientProgress | null;
   /** 是否显示完成态。 */
   isCompleted: boolean;
-  /** 错误信息。 */
-  errorMessage: string;
+  /** 当前下载流程的标准化错误对象。 */
+  error: AppError | null;
   /** 是否应该自动隐藏。当前版本保留字段，不改变原有结构。 */
   shouldAutoHide: boolean;
   /** 是否由用户主动中止。 */

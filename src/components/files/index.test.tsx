@@ -201,7 +201,7 @@ describe("Files", () => {
         backendProgress: null,
         clientProgress: null,
         isCompleted: false,
-        errorMessage: "",
+        error: null,
         shouldAutoHide: false,
         isAborted: false,
       },

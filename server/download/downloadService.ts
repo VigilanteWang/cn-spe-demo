@@ -7,7 +7,7 @@ import {
   createArchiveManifestNotReadyError,
   createArchiveTooLargeError,
   createArchiveTooManyFilesError,
-  getDownloadJobFailureMessage,
+  normalizeDownloadJobFailure,
   validateDownloadJobInput,
 } from "./downloadErrors";
 import {
@@ -76,10 +76,10 @@ export async function startDownloadJob(
   // 故意不 await，让接口先返回 jobId，后台再慢慢准备下载清单。
   void processJob(jobId, containerId, itemIds, userToken).catch(
     (error: unknown) => {
-      // 如果后台准备失败，就把任务状态改成 failed，并保留首个关键错误文案。
+      // 后台准备失败时，也统一收口成标准化 AppError 再写入任务状态。
       markJobFailed(
         job,
-        getDownloadJobFailureMessage(error, "Unable to prepare the archive."),
+        normalizeDownloadJobFailure(error, "Unable to prepare the archive."),
       );
     },
   );

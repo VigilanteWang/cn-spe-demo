@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
-import {
-  AppError,
-  formatAppErrorMessageForUI,
-} from "../../../../common/appError";
+import { AppError, ensureErrorCause } from "../../../../common/appError";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
   getDownloadManifest,
   getDownloadProgress,
-  type IJobProgress,
   selectDownloadSaveTarget,
   startDownload,
 } from "../../../services/downloadApi";
@@ -33,35 +29,35 @@ interface IUseFilesArchiveDownloadOptions {
 }
 
 /**
- * 将归档准备失败的后端进度，转换成前端可直接展示和追踪的统一错误对象。
+ * 将未知异常统一转换成下载流程可直接保存的 `AppError`。
  *
- * 这个函数会保留后端返回的原始错误列表，方便排查问题；
- * 同时把错误文案收敛为稳定的 UI 消息，避免页面直接依赖后端原始结构。
+ * 这样 hook 内部状态只维护一种错误类型，展示层再统一格式化即可。
  *
- * @param progress 后端返回的归档任务失败进度与错误信息。
- * @returns 统一封装后的前端错误对象。
+ * @param error 原始异常值。
+ * @param fallbackMessage 无法提取 message 时的兜底文案。
+ * @returns 标准化后的错误对象。
  */
-const buildArchivePreparationError = (
-  progress: Pick<IDownloadProgress, "backendProgress">["backendProgress"] &
-    Pick<IJobProgress, "errors">,
-) => {
-  // 只保留真正有内容的错误消息，避免空字符串污染最终展示文案。
-  const rawErrors = progress.errors.filter((errorMessage) =>
-    errorMessage.trim(),
-  );
-  // 如果后端没有给出可读错误，就使用一个兜底文案，保证 UI 总能显示内容。
-  const message =
-    rawErrors.length > 0 ? rawErrors.join("; ") : "Archive job failed.";
+const toDownloadAppError = (
+  error: unknown,
+  fallbackMessage: string,
+): AppError => {
+  if (error instanceof AppError) {
+    return error;
+  }
 
-  // 把后端错误转换为统一的前端错误类型，并把原始错误放进 context 供后续排查。
   return new AppError({
-    name: "ArchivePreparationError",
-    code: "archivePreparationFailed",
-    message,
+    name: error instanceof Error && error.name ? error.name : "Error",
+    message:
+      error instanceof Error && error.message ? error.message : fallbackMessage,
     originError: {
       source: "app",
+      // 把原始异常挂到 cause 上，方便后续日志、DevTools 和序列化链路继续追根因。
+      cause: ensureErrorCause(
+        error,
+        fallbackMessage,
+        error instanceof Error && error.name ? error.name : "Error",
+      ),
     },
-    details: [{ errors: rawErrors }],
   });
 };
 
@@ -187,10 +183,7 @@ export const useFilesArchiveDownload = ({
         setDownloadProgress(
           createDownloadProgressState({
             phase: "failed",
-            errorMessage: formatAppErrorMessageForUI(
-              error,
-              "Failed to start download.",
-            ),
+            error: toDownloadAppError(error, "Failed to start download."),
           }),
         );
         if (downloadAbortControllerRef.current === runController) {
@@ -309,7 +302,7 @@ export const useFilesArchiveDownload = ({
               phase: "done",
               isActive: false,
               isCompleted: true,
-              errorMessage: "",
+              error: null,
             }));
             downloadSessionAbortRef.current = null;
             if (downloadAbortControllerRef.current === runController) {
@@ -321,15 +314,19 @@ export const useFilesArchiveDownload = ({
             // 后端准备出错，停止轮询并将错误信息展示给用户。
             clearInterval(downloadPollRef.current!);
             downloadPollRef.current = null;
-            const standardizedError = buildArchivePreparationError(progress);
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
                 backendProgress: progress,
-                errorMessage: formatAppErrorMessageForUI(
-                  standardizedError,
-                  "Archive job failed.",
-                ),
+                error:
+                  progress.error ??
+                  new AppError({
+                    name: "ArchivePreparationError",
+                    message: "Archive job failed.",
+                    originError: {
+                      source: "app",
+                    },
+                  }),
               }),
             );
             downloadSessionAbortRef.current = null;
@@ -351,10 +348,7 @@ export const useFilesArchiveDownload = ({
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
-                errorMessage: formatAppErrorMessageForUI(
-                  error,
-                  "Download failed.",
-                ),
+                error: toDownloadAppError(error, "Download failed."),
               }),
             );
           }
@@ -411,13 +405,28 @@ export const useFilesArchiveDownload = ({
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
-          errorMessage:
+          error:
             error instanceof AppError && error.code === "downloadCancelled"
-              ? "Download cancelled."
-              : formatAppErrorMessageForUI(
-                  error,
-                  "Failed to open save dialog.",
-                ),
+              ? new AppError({
+                  name: "DownloadCancelled",
+                  code: "downloadCancelled",
+                  message: "Download cancelled.",
+                  originError: {
+                    source: "app",
+                    // 这里保留保存对话框取消时的原始异常链，避免新的 UI 语义错误把底层上下文截断。
+                    cause:
+                      error.originError?.cause ??
+                      ensureErrorCause(
+                        error,
+                        "Download cancelled by user.",
+                        error.name ||
+                          "DownloadSaveTargetSelectionCancelledError",
+                      ),
+                  },
+                })
+              : error instanceof AppError
+                ? error
+                : toDownloadAppError(error, "Failed to open save dialog."),
         }),
       );
     }

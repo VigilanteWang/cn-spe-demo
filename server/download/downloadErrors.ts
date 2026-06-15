@@ -1,25 +1,54 @@
-import { AppError } from "../../common/appError";
+import { AppError, ensureErrorCause } from "../../common/appError";
 import {
   createInternalError,
   createValidationError,
 } from "../common/appErrorHelpers";
 
 /**
- * 提取适合写入任务状态的稳定错误文案。
+ * 将后台下载准备阶段抛出的任意异常统一收口成 `AppError`。
+ *
+ * 这样任务进度接口就能与仓库其余错误链路共享同一套结构化 contract，
+ * 前端无需再对 archive progress 做二次包装。
  *
  * @param error 原始异常对象。
  * @param fallbackMessage 无法提取 message 时使用的兜底文案。
- * @returns 适合写入 `job.errors` 的错误文案。
+ * @returns 可直接序列化进任务状态的标准化错误对象。
  */
-export const getDownloadJobFailureMessage = (
+export const normalizeDownloadJobFailure = (
   error: unknown,
   fallbackMessage: string,
-): string => {
-  if (error instanceof AppError || error instanceof Error) {
-    return error.message;
+): AppError => {
+  if (error instanceof AppError) {
+    return error;
   }
 
-  return fallbackMessage;
+  if (error instanceof Error) {
+    return new AppError({
+      name: error.name || "Error",
+      message: error.message || fallbackMessage,
+      originError: {
+        source: "app",
+        cause: ensureErrorCause(
+          error,
+          error.message || fallbackMessage,
+          error.name || "Error",
+        ),
+      },
+    });
+  }
+
+  return new AppError({
+    name: "ArchivePreparationError",
+    message: fallbackMessage,
+    originError: {
+      source: "app",
+      cause: ensureErrorCause(
+        error,
+        fallbackMessage,
+        "ArchivePreparationError",
+      ),
+    },
+  });
 };
 
 /**

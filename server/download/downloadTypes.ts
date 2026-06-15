@@ -1,4 +1,5 @@
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
+import type { AppErrorShape } from "../../common/contracts/errorContracts";
 
 /**
  * 下载准备任务的状态。
@@ -32,11 +33,11 @@ export interface JobProgress {
   totalBytes: number;
 
   /**
-   * 任务失败时记录的错误列表。
+   * 任务失败时记录的标准化错误对象。
    *
-   * 当前实现采用严格失败模式，通常只保留第一个阻断任务继续执行的错误。
+   * 这里保持与仓库其他 HTTP 错误链路一致，前端可以直接反序列化后消费。
    */
-  errors: string[];
+  error?: AppErrorShape;
 }
 
 /**

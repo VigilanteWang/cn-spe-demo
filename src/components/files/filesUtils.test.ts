@@ -38,7 +38,7 @@ describe("filesUtils", () => {
         currentItem: "a.txt",
         preparedBytes: 0,
         totalBytes: 0,
-        errors: [],
+        error: null,
       },
     });
 

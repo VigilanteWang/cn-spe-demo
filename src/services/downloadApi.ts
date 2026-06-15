@@ -15,7 +15,12 @@
  */
 
 import { IAbortRequestOptions, sendAuthorizedRequest } from "./apiClient";
-import { AppError, ensureErrorCause } from "../../common/appError";
+import {
+  AppError,
+  deserializeAppError,
+  ensureErrorCause,
+} from "../../common/appError";
+import type { AppErrorShape } from "../../common/contracts/errorContracts";
 import {
   IArchiveManifest,
   IArchiveSaveTarget,
@@ -40,8 +45,27 @@ export interface IJobProgress {
   currentItem: string; // 当前正在处理的文件名
   preparedBytes: number; // 已准备字节（后端阶段）
   totalBytes: number; // 总字节（后端阶段）
-  errors: string[]; // 严格失败模式下的致命错误列表
+  error: AppError | null; // 失败时的结构化错误对象
 }
+
+/**
+ * HTTP 线上传输用的 job progress 类型（wire type）。
+ *
+ * 所谓 wire type，指的是“接口响应体在网络上传输时的原始数据形状”：
+ * - 它描述的是 `response.json()` 刚解析出来的 plain object
+ * - 它不保证字段已经被恢复成前端运行时对象
+ *
+ * 这里单独保留一个 wire 类型，是为了把“跨 HTTP 传输的结构”与“service 对外返回的运行时结构”分开：
+ * - `IJobProgress` 是本模块返回给调用方的最终类型，`error` 已经是 `AppError | null`
+ * - `IJobProgressWire` 是接口刚返回时的原始类型，`error` 仍是可序列化的 `AppErrorShape`
+ *
+ * 这样 `getDownloadProgress()` 可以先按 wire 类型读取响应，再统一做一次反序列化，
+ * 下游 hook / UI 就不用反复判断当前拿到的是 plain object 还是 `AppError` 实例。
+ */
+type IJobProgressWire = Omit<IJobProgress, "error"> & {
+  /** HTTP 响应里的 error 还是可序列化结构，需先反序列化成运行时 AppError。 */
+  error?: AppErrorShape;
+};
 
 /**
  * 启动下载准备任务。
@@ -101,8 +125,12 @@ export async function getDownloadProgress(
   );
 
   if (response.ok) {
-    // 这里直接把后端 JSON 映射成强类型进度对象，供页面驱动进度条和状态文案。
-    return (await response.json()) as IJobProgress;
+    // 轮询接口仍返回 200 + JobProgress，这里先把跨层错误结构恢复成运行时 AppError。
+    const progress = (await response.json()) as IJobProgressWire;
+    return {
+      ...progress,
+      error: progress.error ? deserializeAppError(progress.error) : null,
+    };
   }
 
   throw await mapApiErrorResponseToAppError(response, {
