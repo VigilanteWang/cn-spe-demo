@@ -1,4 +1,4 @@
-import type { PermissionTabValue } from "../../models/permissionModels";
+import type { PermissionTabValue } from "../../models/permissionSharedModels";
 
 /**
  * 目录搜索支持的 principal 类型。
@@ -100,6 +100,7 @@ export interface IDirectoryPrincipalSearchResult {
   principalType: DirectoryPrincipalType;
   mail?: string;
   userPrincipalName?: string;
+  mailNickname?: string;
   groupTypes?: string[];
   mailEnabled?: boolean;
   securityEnabled?: boolean;

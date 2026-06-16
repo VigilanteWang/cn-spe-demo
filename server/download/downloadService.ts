@@ -7,8 +7,7 @@ import {
   createArchiveManifestNotReadyError,
   createArchiveTooLargeError,
   createArchiveTooManyFilesError,
-  getDownloadJobFailureMessage,
-  toDownloadGraphError,
+  normalizeDownloadJobFailure,
   validateDownloadJobInput,
 } from "./downloadErrors";
 import {
@@ -77,10 +76,10 @@ export async function startDownloadJob(
   // 故意不 await，让接口先返回 jobId，后台再慢慢准备下载清单。
   void processJob(jobId, containerId, itemIds, userToken).catch(
     (error: unknown) => {
-      // 如果后台准备失败，就把任务状态改成 failed，并保留首个关键错误文案。
+      // 后台准备失败时，也统一收口成标准化 AppError 再写入任务状态。
       markJobFailed(
         job,
-        getDownloadJobFailureMessage(error, "Unable to prepare the archive."),
+        normalizeDownloadJobFailure(error, "Unable to prepare the archive."),
       );
     },
   );
@@ -153,15 +152,8 @@ async function processJob(
   // 给前端一个最初始的可见提示，表示任务已经开始工作。
   job.currentItem = "Initialising...";
 
-  let graphToken: string;
-  try {
-    // 先把当前 API token 换成可访问 Graph 的 OBO token。
-    graphToken = await getGraphOBOToken(userToken);
-  } catch (error: unknown) {
-    throw toDownloadGraphError(error, "Unable to prepare the archive.");
-  }
-
   // 用换到的 Graph token 创建后续目录读取和文件解析要用的客户端。
+  const graphToken = await getGraphOBOToken(userToken);
   const graphClient = createGraphClient(graphToken);
 
   // 接下来先把“文件 + 文件夹混合选择”展开成纯文件列表。

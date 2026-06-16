@@ -1,0 +1,189 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../../../common/appError";
+import { useFilesArchiveDownload } from "./useFilesArchiveDownload";
+
+const {
+  startDownloadMock,
+  selectDownloadSaveTargetMock,
+  getDownloadProgressMock,
+  getDownloadManifestMock,
+} = vi.hoisted(() => ({
+  startDownloadMock: vi.fn(),
+  selectDownloadSaveTargetMock: vi.fn(),
+  getDownloadProgressMock: vi.fn(),
+  getDownloadManifestMock: vi.fn(),
+}));
+
+vi.mock("../../../services/downloadApi", () => ({
+  startDownload: startDownloadMock,
+  selectDownloadSaveTarget: selectDownloadSaveTargetMock,
+  getDownloadProgress: getDownloadProgressMock,
+  getDownloadManifest: getDownloadManifestMock,
+}));
+
+vi.mock("../../../services/archiveDownloader", () => ({
+  downloadArchiveFromManifest: vi.fn(),
+}));
+
+describe("useFilesArchiveDownload", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("should format structured archive api errors instead of reading raw message directly", async () => {
+    selectDownloadSaveTargetMock.mockResolvedValue({
+      filename: "archive.zip",
+      writable: null,
+    });
+    startDownloadMock.mockRejectedValue(
+      Object.assign(new Error("Archive request was throttled."), {
+        code: "throttled",
+        retryAfterSeconds: 6,
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useFilesArchiveDownload({
+        containerId: "container-a",
+        driveItems: [
+          {
+            id: "folder-a",
+            name: "Folder A",
+            isFolder: true,
+          },
+        ] as never,
+        selectedRows: new Set(["folder-a"]),
+        onDirectDownload: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.onToolbarDownloadClick();
+    });
+
+    expect(result.current.downloadProgress.phase).toBe("failed");
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "Error",
+      message: "Archive request was throttled.",
+    });
+    expect(result.current.downloadProgress.error?.originError?.cause).toBeInstanceOf(
+      Error,
+    );
+    expect(
+      (result.current.downloadProgress.error?.originError?.cause as Error)
+        .message,
+    ).toBe("Archive request was throttled.");
+    expect(getDownloadProgressMock).not.toHaveBeenCalled();
+    expect(getDownloadManifestMock).not.toHaveBeenCalled();
+  });
+
+  it("should standardize failed backend progress before exposing the ui message", async () => {
+    vi.useFakeTimers();
+    selectDownloadSaveTargetMock.mockResolvedValue({
+      filename: "archive.zip",
+      writable: null,
+    });
+    startDownloadMock.mockResolvedValue("job-1");
+    getDownloadProgressMock.mockResolvedValue({
+      status: "failed",
+      processedFiles: 2,
+      totalFiles: 3,
+      currentItem: "Folder A",
+      preparedBytes: 0,
+      totalBytes: 0,
+      error: new AppError({
+        name: "ArchivePreparationError",
+        code: "archivePreparationFailed",
+        message: "Folder A failed; Folder B failed",
+        originError: {
+          source: "app",
+        },
+      }),
+    });
+
+    const { result } = renderHook(() =>
+      useFilesArchiveDownload({
+        containerId: "container-a",
+        driveItems: [
+          {
+            id: "folder-a",
+            name: "Folder A",
+            isFolder: true,
+          },
+        ] as never,
+        selectedRows: new Set(["folder-a"]),
+        onDirectDownload: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.onToolbarDownloadClick();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+
+    expect(result.current.downloadProgress.phase).toBe("failed");
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "ArchivePreparationError",
+      message: "Folder A failed; Folder B failed",
+      code: "archivePreparationFailed",
+    });
+    expect(result.current.downloadProgress.backendProgress?.status).toBe(
+      "failed",
+    );
+    expect(getDownloadManifestMock).not.toHaveBeenCalled();
+  });
+
+  it("should show a concise cancellation message when the save picker is cancelled", async () => {
+    const pickerAbortCause = new Error("Picker aborted.");
+
+    selectDownloadSaveTargetMock.mockRejectedValue(
+      new AppError({
+        name: "DownloadSaveTargetSelectionCancelledError",
+        code: "downloadCancelled",
+        message: "Download cancelled by user.",
+        originError: {
+          source: "app",
+          cause: pickerAbortCause,
+        },
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useFilesArchiveDownload({
+        containerId: "container-a",
+        driveItems: [
+          {
+            id: "folder-a",
+            name: "Folder A",
+            isFolder: true,
+          },
+        ] as never,
+        selectedRows: new Set(["folder-a"]),
+        onDirectDownload: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.onToolbarDownloadClick();
+    });
+
+    expect(result.current.downloadProgress.phase).toBe("failed");
+    expect(result.current.downloadProgress.error).toMatchObject({
+      name: "DownloadCancelled",
+      message: "Download cancelled.",
+      code: "downloadCancelled",
+    });
+    expect(result.current.downloadProgress.error?.originError?.cause).toBe(
+      pickerAbortCause,
+    );
+    expect(startDownloadMock).not.toHaveBeenCalled();
+    expect(getDownloadProgressMock).not.toHaveBeenCalled();
+    expect(getDownloadManifestMock).not.toHaveBeenCalled();
+  });
+});

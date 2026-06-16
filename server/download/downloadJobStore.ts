@@ -1,3 +1,4 @@
+import { AppError, serializeAppError } from "../../common/appError";
 import type { Job, JobProgress } from "./downloadTypes";
 
 const JOB_TTL_MS = 10 * 60 * 1000;
@@ -41,7 +42,7 @@ export const createQueuedJob = (jobId: string, ownerOid: string): Job => {
     currentItem: "",
     preparedBytes: 0,
     totalBytes: 0,
-    errors: [],
+    error: undefined,
     createdAt: Date.now(),
     ownerOid,
   };
@@ -92,15 +93,11 @@ export const canAccessJob = (job: Job, requesterOid?: string): boolean =>
  * 把任务标记为失败。
  *
  * @param job 当前任务。
- * @param message 要记录到任务中的错误文案。
+ * @param error 要记录到任务中的标准化错误对象。
  */
-export const markJobFailed = (job: Job, message: string): void => {
+export const markJobFailed = (job: Job, error: AppError): void => {
   job.status = "failed";
   job.currentItem = "";
   job.completedAt = Date.now();
-
-  // 只保留第一个关键错误，避免后续兜底错误覆盖掉真正的根因。
-  if (job.errors.length === 0) {
-    job.errors.push(message);
-  }
+  job.error = serializeAppError(error);
 };

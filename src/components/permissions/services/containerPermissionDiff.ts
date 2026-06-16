@@ -1,4 +1,4 @@
-import { FrontendValidationError } from "../../../common/errors.ts";
+import { AppError } from "../../../../common/appError";
 import type {
   IContainerPermissionChangeSetFromUI,
   IContainerPermissionCreateChange,
@@ -7,25 +7,36 @@ import type {
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 import type {
   IContainerPermissionEntry,
-  PermissionEntriesByTab,
-} from "../models/permissionModels";
+  IContainerPermissionEntriesByTab,
+} from "../models/containerPermissionModels";
 
 export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
 
 /**
- * 容器权限草稿计算阶段的验证错误。
+ * 构造容器权限草稿计算阶段的验证错误。
  *
  * 这类错误说明前端当前持有的权限快照不完整，
  * 应该阻止继续写回后端，并把上下文反馈给 UI。
+ *
+ * @param code 稳定错误码，用于区分不同校验问题。
+ * @param message 面向界面和日志的错误说明。
+ * @param entryId 出错的权限行 id。
+ * @returns 统一的前端校验错误对象。
  */
-export class ContainerPermissionValidationError extends FrontendValidationError {
-  constructor(code: string, message: string, entryId: string) {
-    super(code, message, {
-      name: "ContainerPermissionValidationError",
-      details: { entryId },
-    });
-  }
-}
+export const buildContainerPermissionValidationError = (
+  code: string,
+  message: string,
+  entryId: string,
+): AppError =>
+  new AppError({
+    name: "ContainerPermissionValidationError",
+    code,
+    message,
+    originError: {
+      source: "validation",
+    },
+    details: [{ entryId }],
+  });
 
 interface IRequiredFieldErrorOptions {
   code: string;
@@ -38,8 +49,8 @@ interface IRequiredFieldErrorOptions {
  * 计算权限草稿相对初始快照的差异，以便一次性保存权限修改。
  */
 export const computeContainerPermissionChanges = (
-  originalEntriesByTab: PermissionEntriesByTab,
-  draftEntriesByTab: PermissionEntriesByTab,
+  originalEntriesByTab: IContainerPermissionEntriesByTab,
+  draftEntriesByTab: IContainerPermissionEntriesByTab,
 ): IContainerPermissionChangeSetFromUI => {
   const create: IContainerPermissionCreateChange[] = [];
   const update: IContainerPermissionUpdateChange[] = [];
@@ -144,7 +155,7 @@ const requireEntryField = (
     return value;
   }
 
-  throw new ContainerPermissionValidationError(
+  throw buildContainerPermissionValidationError(
     requiredFieldErrorOptions.code,
     `Cannot ${requiredFieldErrorOptions.operation}: missing ${String(requiredFieldErrorOptions.fieldName)}`,
     requiredFieldErrorOptions.entryId,

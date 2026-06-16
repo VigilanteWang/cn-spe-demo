@@ -5,7 +5,7 @@ import { useFilesNavigation } from "./useFilesNavigation";
 
 describe("useFilesNavigation", () => {
   it("should initialize at root", async () => {
-    const loadItems = vi.fn().mockResolvedValue(undefined);
+    const loadItems = vi.fn().mockResolvedValue(true);
     const clearSelection = vi.fn();
 
     const { result } = renderHook(() =>
@@ -26,7 +26,7 @@ describe("useFilesNavigation", () => {
   });
 
   it("should append breadcrumb when navigating into child folder", async () => {
-    const loadItems = vi.fn().mockResolvedValue(undefined);
+    const loadItems = vi.fn().mockResolvedValue(true);
     const clearSelection = vi.fn();
 
     const { result } = renderHook(() =>
@@ -48,7 +48,7 @@ describe("useFilesNavigation", () => {
   });
 
   it("should truncate breadcrumb when navigating back through breadcrumb", async () => {
-    const loadItems = vi.fn().mockResolvedValue(undefined);
+    const loadItems = vi.fn().mockResolvedValue(true);
     const clearSelection = vi.fn();
 
     const { result } = renderHook(() =>

@@ -37,6 +37,7 @@ import {
 } from "@fluentui/react-components";
 import { customTheme } from "./customTheme";
 import Containers from "./components/containers";
+import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
 
 const useStyles = makeStyles({
   appContainer: {
@@ -128,15 +129,17 @@ function App() {
   // }
   return (
     <FluentProvider theme={customTheme}>
-      <div className={styles.appContainer}>
-        <div className={styles.topBanner}>
-          <Text size={600} weight="bold" className={styles.title}>
-            SharePoint Embedded Demo App
-          </Text>
-          <Login loginView="compact" />
+      <AppErrorBoundary>
+        <div className={styles.appContainer}>
+          <div className={styles.topBanner}>
+            <Text size={600} weight="bold" className={styles.title}>
+              SharePoint Embedded Demo App
+            </Text>
+            <Login loginView="compact" />
+          </div>
+          {isSignedIn && <Containers />}
         </div>
-        {isSignedIn && <Containers />}
-      </div>
+      </AppErrorBoundary>
     </FluentProvider>
   );
 }

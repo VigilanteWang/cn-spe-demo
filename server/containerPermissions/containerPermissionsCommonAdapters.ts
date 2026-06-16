@@ -17,16 +17,16 @@ import {
   mapGraphContainerPermissionRoleToUi,
   mapUiContainerPermissionRoleToGraph,
 } from "./containerPermissionRoleMapper";
-import type { IGraphIdentityInPermission } from "./containerPermissionsInternalContracts";
+
 import {
-  readOptionalString,
   readGraphToRecord,
   readRequiredString,
   readStringArray,
 } from "./containerPermissionsReaders";
+import { resolveGraphPermissionIdentity } from "../permissionsCore/permissionIdentityAdapters";
 
 /**
- * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntry。
+ * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntryForUI
  */
 export const mapGraphPermissionToEntryOnUI = (
   permission: unknown,
@@ -35,24 +35,15 @@ export const mapGraphPermissionToEntryOnUI = (
   // Graph permission 的 id 是后续更新、删除这条权限时最稳定的锚点。
   const permissionId = readRequiredString(permissionRecord.id, "permission id");
   const roles = readStringArray(permissionRecord.roles);
-  const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
-
-  // Graph 可能把同一条权限挂在 user、siteUser、group 或 siteGroup 上。
-  // 这里先按优先级收口成统一 identity，后面的映射逻辑就不必关心原始分支细节。
-  const principal =
-    normalizeGraphPermissionIdentity(grantedToV2.user) ??
-    normalizeGraphPermissionIdentity(grantedToV2.siteUser) ??
-    normalizeGraphPermissionIdentity(grantedToV2.group) ??
-    normalizeGraphPermissionIdentity(grantedToV2.siteGroup);
+  const principal = resolveGraphPermissionIdentity(permission);
 
   if (!principal) {
     throw new Error(
-      `Permission ${permissionId} is missing grantedToV2 identity.`,
+      `Permission ${permissionId} is missing a supported identity facet.`,
     );
   }
 
-  const principalType =
-    grantedToV2.user || grantedToV2.siteUser ? "people" : "groups";
+  const principalType = principal.principalType;
   // Graph roles 是数组，但当前 UI 一行只展示一个主角色，所以这里显式取第一项并兜底为 reader。
   const primaryRole = roles[0] ?? "reader";
 
@@ -66,53 +57,19 @@ export const mapGraphPermissionToEntryOnUI = (
     principalId:
       principal.graphId ??
       createFallbackPrincipalId(principalType, permissionId),
+    principalObjectId: principal.graphId,
     // people 新增时后续写回 Graph 需要 userPrincipalName，所以读取时也尽量保留下来。
     principalUserPrincipalName:
       principalType === "people" ? principal.userPrincipalName : undefined,
+    principalMail: principal.mail,
     principalName: principal.displayName,
     principalType,
     description: principal.description,
+    isInherited: false,
+    isEditable: true,
+    isRemovable: true,
     // 这里把 Graph 小写角色翻译成 UI / 共同契约里使用的大写角色。
     role: mapGraphContainerPermissionRoleToUi(primaryRole),
-  };
-};
-
-/**
- * 从 Graph identity 对象里提取共同契约真正需要的最小字段集合。
- */
-export const normalizeGraphPermissionIdentity = (
-  identity: unknown,
-): IGraphIdentityInPermission | null => {
-  if (!identity) {
-    return null;
-  }
-
-  const record = readGraphToRecord(identity);
-  const graphId = readOptionalString(record.id);
-  const userPrincipalName = readOptionalString(record.userPrincipalName);
-  // Graph 在不同 identity 形状下，可用的人类可读字段并不完全一致。
-  // 这里按“最适合展示给用户”的优先级依次兜底，尽量稳定产出可显示名称。
-  const displayName =
-    readOptionalString(record.displayName) ??
-    readOptionalString(record.email) ??
-    userPrincipalName ??
-    readOptionalString(record.mail) ??
-    readOptionalString(record.loginName) ??
-    graphId ??
-    "Unknown principal";
-  // description 更偏向副标题，因此优先选 email / UPN 这类更适合辅助展示的字段。
-  const description =
-    readOptionalString(record.email) ??
-    userPrincipalName ??
-    readOptionalString(record.mail) ??
-    readOptionalString(record.loginName) ??
-    "";
-
-  return {
-    graphId,
-    displayName,
-    description,
-    userPrincipalName,
   };
 };
 

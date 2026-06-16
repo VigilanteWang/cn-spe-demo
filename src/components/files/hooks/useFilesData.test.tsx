@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { Providers } from "@microsoft/mgt-element";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../../../common/appError";
 
 import { useFilesData } from "./useFilesData";
 
@@ -61,6 +62,8 @@ describe("useFilesData", () => {
     });
     Providers.globalProvider = {
       onStateChanged: vi.fn(),
+      addStateChangedHandler: vi.fn(),
+      removeStateChangedHandler: vi.fn(),
       graph: {
         client: {
           api: apiMock,
@@ -91,5 +94,48 @@ describe("useFilesData", () => {
 
     photoDeferred.resolve(new Blob());
     presenceDeferred.resolve({ value: [] });
+  });
+
+  it("should expose a standardized page error when the main file list load fails", async () => {
+    const getMock = vi.fn().mockRejectedValue(
+      new AppError({
+        name: "AppError",
+        code: "throttled",
+        message: "Items request was throttled.",
+        originError: {
+          retryAfter: 9,
+        },
+      }),
+    );
+    const apiMock = vi.fn(() => ({ get: getMock }));
+    Providers.globalProvider = {
+      onStateChanged: vi.fn(),
+      addStateChangedHandler: vi.fn(),
+      removeStateChangedHandler: vi.fn(),
+      graph: {
+        client: {
+          api: apiMock,
+        },
+      },
+    } as never;
+
+    const { result } = renderHook(() =>
+      useFilesData({
+        containerId: "container-1",
+      }),
+    );
+
+    let didLoad = true;
+
+    await act(async () => {
+      didLoad = await result.current.loadItems("root");
+    });
+
+    expect(didLoad).toBe(false);
+    expect(result.current.driveItems).toEqual([]);
+    expect(result.current.loadError?.code).toBe("throttled");
+    expect(result.current.loadError?.message).toBe(
+      "Items request was throttled.",
+    );
   });
 });

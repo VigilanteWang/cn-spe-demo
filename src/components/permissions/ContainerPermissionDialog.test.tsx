@@ -2,10 +2,10 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../../common/appError";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
-import type { IContainerPermissionEntry } from "./models/permissionModels";
+import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
 import {
-  ContainerPermissionApiError,
   applyContainerPermissionChanges,
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
@@ -26,36 +26,12 @@ vi.mock(
   },
 );
 
-vi.mock("../../services/containerPermissionApi", () => ({
-  ContainerPermissionApiError: class ContainerPermissionApiError extends Error {
-    readonly code: string;
-
-    readonly retryAfterSeconds?: number;
-
-    readonly requestId?: string;
-
-    readonly statusCode?: number;
-
-    constructor(
-      code: string,
-      message: string,
-      options?: {
-        retryAfterSeconds?: number;
-        requestId?: string;
-        statusCode?: number;
-      },
-    ) {
-      super(message);
-      this.name = "ContainerPermissionApiError";
-      this.code = code;
-      this.retryAfterSeconds = options?.retryAfterSeconds;
-      this.requestId = options?.requestId;
-      this.statusCode = options?.statusCode;
-    }
-  },
-  listContainerPermissions: vi.fn(),
-  applyContainerPermissionChanges: vi.fn(),
-}));
+vi.mock("../../services/containerPermissionApi", () => {
+  return {
+    listContainerPermissions: vi.fn(),
+    applyContainerPermissionChanges: vi.fn(),
+  };
+});
 
 const searchDirectoryPrincipalsMock = vi.mocked(searchDirectoryPrincipals);
 const listContainerPermissionsMock = vi.mocked(listContainerPermissions);
@@ -121,6 +97,7 @@ const createSearchResult = (
   displayName: "Adele Vance",
   secondaryText: "adele.vance@contoso.com",
   principalType: "user",
+  mail: "adele.vance@contoso.com",
   userPrincipalName: "adele.vance@contoso.com",
   ...overrides,
 });
@@ -134,9 +111,14 @@ const createPermissionEntry = (
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
+  principalObjectId: "user-adele-vance",
+  principalMail: "adele.vance@contoso.com",
   principalName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
+  isInherited: false,
+  isEditable: true,
+  isRemovable: true,
   role: "Writer",
   ...overrides,
 });
@@ -201,6 +183,9 @@ describe("ContainerPermissionDialog", () => {
       "permission-row-people:user-adele-vance",
     );
     expect(within(peopleRow).getByText("Adele Vance")).toBeInTheDocument();
+    expect(
+      within(peopleRow).getByText("adele.vance@contoso.com"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("combobox", { name: "Adele Vance role" }),
     ).toHaveValue("Writer");
@@ -404,15 +389,16 @@ describe("ContainerPermissionDialog", () => {
       groups: [],
     });
     applyContainerPermissionChangesMock.mockRejectedValue(
-      new ContainerPermissionApiError(
-        "throttled",
-        "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
-        {
-          retryAfterSeconds: 12,
-          requestId: "req-429",
-          statusCode: 429,
+      new AppError({
+        name: "AppError",
+        code: "throttled",
+        message:
+          "Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
+        statusCode: 429,
+        originError: {
+          retryAfter: 12,
         },
-      ),
+      }),
     );
 
     renderDialog();
@@ -425,7 +411,11 @@ describe("ContainerPermissionDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     await flushAsyncWork();
 
-    expect(screen.getByText(/Retry after 12 seconds/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Api Error: AppError: Microsoft Graph throttled the container permission request after SDK retries were exhausted.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
 
     expect(

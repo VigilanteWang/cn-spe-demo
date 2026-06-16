@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { IContainerPermissionEntry } from "../models/permissionModels";
+import type { IContainerPermissionEntry } from "../models/containerPermissionModels";
 import { computeContainerPermissionChanges } from "./containerPermissionDiff";
 
 const createPermissionEntry = (
@@ -8,10 +8,15 @@ const createPermissionEntry = (
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
+  principalObjectId: "user-adele-vance",
   principalUserPrincipalName: "adele.vance@contoso.com",
+  principalMail: "adele.vance@contoso.com",
   principalName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
+  isInherited: false,
+  isEditable: true,
+  isRemovable: true,
   role: "Writer",
   ...overrides,
 });

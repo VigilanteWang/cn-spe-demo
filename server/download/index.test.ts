@@ -94,9 +94,10 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to prepare the archive.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "Error",
+      message: "token boom",
+    });
   });
 
   it("should fail the job when expanding an item fails", async () => {
@@ -120,9 +121,10 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to expand the selected items.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "GraphError",
+      message: "expand failed",
+    });
   });
 
   it("should fail the job when resolving a download url fails", async () => {
@@ -152,9 +154,10 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Unable to resolve the download url for item item-1.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "GraphError",
+      message: "resolve failed",
+    });
   });
 
   it("should fail the job when no files are found", async () => {
@@ -183,9 +186,11 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "No files found to archive.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "ArchiveEmptyError",
+      message: "No files found to archive.",
+      code: "conflict",
+    });
   });
 
   it("should fail the job when file count exceeds the limit", async () => {
@@ -221,9 +226,11 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Too many files (501). Maximum is 500.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "ArchiveTooManyFilesError",
+      message: "Too many files (501). Maximum is 500.",
+      code: "conflict",
+    });
   });
 
   it("should fail the job when total size exceeds the limit", async () => {
@@ -250,9 +257,11 @@ describe("download module", () => {
 
     await waitForJobStatus(jobId, "failed");
 
-    expect(getJobProgress(jobId, "user-oid").errors).toEqual([
-      "Archive would exceed the 500 MB size limit.",
-    ]);
+    expect(getJobProgress(jobId, "user-oid").error).toMatchObject({
+      name: "ArchiveTooLargeError",
+      message: "Archive would exceed the 500 MB size limit.",
+      code: "conflict",
+    });
   });
 
   it("should build the manifest when every file is prepared successfully", async () => {

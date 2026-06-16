@@ -13,7 +13,7 @@
  * - 可观测：关键阶段持续上报 downloaded/zipped/progress
  */
 import { AsyncZipDeflate, Zip } from "fflate";
-import { FrontendApiError } from "../common/errors.ts";
+import { AppError } from "../../common/appError";
 import { IAbortRequestOptions } from "./apiClient";
 import {
   IArchiveClientProgress,
@@ -21,26 +21,6 @@ import {
   IArchiveManifest,
   IArchiveSaveTarget,
 } from "../common/types";
-
-/**
- * 归档下载过程中单个文件的下载错误。
- */
-export class ArchiveItemDownloadError extends FrontendApiError {
-  readonly relativePath: string;
-
-  constructor(relativePath: string, statusCode: number) {
-    super(
-      "downloadItemFailed",
-      `Failed to download ${relativePath}. HTTP ${statusCode}`,
-      {
-        name: "ArchiveItemDownloadError",
-        statusCode,
-        details: { relativePath },
-      },
-    );
-    this.relativePath = relativePath;
-  }
-}
 
 /**
  * 将 Uint8Array 安全转换为标准 ArrayBuffer。
@@ -437,10 +417,16 @@ export const downloadArchiveFromManifest = (
 
               if (!response.ok) {
                 // HTTP 返回失败时，直接中断整个归档流程。
-                throw new ArchiveItemDownloadError(
-                  item.relativePath,
-                  response.status,
-                );
+                throw new AppError({
+                  name: "ArchiveItemDownloadError",
+                  code: "downloadItemFailed",
+                  message: `Failed to download ${item.relativePath}. HTTP ${response.status}`,
+                  statusCode: response.status,
+                  originError: {
+                    source: "network",
+                  },
+                  details: [{ relativePath: item.relativePath }],
+                });
               }
 
               if (!response.body) {

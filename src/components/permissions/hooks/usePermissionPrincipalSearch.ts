@@ -1,10 +1,10 @@
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { useEffect, useRef, useState } from "react";
-import { FrontendUserActionError } from "../../../common/errors.ts";
-import {
+import { AppError } from "../../../../common/appError";
+import type {
   IPermissionPrincipalCandidate,
   PermissionTabValue,
-} from "../models/permissionModels";
+} from "../models/permissionSharedModels";
 import { mapDirectorySearchResultToCandidate } from "../services/permissionPrincipalCandidateMapper";
 import {
   type IDirectoryPrincipalSearchResult,
@@ -33,7 +33,7 @@ const FALLBACK_ACCOUNT_ID = "__mgt-active-account__";
  * - `debouncing`：已经满足最小长度，正在等待 debounce
  * - `loading / success / empty / error`：真实搜索生命周期
  */
-type PermissionPrincipalSearchStatus =
+export type PermissionPrincipalSearchStatus =
   | "idle"
   | "waitingForMoreInput"
   | "debouncing"
@@ -233,10 +233,15 @@ export const usePermissionPrincipalSearch = ({
         }));
         setSearchErrorByTab((currentErrors) => ({
           ...currentErrors,
-          [selectedTab]: new FrontendUserActionError(
-            "directorySearchNotSignedIn",
-            "You are not signed in, so directory search is unavailable.",
-          ),
+          [selectedTab]: new AppError({
+            name: "PermissionSearchError",
+            code: "directorySearchNotSignedIn",
+            message:
+              "You are not signed in, so directory search is unavailable.",
+            originError: {
+              source: "app",
+            },
+          }),
         }));
         return;
       }

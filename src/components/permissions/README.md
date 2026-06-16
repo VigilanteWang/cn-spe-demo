@@ -43,19 +43,19 @@
 src/components/permissions/
 ├─ index.ts
 ├─ ContainerPermissionDialog.tsx
-├─ permissionsTypes.ts
-├─ permissionsStyles.ts
-├─ models/
-│  └─ permissionModels.ts
+├─ ContainerPermissionDialog.test.tsx
+├─ ItemPermissionDialog.tsx
+├─ ItemPermissionDialog.test.tsx
 ├─ hooks/
-│  ├─ useContainerPermissionDialogState.ts
-│  ├─ usePermissionDraft.ts
-│  ├─ usePermissionPrincipalSearch.ts
-│  └─ usePermissionTabs.ts
-└─ services/
-   ├─ containerPermissionDiff.ts
-   ├─ permissionPrincipalCandidateMapper.ts
-   └─ directoryPrincipalSearch/
+├─ models/
+├─ services/
+└─ components/
+   ├─ permissionsTypes.ts
+   ├─ permissionsStyles.ts
+   ├─ PermissionDialogFrame.tsx
+   ├─ PermissionDialogFrame.test.tsx
+   ├─ PermissionAccessListTable.tsx
+   └─ PrincipalSearchComboBox.tsx
 ```
 
 另外，这个模块还直接依赖两个外部层：
@@ -111,7 +111,7 @@ src/components/permissions/
 - Access List 表格区
 - 底部操作区
 
-### `models/permissionModels.ts`
+### `models/containerPermissionModels.ts`
 
 这是前端模型补充层。
 
@@ -133,7 +133,7 @@ src/components/permissions/
 
 - `common/contracts`
   前后端都认的稳定协议
-- `models/permissionModels.ts`
+- `models/containerPermissionModels.ts`
   前端为了页面交互补出来的本地模型
 
 ---
@@ -185,7 +185,10 @@ src/components/permissions/
 
 > “权限弹窗里的本地编辑会话状态机”
 
-### 3.3 `useContainerPermissionDialogState.ts`
+### 3.3 `usePermissionDialogUIState.ts`
+
+`ContainerPermissionDialog.tsx` 和 `ItemPermissionDialog.tsx` 会各自把
+`candidate -> permission entry` 的场景适配函数传给这个共享 Hook。
 
 这个 Hook 负责把“页签 + 草稿 + 每个 tab 的输入框”组合起来。
 
@@ -398,7 +401,7 @@ IPermissionPrincipalCandidate
 3. 如果没加过，就调用 `addCandidate(...)`
 4. 清空当前 query 和当前 tab 的结果列表
 
-`useContainerPermissionDialogState.ts` 里会把候选项转换成新的草稿权限条目：
+`ContainerPermissionDialog.tsx` 里会把候选项转换成新的草稿权限条目：
 
 ```ts
 {
@@ -506,7 +509,8 @@ replaceEntries(refreshedEntries)
 它的核心文件是：
 
 - `hooks/usePermissionDraft.ts`
-- `hooks/useContainerPermissionDialogState.ts`
+- `hooks/usePermissionDialogUIState.ts`
+- `hooks/usePermissionDialogApiRequestState.ts`
 - `services/containerPermissionDiff.ts`
 - `src/services/containerPermissionApi.ts`
 
@@ -594,7 +598,6 @@ ContainerPermissionApiError
 如果后端返回了：
 
 - `retryAfterSeconds`
-- `requestId`
 
 前端会把它拼进错误文案里。
 
@@ -622,7 +625,7 @@ ContainerPermissionApiError
 如果你第一次接触这个模块，建议按这个顺序读：
 
 1. `src/components/permissions/ContainerPermissionDialog.tsx`
-2. `src/components/permissions/hooks/useContainerPermissionDialogState.ts`
+2. `src/components/permissions/hooks/usePermissionDialogUIState.ts`
 3. `src/components/permissions/hooks/usePermissionDraft.ts`
 4. `src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
 5. `src/components/permissions/services/containerPermissionDiff.ts`
@@ -688,6 +691,7 @@ computeContainerPermissionChanges(...)
 - `hooks/usePermissionPrincipalSearch.ts`
 - `services/permissionPrincipalCandidateMapper.ts`
 - `services/directoryPrincipalSearch/*`
+- `utils/permissionDialogSharedUtils.ts`
 
 特别注意：
 
@@ -701,7 +705,7 @@ computeContainerPermissionChanges(...)
 优先看：
 
 - `hooks/usePermissionDraft.ts`
-- `hooks/useContainerPermissionDialogState.ts`
+- `hooks/usePermissionDialogUIState.ts`
 
 特别注意：
 
@@ -739,3 +743,22 @@ computeContainerPermissionChanges(...)
 当前 `Container Permission` 前端模块的本质是：
 
 > 用 `Combobox` 驱动目录搜索，用“双快照草稿模型”管理本地编辑，用“差异提交”驱动 Apply，并通过 `common/contracts` 和后端保持统一协议。
+---
+
+## 13. Shared dialog responsibilities
+
+`ContainerPermissionDialog.tsx` 和 `ItemPermissionDialog.tsx` 现在共用同一套权限对话框骨架，但仍然按层分工：
+
+- `components/PermissionDialogFrame.tsx`
+  负责 dialog 外壳、顶部状态区、tab、搜索区、access list 区块编排，以及底部 Close / Apply 和保存反馈。
+- `components/PermissionAccessListTable.tsx`
+  负责 access list 的 loading / empty / row 三种状态，以及统一的主体信息列、角色下拉框列、删除按钮列。
+- `hooks/usePermissionDialogApiRequestState.ts`
+  负责权限加载、Apply 前差异计算、Apply 后刷新，以及 `container / item` 默认请求文案的参数化。
+
+现在两个 dialog 自己保留的差异主要是：
+
+- header 文案
+- role options
+- item 专属的 inherited tooltip、visibility disclaimer、container permission 跳转入口
+- 各自对应的 API 调用函数

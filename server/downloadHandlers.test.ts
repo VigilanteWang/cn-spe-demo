@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BackendError } from "./common/errors";
+import { AppError } from "../common/appError";
 import { withErrorHandling } from "./common/errorResponse";
 import {
   getDownloadManifestRequest,
@@ -30,69 +30,88 @@ describe("downloadHandlers error handling", () => {
 
   it("should return notFound when archive progress does not exist", async () => {
     downloadMocks.getJobProgress.mockImplementation(() => {
-      throw new BackendError({
+      throw new AppError({
         name: "ArchiveJobNotFoundError",
         code: "notFound",
-        category: "business",
         message: "Job not found, expired, or access denied.",
         statusCode: 404,
+        originError: {
+          source: "app",
+        },
       });
     });
 
     const req = { params: { jobId: "job-1" } } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadProgressRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(404, {
-      code: "notFound",
-      message: "Job not found, expired, or access denied.",
-      statusCode: 404,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        name: "ArchiveJobNotFoundError",
+        code: "notFound",
+        message: "Job not found, expired, or access denied.",
+        statusCode: 404,
+        originError: {
+          source: "app",
+          cause: undefined,
+        },
+        details: undefined,
+      },
     });
   });
 
   it("should return conflict when archive manifest is not ready", async () => {
     downloadMocks.getJobManifest.mockImplementation(() => {
-      throw new BackendError({
+      throw new AppError({
         name: "ArchiveManifestNotReadyError",
         code: "conflict",
-        category: "business",
         message: "Archive manifest not ready yet. Status: preparing",
         statusCode: 409,
+        originError: {
+          source: "app",
+        },
       });
     });
 
     const req = { params: { jobId: "job-2" } } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadManifestRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(409, {
-      code: "conflict",
-      message: "Archive manifest not ready yet. Status: preparing",
-      statusCode: 409,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        name: "ArchiveManifestNotReadyError",
+        code: "conflict",
+        message: "Archive manifest not ready yet. Status: preparing",
+        statusCode: 409,
+        originError: {
+          source: "app",
+          cause: undefined,
+        },
+        details: undefined,
+      },
     });
   });
 
   it("should return invalidRequest when jobId route parameter is missing", async () => {
     const req = { params: {} } as never;
-    const res = { send: vi.fn() } as never;
+    const res = { send: vi.fn(), header: vi.fn() } as never;
 
     await withErrorHandling(getDownloadProgressRequest)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(400, {
-      code: "invalidRequest",
-      message: "jobId route parameter is required.",
-      statusCode: 400,
-      details: undefined,
-      requestId: undefined,
-      retryAfterSeconds: undefined,
+      error: {
+        name: "ValidationError",
+        code: "invalidRequest",
+        message: "jobId route parameter is required.",
+        statusCode: 400,
+        originError: {
+          source: "validation",
+          cause: undefined,
+        },
+        details: undefined,
+      },
     });
   });
 });

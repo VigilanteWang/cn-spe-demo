@@ -35,12 +35,12 @@ import type {
   SelectionEvents,
 } from "@fluentui/react-combobox";
 import { IContainer } from "../../common/types";
-import { readErrorMessage } from "../../common/errors.ts";
+import { formatAppErrorMessageForUI } from "../../../common/appError";
 import { listContainers } from "../../services/backendApi";
 import { Files } from "../files";
 import { useContainersStyles } from "./containersStyles";
 import { CreateContainerDialog } from "./components/CreateContainerDialog";
-import { ContainerPermissionDialog } from "../permissions";
+import { ContainerPermissionDialog } from "../permissions/ContainerPermissionDialog";
 
 /**
  * 容器管理页面
@@ -67,7 +67,8 @@ export const Containers = () => {
 
   // =============== 页面弹窗开关状态 ===============
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+  const [isContainerPermissionDialogOpen, setIsContainerPermissionDialogOpen] =
+    useState(false);
 
   // =============== 错误状态：容器加载失败或创建失败时展示 ===============
   const [containerError, setContainerError] = useState<string | null>(null);
@@ -81,7 +82,9 @@ export const Containers = () => {
         setContainers(nextContainers);
       } catch (error) {
         // 加载容器列表失败时，在按鈕旁显示错误提示
-        setContainerError(readErrorMessage(error, "Failed to load containers"));
+        setContainerError(
+          formatAppErrorMessageForUI(error, "Failed to load containers"),
+        );
       }
     })();
   }, []);
@@ -139,7 +142,7 @@ export const Containers = () => {
             <Button
               appearance="primary"
               disabled={!selectedContainer}
-              onClick={() => setIsPermissionDialogOpen(true)}
+              onClick={() => setIsContainerPermissionDialogOpen(true)}
             >
               Manage Permission
             </Button>
@@ -161,22 +164,29 @@ export const Containers = () => {
         onContainerCreated={handleContainerCreated}
         onError={(error) =>
           setContainerError(
-            readErrorMessage(error, "Failed to create container"),
+            formatAppErrorMessageForUI(error, "Failed to create container"),
           )
         }
       />
 
       {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}
       <ContainerPermissionDialog
-        open={isPermissionDialogOpen}
+        open={isContainerPermissionDialogOpen}
         containerId={selectedContainer?.id}
         containerName={selectedContainer?.displayName}
-        onClose={() => setIsPermissionDialogOpen(false)}
+        onClose={() => setIsContainerPermissionDialogOpen(false)}
       />
 
       {/* 仅在用户选中容器后才渲染文件列表组件，传入选中的容器对象 */}
       <div className={styles.filesRegion} data-testid="containers-files-region">
-        {selectedContainer && <Files container={selectedContainer} />}
+        {selectedContainer && (
+          <Files
+            container={selectedContainer}
+            onOpenContainerPermissions={() =>
+              setIsContainerPermissionDialogOpen(true)
+            }
+          />
+        )}
       </div>
     </div>
   );

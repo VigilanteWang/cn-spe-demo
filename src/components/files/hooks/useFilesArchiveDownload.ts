@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SelectionItemId } from "@fluentui/react-components";
-import { readErrorMessage } from "../../../common/errors.ts";
+import { AppError, ensureErrorCause } from "../../../../common/appError";
 import { IArchiveSaveTarget, IDriveItemExtended } from "../../../common/types";
 import {
-  DownloadSaveTargetSelectionCancelledError,
   getDownloadManifest,
   getDownloadProgress,
   selectDownloadSaveTarget,
@@ -28,6 +27,39 @@ interface IUseFilesArchiveDownloadOptions {
   /** 单文件直链下载函数。 */
   onDirectDownload: (downloadUrl: string) => void;
 }
+
+/**
+ * 将未知异常统一转换成下载流程可直接保存的 `AppError`。
+ *
+ * 这样 hook 内部状态只维护一种错误类型，展示层再统一格式化即可。
+ *
+ * @param error 原始异常值。
+ * @param fallbackMessage 无法提取 message 时的兜底文案。
+ * @returns 标准化后的错误对象。
+ */
+const toDownloadAppError = (
+  error: unknown,
+  fallbackMessage: string,
+): AppError => {
+  if (error instanceof AppError) {
+    return error;
+  }
+
+  return new AppError({
+    name: error instanceof Error && error.name ? error.name : "Error",
+    message:
+      error instanceof Error && error.message ? error.message : fallbackMessage,
+    originError: {
+      source: "app",
+      // 把原始异常挂到 cause 上，方便后续日志、DevTools 和序列化链路继续追根因。
+      cause: ensureErrorCause(
+        error,
+        fallbackMessage,
+        error instanceof Error && error.name ? error.name : "Error",
+      ),
+    },
+  });
+};
 
 /**
  * 管理 ZIP 归档下载逻辑。
@@ -151,9 +183,7 @@ export const useFilesArchiveDownload = ({
         setDownloadProgress(
           createDownloadProgressState({
             phase: "failed",
-            errorMessage: `Failed to start download: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+            error: toDownloadAppError(error, "Failed to start download."),
           }),
         );
         if (downloadAbortControllerRef.current === runController) {
@@ -272,7 +302,7 @@ export const useFilesArchiveDownload = ({
               phase: "done",
               isActive: false,
               isCompleted: true,
-              errorMessage: "",
+              error: null,
             }));
             downloadSessionAbortRef.current = null;
             if (downloadAbortControllerRef.current === runController) {
@@ -288,11 +318,15 @@ export const useFilesArchiveDownload = ({
               createDownloadProgressState({
                 phase: "failed",
                 backendProgress: progress,
-                // 如果后端返回了具体错误列表，将其拼接展示；否则显示通用提示。
-                errorMessage:
-                  progress.errors.length > 0
-                    ? progress.errors.join("; ")
-                    : "Archive job failed.",
+                error:
+                  progress.error ??
+                  new AppError({
+                    name: "ArchivePreparationError",
+                    message: "Archive job failed.",
+                    originError: {
+                      source: "app",
+                    },
+                  }),
               }),
             );
             downloadSessionAbortRef.current = null;
@@ -314,9 +348,7 @@ export const useFilesArchiveDownload = ({
             setDownloadProgress(
               createDownloadProgressState({
                 phase: "failed",
-                errorMessage: `Download failed: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
+                error: toDownloadAppError(error, "Download failed."),
               }),
             );
           }
@@ -373,13 +405,28 @@ export const useFilesArchiveDownload = ({
       setDownloadProgress(
         createDownloadProgressState({
           phase: "failed",
-          errorMessage:
-            error instanceof DownloadSaveTargetSelectionCancelledError
-              ? "Download cancelled."
-              : `Failed to open save dialog: ${readErrorMessage(
-                  error,
-                  "Unknown error.",
-                )}`,
+          error:
+            error instanceof AppError && error.code === "downloadCancelled"
+              ? new AppError({
+                  name: "DownloadCancelled",
+                  code: "downloadCancelled",
+                  message: "Download cancelled.",
+                  originError: {
+                    source: "app",
+                    // 这里保留保存对话框取消时的原始异常链，避免新的 UI 语义错误把底层上下文截断。
+                    cause:
+                      error.originError?.cause ??
+                      ensureErrorCause(
+                        error,
+                        "Download cancelled by user.",
+                        error.name ||
+                          "DownloadSaveTargetSelectionCancelledError",
+                      ),
+                  },
+                })
+              : error instanceof AppError
+                ? error
+                : toDownloadAppError(error, "Failed to open save dialog."),
         }),
       );
     }

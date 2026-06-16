@@ -1,6 +1,6 @@
 import { Request, Response } from "restify";
 import { requireContainerManageRequest } from "./auth";
-import { BackendValidationError } from "./common/errors";
+import { createValidationError } from "./common/appErrorHelpers";
 import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
 
 interface IStartDownloadRequestBody {
@@ -21,7 +21,7 @@ export const startDownloadRequest = async (req: Request, res: Response) => {
   const itemIds = readStringArray(body.itemIds);
 
   if (!containerId || itemIds.length === 0) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "containerId and a non-empty itemIds array are required.",
     );
   }
@@ -50,7 +50,7 @@ export const getDownloadProgressRequest = async (
   const jobId = readNonEmptyString(req.params?.jobId);
 
   if (!jobId) {
-    throw new BackendValidationError("jobId route parameter is required.");
+    throw createValidationError("jobId route parameter is required.");
   }
 
   const requesterOid = authResult.claims.oid ?? "";
@@ -72,7 +72,7 @@ export const getDownloadManifestRequest = async (
   const jobId = readNonEmptyString(req.params?.jobId);
 
   if (!jobId) {
-    throw new BackendValidationError("jobId route parameter is required.");
+    throw createValidationError("jobId route parameter is required.");
   }
 
   const requesterOid = authResult.claims.oid ?? "";

@@ -3,7 +3,7 @@ import { IFilesBreadcrumbItem } from "../filesTypes";
 
 interface IUseFilesNavigationOptions {
   /** 加载指定目录内容的方法。 */
-  loadItems: (itemId?: string) => Promise<void>;
+  loadItems: (itemId?: string) => Promise<boolean>;
   /** 清空表格选中状态的方法。 */
   clearSelection: () => void;
 }
@@ -38,7 +38,13 @@ export const useFilesNavigation = ({
   const navigateToFolder = useCallback(
     async (targetFolderId: string, targetFolderName: string) => {
       clearSelection();
-      await loadItems(targetFolderId);
+      const didLoad = await loadItems(targetFolderId);
+
+      // 主列表加载失败时保留当前目录上下文，避免面包屑和列表状态脱节。
+      if (!didLoad) {
+        return;
+      }
+
       setFolderId(targetFolderId);
       setBreadcrumbPath((previousPath) => {
         if (targetFolderId === "root") {

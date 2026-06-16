@@ -13,12 +13,12 @@
  */
 
 import { Request, Response } from "restify";
+import { sendGraphRequest } from "../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "./auth";
-import { toBackendGraphError } from "./common/errors";
 import { serverConfig } from "./config";
 
 /**
@@ -33,30 +33,18 @@ import { serverConfig } from "./config";
 export const listContainers = async (req: Request, res: Response) => {
   /** 先做权限校验，避免未授权请求访问下游服务。 */
   const authorizationResult = await requireContainerManageRequest(req);
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken);
 
-  try {
-    /** 当前 API 使用的令牌需要先交换成 Graph 令牌。 */
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const containersRequest = graphClient
+    .api("/storage/fileStorage/containers")
+    .version("v1.0")
+    .filter(`containerTypeId eq ${serverConfig.containerTypeId}`);
 
-    /** Graph 客户端负责封装认证和请求链式调用。 */
-    const graphClient = createGraphClient(graphToken);
+  const graphResponse = await sendGraphRequest(
+    () => containersRequest.get(),
+    "Unable to list containers.",
+  );
 
-    /**
-     * 只返回当前应用所属的容器类型。
-     * 这里在 Graph 层过滤，能减少无关数据返回到服务端。
-     */
-    const graphResponse = await graphClient
-      .api("/storage/fileStorage/containers")
-      .version("v1.0")
-      .filter(`containerTypeId eq ${serverConfig.containerTypeId}`)
-      .get();
-
-    res.send(200, graphResponse);
-    return;
-  } catch (error: unknown) {
-    throw toBackendGraphError(error, {
-      failureMessage: "Unable to list containers.",
-      operationDescription: "container list",
-    });
-  }
+  res.send(200, graphResponse);
 };

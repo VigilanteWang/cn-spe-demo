@@ -1,0 +1,87 @@
+import type { IGraphPermissionIdentity } from "./permissionGraphContracts";
+import {
+  readGraphToRecord,
+  readOptionalString,
+} from "./permissionGraphReaders";
+
+export interface IResolvedGraphPermissionIdentity
+  extends IGraphPermissionIdentity {
+  principalType: "people" | "groups";
+}
+
+/**
+ * 从单个 Graph identity 对象里提取权限模块真正关心的稳定字段。
+ */
+export const normalizeGraphPermissionIdentity = (
+  identity: unknown,
+): IGraphPermissionIdentity | null => {
+  if (!identity) {
+    return null;
+  }
+
+  const record = readGraphToRecord(identity);
+  const graphId = readOptionalString(record.id);
+  const mail =
+    readOptionalString(record.mail) ?? readOptionalString(record.email);
+  const userPrincipalName = readOptionalString(record.userPrincipalName);
+  const displayName =
+    readOptionalString(record.displayName) ??
+    readOptionalString(record.email) ??
+    userPrincipalName ??
+    mail ??
+    readOptionalString(record.loginName) ??
+    graphId ??
+    "Unknown principal";
+  const description =
+    readOptionalString(record.email) ??
+    userPrincipalName ??
+    mail ??
+    readOptionalString(record.loginName) ??
+    "";
+
+  return {
+    graphId,
+    displayName,
+    description,
+    mail,
+    userPrincipalName,
+  };
+};
+
+/**
+ * 从 item/container permission 的 `grantedToV2` 里提取当前项目真正支持管理的主体。
+ *
+ * 说明：
+ * - 当前实现只读取 `grantedToV2.group` 和 `grantedToV2.user`。
+ * - Microsoft Graph 已将 `grantedTo` 标记为 deprecated，这里不再回退读取旧字段，
+ *   避免在新代码路径里继续扩散旧兼容逻辑。
+ * - `siteUser` / `siteGroup` 这类 SharePoint-specific identity 当前故意忽略。
+ *   如果一条权限没有 `group`，只有 `user`，就按 `people` 返回。
+ *   如果 `group` 和 `user` 同时存在，就优先按 `groups` 返回，避免把组权限误判成 people。
+ *   如果这条权限只暴露 `siteUser` / `siteGroup` 等未纳管身份，就返回 `null`。
+ */
+export const resolveGraphPermissionIdentity = (
+  permission: unknown,
+): IResolvedGraphPermissionIdentity | null => {
+  const permissionRecord = readGraphToRecord(permission);
+  const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
+  // 当前只支持 AAD group / user 两种正式可管理主体。
+  // 如果两者同时存在，优先使用 group，避免把组权限误当成 people。
+  const groupIdentity = normalizeGraphPermissionIdentity(grantedToV2.group);
+  if (groupIdentity) {
+    return {
+      principalType: "groups",
+      ...groupIdentity,
+    };
+  }
+
+  const userIdentity = normalizeGraphPermissionIdentity(grantedToV2.user);
+  if (userIdentity) {
+    return {
+      principalType: "people",
+      ...userIdentity,
+    };
+  }
+
+  return null;
+};

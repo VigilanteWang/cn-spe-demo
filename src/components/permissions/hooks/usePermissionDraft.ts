@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
-import {
-  ContainerPermissionRole,
-  IContainerPermissionEntry,
+import { useCallback, useEffect, useState } from "react";
+import type {
+  IPermissionEntryBaseForUI,
   PermissionEntriesByTab,
   PermissionTabValue,
-} from "../models/permissionModels";
+} from "../models/permissionSharedModels";
 
 /**
  * 复制权限列表，避免不同快照共享同一份引用。
@@ -15,9 +14,9 @@ import {
  *
  * 两份列表必须互相独立，也不能直接引用外部传入的 `initial` 数据。
  */
-const cloneEntriesByTab = (
-  entriesByTab: PermissionEntriesByTab,
-): PermissionEntriesByTab => ({
+const cloneEntriesByTab = <TEntry extends IPermissionEntryBaseForUI>(
+  entriesByTab: PermissionEntriesByTab<TEntry>,
+): PermissionEntriesByTab<TEntry> => ({
   people: entriesByTab.people.map((entry) => ({ ...entry })),
   groups: entriesByTab.groups.map((entry) => ({ ...entry })),
 });
@@ -25,9 +24,9 @@ const cloneEntriesByTab = (
 /**
  * 比较两份权限列表是否完全一致。
  */
-const areEntriesByTabEqual = (
-  left: PermissionEntriesByTab,
-  right: PermissionEntriesByTab,
+const areEntriesByTabEqual = <TEntry extends IPermissionEntryBaseForUI>(
+  left: PermissionEntriesByTab<TEntry>,
+  right: PermissionEntriesByTab<TEntry>,
 ) => JSON.stringify(left) === JSON.stringify(right);
 
 /**
@@ -48,21 +47,23 @@ const areEntriesByTabEqual = (
  *
  * - initial 依靠父组件的 re-render 来更新，apply 后会没来得及更新至最新值，用户也会看到还有未保存更改
  */
-export const usePermissionDraft = (
-  initialEntriesByTab: PermissionEntriesByTab,
+export const usePermissionDraft = <
+  TEntry extends IPermissionEntryBaseForUI & { role: string },
+>(
+  initialEntriesByTab: PermissionEntriesByTab<TEntry>,
   resetKey: string,
 ) => {
-  // 保存“本次编辑会话里最近一次确认后的基线快照”，Close / Reset 时需要回到这份数据。
+  // 保存最近一次确认后的基线快照，Close / Reset 都要回到这份数据。
   const [originalEntriesByTab, setOriginalEntriesByTab] = useState(
     cloneEntriesByTab(initialEntriesByTab),
   );
-  // 保存弹窗内当前正在编辑的草稿；表格里的增删改都只改这份数据。
+  // 保存弹窗内当前正在编辑的草稿，增删改都只改这份数据。
   const [draftEntriesByTab, setDraftEntriesByTab] = useState(
     cloneEntriesByTab(initialEntriesByTab),
   );
 
   useEffect(() => {
-    // `resetKey` 一般对应容器 ID。容器切换时，同时重建基线和草稿，避免不同容器串数据。
+    // `resetKey` 通常对应当前资源 ID，资源切换时要整体重建基线和草稿。
     const nextEntriesByTab = cloneEntriesByTab(initialEntriesByTab);
     setOriginalEntriesByTab(nextEntriesByTab);
     setDraftEntriesByTab(cloneEntriesByTab(nextEntriesByTab));
@@ -72,10 +73,7 @@ export const usePermissionDraft = (
    * 向指定页签追加一条新的草稿权限记录。
    * 这里要返回新数组而不是直接修改原数组，这样才能符合 React state 的“不可变”更新要求。
    */
-  const addEntry = (
-    tab: PermissionTabValue,
-    entry: IContainerPermissionEntry,
-  ) => {
+  const addEntry = (tab: PermissionTabValue, entry: TEntry) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
       ...currentEntriesByTab,
       [tab]: [...currentEntriesByTab[tab], entry],
@@ -89,7 +87,7 @@ export const usePermissionDraft = (
   const updateEntryRole = (
     tab: PermissionTabValue,
     entryId: string,
-    role: ContainerPermissionRole,
+    role: TEntry["role"],
   ) => {
     setDraftEntriesByTab((currentEntriesByTab) => ({
       ...currentEntriesByTab,
@@ -111,14 +109,14 @@ export const usePermissionDraft = (
   };
 
   /**
-   * 放弃本次编辑，把草稿恢复到最近一次确认后的状态。
+   * 放弃本次编辑，把草稿恢复到最近一次确认后的基线。
    */
   const resetDraft = () => {
     setDraftEntriesByTab(cloneEntriesByTab(originalEntriesByTab));
   };
 
   /**
-   * 用一份新的权限数据同时更新 original 和 draft 快照，保持两者一致。
+   * 用一份新的权限数据同时更新 `original` 和 `draft`。
    *
    * 具体操作：接收权限列表，将其复制后分别赋值给 original 和 draft，
    * 以此清除任何本地未保存的编辑痕迹。
@@ -127,11 +125,14 @@ export const usePermissionDraft = (
    * 1. Dialog 初次打开后，用加载回来的真实容器权限同步状态；
    * 2. Apply 成功后，用后端最新结果覆盖本地草稿，清空脏状态。
    */
-  const replaceEntries = (entriesByTab: PermissionEntriesByTab) => {
-    const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
-    setOriginalEntriesByTab(nextOriginalEntriesByTab);
-    setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
-  };
+  const replaceEntries = useCallback(
+    (entriesByTab: PermissionEntriesByTab<TEntry>) => {
+      const nextOriginalEntriesByTab = cloneEntriesByTab(entriesByTab);
+      setOriginalEntriesByTab(nextOriginalEntriesByTab);
+      setDraftEntriesByTab(cloneEntriesByTab(nextOriginalEntriesByTab));
+    },
+    [],
+  );
 
   return {
     originalEntriesByTab,

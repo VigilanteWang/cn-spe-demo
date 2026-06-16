@@ -12,24 +12,9 @@
  * - POST /api/deleteItems      - 批量删除文件/文件夹
  */
 
-import { FrontendApiError } from "../common/errors.ts";
 import { sendAuthorizedRequest } from "./apiClient";
 import { IContainer } from "../common/types";
-
-/**
- * 后端 API 请求失败时抛出的稳定错误类型。
- *
- * 携带 code（错误标识）和 statusCode（HTTP 状态码），
- * 便于调用方通过 instanceof 和 code 区分不同失败场景。
- */
-export class BackendRequestError extends FrontendApiError {
-  constructor(code: string, message: string, statusCode: number) {
-    super(code, message, {
-      name: "BackendRequestError",
-      statusCode,
-    });
-  }
-}
+import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 
 /**
  * 批量删除操作的返回结果。
@@ -40,20 +25,6 @@ export interface IDeleteItemsResult {
   successful: string[]; // 成功删除的文件 ID 列表
   failed: Array<{ id: string; reason: string }>; // 失败的文件 ID 及原因
 }
-
-/**
- * 根据响应构造容器 API 请求错误。
- */
-const buildBackendRequestError = (
-  code: string,
-  operation: string,
-  response: Response,
-): BackendRequestError =>
-  new BackendRequestError(
-    code,
-    `${operation} failed: ${response.status}`,
-    response.status,
-  );
 
 /**
  * 列出当前用户可访问的所有容器。
@@ -77,11 +48,9 @@ export async function listContainers(): Promise<IContainer[]> {
     // Graph API 把集合包在 value 数组里返回；空集合时返回空数组而非 undefined
     return (body.value as IContainer[]) ?? [];
   }
-  throw buildBackendRequestError(
-    "listContainersFailed",
-    "listContainers",
-    response,
-  );
+  throw await mapApiErrorResponseToAppError(response, {
+    operationLabel: "listContainers",
+  });
 }
 
 /**
@@ -113,11 +82,9 @@ export async function createContainer(
   if (response.ok) {
     return (await response.json()) as IContainer;
   }
-  throw buildBackendRequestError(
-    "createContainerFailed",
-    "createContainer",
-    response,
-  );
+  throw await mapApiErrorResponseToAppError(response, {
+    operationLabel: "createContainer",
+  });
 }
 
 /**
@@ -143,5 +110,7 @@ export async function deleteItems(
   if (response.ok) {
     return (await response.json()) as IDeleteItemsResult;
   }
-  throw buildBackendRequestError("deleteItemsFailed", "deleteItems", response);
+  throw await mapApiErrorResponseToAppError(response, {
+    operationLabel: "deleteItems",
+  });
 }

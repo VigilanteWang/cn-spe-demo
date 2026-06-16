@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import pluginReact from "eslint-plugin-react";
+import pluginReactHooks from "eslint-plugin-react-hooks";
 import json from "@eslint/json";
 import { defineConfig } from "eslint/config";
 import prettier from "eslint-plugin-prettier";
@@ -102,6 +103,16 @@ export default defineConfig([
       ...reactRecommendedConfig.rules,
       "react/react-in-jsx-scope": "off",
       "react/jsx-uses-react": "off",
+    },
+  },
+  {
+    files: ["src/**/*.{jsx,tsx}"],
+    plugins: {
+      "react-hooks": pluginReactHooks,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
   {

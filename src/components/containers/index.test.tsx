@@ -152,12 +152,30 @@ describe("Containers", () => {
     fireEvent.click(await screen.findByText("Container A"));
     fireEvent.click(screen.getByRole("button", { name: "Manage Permission" }));
 
-    expect(
-      screen.getByRole("dialog", { name: "Manage Container Permission" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Container:/)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", {
+      name: "Manage Container Permission",
+    });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Container A")).toBeInTheDocument();
     expect(
       screen.getByRole("combobox", { name: "Add People" }),
+    ).toBeInTheDocument();
+  });
+
+  it("should surface structured backend request details when loading containers fails", async () => {
+    const error = Object.assign(
+      new Error("Container list request was throttled."),
+      {
+        code: "throttled",
+        retryAfterSeconds: 8,
+      },
+    );
+    listContainersMock.mockRejectedValue(error);
+
+    render(<Containers />);
+
+    expect(
+      await screen.findByText("Error: Container list request was throttled."),
     ).toBeInTheDocument();
   });
 });

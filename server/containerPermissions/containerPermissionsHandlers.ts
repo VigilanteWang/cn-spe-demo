@@ -12,6 +12,7 @@
  * 它负责组织流程，但尽量不直接承载 Graph 结构转换或字段解析细节。
  */
 import { Request, Response } from "restify";
+import { sendGraphRequest } from "../../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -25,11 +26,6 @@ import {
   newGraphCreatePermissionBody,
   mapGraphPermissionToEntryOnUI,
 } from "./containerPermissionsCommonAdapters";
-import {
-  getContainerPermissionsApiErrorResponseStatus,
-  mapContainerPermissionsGraphError,
-  toContainerPermissionsApiErrorResponseBody,
-} from "./containerPermissionsError";
 import type { IGraphClient } from "./containerPermissionsInternalContracts";
 import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
 import { parseContainerPermissionChangeSet } from "./containerPermissionsRequestParser";
@@ -37,7 +33,7 @@ import {
   readOptionalString,
   readGraphToRecord,
 } from "./containerPermissionsReaders";
-import { BackendValidationError } from "../common/errors";
+import { createValidationError } from "../common/appErrorHelpers";
 
 /**
  * 读取指定容器的权限列表，并映射成前端可直接消费的 entries 响应。
@@ -57,28 +53,18 @@ export const listContainerPermissionsFromGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError(
-      "containerId route parameter is required.",
-    );
+    throw createValidationError("containerId route parameter is required.");
   }
 
-  try {
-    // 通过 OBO 流程获取当前用户上下文下的 Graph token。
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
-    // 基于本次请求 token 创建 Graph 客户端，避免跨请求串用身份。
-    const graphClient = createGraphClient(graphToken) as IGraphClient;
-    const entries = await fetchMapContainerPermissionFromGraphToEntries(
-      graphClient,
-      containerId,
-    );
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as IGraphClient;
+  const entries = await fetchMapContainerPermissionFromGraphToEntries(
+    graphClient,
+    containerId,
+  );
 
-    // 使用对象响应结构，便于后续无破坏性扩展更多字段。
-    const responseBody: IContainerPermissionsResponseFromApi = { entries };
-    res.send(200, responseBody);
-  } catch (error: unknown) {
-    // 统一走错误映射，保证前端拿到稳定的错误码与消息结构。
-    sendContainerPermissionMappedGraphError(res, error);
-  }
+  const responseBody: IContainerPermissionsResponseFromApi = { entries };
+  res.send(200, responseBody);
 };
 
 /**
@@ -99,42 +85,29 @@ export const applyContainerPermissionsToGraph = async (
   const containerId = readContainerId(req);
 
   if (!containerId) {
-    throw new BackendValidationError(
-      "containerId route parameter is required.",
-    );
+    throw createValidationError("containerId route parameter is required.");
   }
 
   // 解析并校验 create/update/remove 三段变更数据。
   const changeSet = parseContainerPermissionChangeSet(req.body);
 
   if (!changeSet) {
-    throw new BackendValidationError(
+    throw createValidationError(
       "create, update and remove arrays are required.",
     );
   }
 
-  try {
-    // 使用请求级 token 构造 Graph 客户端，保证权限边界正确。
-    const graphToken = await getGraphOBOToken(authorizationResult.token);
-    const graphClient = createGraphClient(graphToken) as IGraphClient;
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken) as IGraphClient;
 
-    await applyContainerPermissionChangeSet(
-      graphClient,
-      containerId,
-      changeSet,
-    );
+  await applyContainerPermissionChangeSet(graphClient, containerId, changeSet);
 
-    // 变更完成后重新拉取一次，确保返回的是服务端真实状态，而不是本地猜测状态。
-    const entries = await fetchMapContainerPermissionFromGraphToEntries(
-      graphClient,
-      containerId,
-    );
-    const responseBody: IContainerPermissionsResponseFromApi = { entries };
-    res.send(200, responseBody);
-  } catch (error: unknown) {
-    // 所有异常统一转换为稳定 API 错误格式。
-    sendContainerPermissionMappedGraphError(res, error);
-  }
+  const entries = await fetchMapContainerPermissionFromGraphToEntries(
+    graphClient,
+    containerId,
+  );
+  const responseBody: IContainerPermissionsResponseFromApi = { entries };
+  res.send(200, responseBody);
 };
 
 /**
@@ -148,28 +121,24 @@ export const fetchMapContainerPermissionFromGraphToEntries = async (
   graphClient: IGraphClient,
   containerId: string,
 ) => {
-  try {
-    // 使用 v1.0 权限接口读取容器权限集合。
-    const response = await graphClient
-      .api(getContainerPermissionsGraphPath(containerId))
-      .version("v1.0")
-      .get();
+  const response = await sendGraphRequest(
+    () =>
+      graphClient
+        .api(getContainerPermissionsGraphPath(containerId))
+        .version("v1.0")
+        .get(),
+    "Unable to read container permissions.",
+    500,
+  );
 
-    // Graph 返回值是动态结构，这里先转成可安全读取的 record。
-    const responseRecord = readGraphToRecord(response);
-    const permissionItems = responseRecord.value;
+  const responseRecord = readGraphToRecord(response);
+  const permissionItems = responseRecord.value;
 
-    // 容错处理：若返回值不符合预期，按空列表处理，避免前端崩溃。
-    if (!Array.isArray(permissionItems)) {
-      return [];
-    }
-
-    // 每一项原始 Graph permission 都交给适配层翻译成共同契约 entry。
-    return permissionItems.map(mapGraphPermissionToEntryOnUI);
-  } catch (error: unknown) {
-    // 将原始 Graph/SDK 错误映射成项目内稳定错误类型。
-    throw mapContainerPermissionsGraphError(error);
+  if (!Array.isArray(permissionItems)) {
+    return [];
   }
+
+  return permissionItems.map(mapGraphPermissionToEntryOnUI);
 };
 
 /**
@@ -185,65 +154,58 @@ export const applyContainerPermissionChangeSet = async (
   containerId: string,
   changeSet: IContainerPermissionChangeSetFromUI,
 ): Promise<void> => {
-  try {
-    // 先删再改再建，可减少同一 principal 残留权限导致的冲突与排查复杂度。
-    for (const deleteChange of changeSet.remove) {
-      await graphClient
-        .api(
-          getSingleContainerPermissionGraphPath(
-            containerId,
-            deleteChange.permissionId,
-          ),
-        )
-        .version("v1.0")
-        // 删除时显式带上 Prefer，避免误删更高范围继承来的权限。
-        .header("Prefer", "onlyRemoveContainerScopedPermission")
-        .delete();
-    }
-
-    // 更新阶段只改角色，不变更 principal 身份字段。
-    for (const updateChange of changeSet.update) {
-      await graphClient
-        .api(
-          getSingleContainerPermissionGraphPath(
-            containerId,
-            updateChange.permissionId,
-          ),
-        )
-        .version("v1.0")
-        .patch({
-          // PATCH 时只发送角色变更，保持请求体最小化。
-          roles: [mapUiContainerPermissionRoleToGraph(updateChange.role)],
-        });
-    }
-
-    // 创建阶段使用 Graph 要求的 grantedToV2 载荷结构。
-    for (const createChange of changeSet.create) {
-      await graphClient
-        .api(getContainerPermissionsGraphPath(containerId))
-        .version("v1.0")
-        .post(newGraphCreatePermissionBody(createChange));
-    }
-  } catch (error: unknown) {
-    throw mapContainerPermissionsGraphError(error);
+  for (const deleteChange of changeSet.remove) {
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(
+            getSingleContainerPermissionGraphPath(
+              containerId,
+              deleteChange.permissionId,
+            ),
+          )
+          .version("v1.0")
+          .header("Prefer", "onlyRemoveContainerScopedPermission")
+          .delete(),
+      "Unable to remove container permissions.",
+      500,
+    );
   }
-};
 
-/**
- * 将任意异常映射为统一的容器权限 API 错误响应并发送。
- *
- * @param res Restify 响应对象。
- * @param error 捕获到的未知异常。
- */
-const sendContainerPermissionMappedGraphError = (
-  res: Response,
-  error: unknown,
-) => {
-  const mappedError = mapContainerPermissionsGraphError(error);
-  res.send(
-    getContainerPermissionsApiErrorResponseStatus(mappedError),
-    toContainerPermissionsApiErrorResponseBody(mappedError),
-  );
+  for (const updateChange of changeSet.update) {
+    const nextRole = mapUiContainerPermissionRoleToGraph(updateChange.role);
+
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(
+            getSingleContainerPermissionGraphPath(
+              containerId,
+              updateChange.permissionId,
+            ),
+          )
+          .version("v1.0")
+          .patch({
+            roles: [nextRole],
+          }),
+      "Unable to update container permissions.",
+      500,
+    );
+  }
+
+  for (const createChange of changeSet.create) {
+    const createBody = newGraphCreatePermissionBody(createChange);
+
+    await sendGraphRequest(
+      () =>
+        graphClient
+          .api(getContainerPermissionsGraphPath(containerId))
+          .version("v1.0")
+          .post(createBody),
+      "Unable to create container permissions.",
+      500,
+    );
+  }
 };
 
 /**

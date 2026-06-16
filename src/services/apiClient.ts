@@ -10,7 +10,7 @@
  */
 
 import { Providers, ProviderState } from "@microsoft/mgt-element";
-import { FrontendApiError } from "../common/errors.ts";
+import { AppError, ensureErrorCause } from "../../common/appError";
 import { clientConfig } from "../common/config";
 import * as Scopes from "../common/scopes";
 
@@ -42,9 +42,14 @@ export async function getApiAccessToken(): Promise<string> {
   // 重用全局 provider 已登录用户的 token，避免 "no account selected" 错误
   const provider = Providers.globalProvider;
   if (provider.state !== ProviderState.SignedIn) {
-    throw new FrontendApiError("unauthorized", "You are not signed in.", {
+    throw new AppError({
       name: "ApiClientError",
+      code: "unauthorized",
+      message: "You are not signed in.",
       statusCode: 401,
+      originError: {
+        source: "app",
+      },
     });
   }
 
@@ -57,23 +62,20 @@ export async function getApiAccessToken(): Promise<string> {
     return accessToken;
   } catch (error: unknown) {
     // 将底层鉴权异常标准化为稳定业务错误，避免 UI/调用方依赖控制台日志排查。
-    throw new FrontendApiError(
-      "token_acquisition_failed",
-      "Failed to get access token.",
-      {
-        name: "ApiClientError",
-        statusCode: 401,
-        details: {
-          cause:
-            error instanceof Error
-              ? {
-                  name: error.name,
-                  message: error.message,
-                }
-              : { message: "Unknown token acquisition error" },
-        },
+    throw new AppError({
+      name: "ApiClientError",
+      code: "token_acquisition_failed",
+      message: "Failed to get access token.",
+      statusCode: 401,
+      originError: {
+        source: "app",
+        cause: ensureErrorCause(
+          error,
+          "Failed to get access token.",
+          "ApiClientError",
+        ),
       },
-    );
+    });
   }
 }
 

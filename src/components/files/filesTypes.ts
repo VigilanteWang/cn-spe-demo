@@ -1,6 +1,7 @@
 import { DriveItem } from "@microsoft/microsoft-graph-types-beta";
 import { IArchiveClientProgress, IContainer } from "../../common/types";
 import type { IJobProgress } from "../../services/downloadApi";
+import type { AppError } from "../../../common/appError";
 
 /**
  * Files 入口组件属性。
@@ -8,6 +9,7 @@ import type { IJobProgress } from "../../services/downloadApi";
 export interface IFilesProps {
   /** 当前选中的容器信息。 */
   container: IContainer;
+  onOpenContainerPermissions: () => void;
 }
 
 /**
@@ -40,6 +42,8 @@ export interface IUploadProgress {
   fileSize: string;
   /** 是否显示完成态。 */
   isCompleted: boolean;
+  /** 当前上传批次的标准化错误对象。 */
+  error: AppError | null;
 }
 
 /**
@@ -56,8 +60,8 @@ export interface IDownloadProgress {
   clientProgress: IArchiveClientProgress | null;
   /** 是否显示完成态。 */
   isCompleted: boolean;
-  /** 错误信息。 */
-  errorMessage: string;
+  /** 当前下载流程的标准化错误对象。 */
+  error: AppError | null;
   /** 是否应该自动隐藏。当前版本保留字段，不改变原有结构。 */
   shouldAutoHide: boolean;
   /** 是否由用户主动中止。 */
