@@ -102,6 +102,58 @@ describe("mapGraphItemLinkPermission", () => {
       ]),
     );
   });
+
+  it("should ignore deprecated and user-permission-only granted fields", () => {
+    const entry = mapGraphItemLinkPermission({
+      id: "perm-link-4",
+      shareId: "u!share-id-4",
+      link: {
+        scope: "users",
+        type: "view",
+        webUrl: "https://contoso.sharepoint.com/link-4",
+      },
+      grantedToIdentitiesV2: [
+        {
+          user: {
+            id: "user-v2-1",
+            displayName: "V2 User",
+            email: "v2-user@contoso.com",
+          },
+        },
+      ],
+      grantedToIdentities: [
+        {
+          user: {
+            id: "legacy-user-1",
+            displayName: "Legacy User",
+            email: "legacy-user@contoso.com",
+          },
+        },
+      ],
+      grantedToV2: {
+        user: {
+          id: "single-user-v2-1",
+          displayName: "Single User V2",
+          email: "single-v2@contoso.com",
+        },
+      },
+      grantedTo: {
+        user: {
+          id: "single-user-legacy-1",
+          displayName: "Single User Legacy",
+          email: "single-legacy@contoso.com",
+        },
+      },
+    });
+
+    expect(entry?.grantedToCount).toBe(1);
+    expect(entry?.grantedToIdentities).toEqual([
+      expect.objectContaining({
+        principalObjectId: "user-v2-1",
+        principalName: "V2 User",
+      }),
+    ]);
+  });
 });
 
 describe("link permission Graph payload builders", () => {

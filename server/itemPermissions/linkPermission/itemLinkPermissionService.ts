@@ -12,7 +12,6 @@ import {
 import {
   mapGraphItemLinkPermissions,
   mapItemLinkPermissionTypeToGrantRole,
-  newGraphCreateLinkBody,
   newGraphGrantLinkPermissionBody,
   newGraphRevokeLinkPermissionBody,
 } from "./itemLinkPermissionGraphAdapters";
@@ -140,7 +139,10 @@ export const applyItemLinkPermissionChangeSet = async (
           graphClient
             .api(getItemCreateLinkGraphPath(driveId, itemId))
             .version("v1.0")
-            .post(newGraphCreateLinkBody(createChange)),
+            .post({
+              scope: createChange.scope,
+              type: createChange.type,
+            }),
         "Unable to create item link permission.",
         500,
       );

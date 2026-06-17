@@ -13,7 +13,7 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "../auth";
-import { mapGraphItemPermissionsToResponse } from "./itemPermissionsCommonAdapters";
+import { mapGraphItemPermissionsToResponse } from "./itemPermissionsGraphAdapters";
 
 vi.mock("../auth", () => ({
   createGraphClient: vi.fn(),
@@ -21,10 +21,10 @@ vi.mock("../auth", () => ({
   requireContainerManageRequest: vi.fn(),
 }));
 
-vi.mock("./itemPermissionsCommonAdapters", async () => {
+vi.mock("./itemPermissionsGraphAdapters", async () => {
   const actual = await vi.importActual<
-    typeof import("./itemPermissionsCommonAdapters")
-  >("./itemPermissionsCommonAdapters");
+    typeof import("./itemPermissionsGraphAdapters")
+  >("./itemPermissionsGraphAdapters");
 
   return {
     ...actual,

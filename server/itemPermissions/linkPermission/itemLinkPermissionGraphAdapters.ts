@@ -14,7 +14,7 @@ import {
   readGraphToRecord,
   readOptionalString,
 } from "../../permissionsCore/permissionGraphReaders";
-import { buildGraphInviteRecipient } from "../itemPermissionsCommonAdapters";
+import { buildGraphInviteRecipient } from "../itemPermissionsGraphAdapters";
 
 /**
  * 把单条 Graph link permission 映射成前端 link model。
@@ -28,7 +28,12 @@ export const mapGraphItemLinkPermission = (
   const linkRecord = readGraphToRecord(permissionRecord.link);
   const webUrl = readOptionalString(linkRecord.webUrl);
   const scope = readLinkPermissionScope(linkRecord.scope);
-  const type = readLinkPermissionType(linkRecord);
+  const rawType = readOptionalString(linkRecord.type);
+  // 这里直接信任 Graph 返回的 `type`，只接受当前 UI 支持的三种枚举值。
+  const type =
+    rawType === "view" || rawType === "edit" || rawType === "blocksDownload"
+      ? rawType
+      : undefined;
 
   if (!permissionId || !webUrl || !scope || !type) {
     return null;
@@ -81,30 +86,6 @@ export const readLinkPermissionScope = (
 };
 
 /**
- * 读取 link type，并保留 blocksDownload 语义。
- */
-export const readLinkPermissionType = (
-  linkRecord: Record<string, unknown>,
-): ItemLinkPermissionType | undefined => {
-  const linkType = readOptionalString(linkRecord.type);
-  const preventsDownload = linkRecord.preventsDownload === true;
-
-  if (linkType === "blocksDownload") {
-    return "blocksDownload";
-  }
-
-  if (linkType === "edit") {
-    return "edit";
-  }
-
-  if (linkType === "view") {
-    return preventsDownload ? "blocksDownload" : "view";
-  }
-
-  return undefined;
-};
-
-/**
  * 把 link type 转成前端只读标签。
  */
 export const mapLinkPermissionTypeToRoleLabel = (
@@ -127,20 +108,6 @@ export const mapLinkPermissionTypeToRoleLabel = (
 export const mapItemLinkPermissionTypeToGrantRole = (
   type: ItemLinkPermissionType,
 ): "read" | "write" => (type === "edit" ? "write" : "read");
-
-/**
- * 构造 createLink 的 Graph 请求体。
- */
-export const newGraphCreateLinkBody = (change: {
-  scope: ItemLinkPermissionScope;
-  type: ItemLinkPermissionType;
-}): {
-  scope: ItemLinkPermissionScope;
-  type: ItemLinkPermissionType;
-} => ({
-  scope: change.scope,
-  type: change.type,
-});
 
 /**
  * 构造 permission/grant 的 Graph 请求体。
@@ -178,32 +145,11 @@ export const newGraphRevokeLinkPermissionBody = (change: {
 const readGrantedToIdentities = (
   permissionRecord: Record<string, unknown>,
 ): IItemLinkPermissionGrantedIdentityForUI[] => {
-  const identityCandidates = [
-    ...readGrantedToIdentitiesFromCollection(
-      permissionRecord.grantedToIdentitiesV2,
-      "grantedToIdentitiesV2",
-    ),
-    ...readGrantedToIdentitiesFromCollection(
-      permissionRecord.grantedToIdentities,
-      "grantedToIdentities",
-    ),
-  ];
-
-  const singleGrantedIdentity = resolveGraphPermissionIdentity({
-    grantedToV2: permissionRecord.grantedToV2,
-  });
-
-  if (singleGrantedIdentity) {
-    identityCandidates.push(singleGrantedIdentity);
-  }
-
-  const legacyGrantedIdentity = resolveGraphPermissionIdentity({
-    grantedToV2: permissionRecord.grantedTo,
-  });
-
-  if (legacyGrantedIdentity) {
-    identityCandidates.push(legacyGrantedIdentity);
-  }
+  // link permission 只读取 share facet 自己的 `grantedToIdentitiesV2` 集合，
+  // 不再兼容 deprecated 的 `grantedToIdentities`，也不消费 user permission 专用字段。
+  const identityCandidates = readGrantedToIdentitiesFromCollection(
+    permissionRecord.grantedToIdentitiesV2,
+  );
 
   const seen = new Set<string>();
 
@@ -240,10 +186,7 @@ const readGrantedToIdentities = (
     );
 };
 
-const readGrantedToIdentitiesFromCollection = (
-  value: unknown,
-  _collectionFieldName: string,
-) => {
+const readGrantedToIdentitiesFromCollection = (value: unknown) => {
   if (!Array.isArray(value)) {
     return [];
   }

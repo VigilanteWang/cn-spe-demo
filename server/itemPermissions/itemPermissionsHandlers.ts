@@ -12,7 +12,7 @@ import { sendGraphRequest } from "../../common/graphError";
 import {
   mapGraphItemPermissionsToResponse,
   newGraphInvitePermissionBody,
-} from "./itemPermissionsCommonAdapters";
+} from "./itemPermissionsGraphAdapters";
 import type { IPermissionGraphClient } from "../permissionsCore/permissionGraphContracts";
 import { mapUiItemPermissionRoleToGraph } from "./itemPermissionRoleMapper";
 import { parseItemPermissionChangeSet } from "./itemPermissionsRequestParser";
