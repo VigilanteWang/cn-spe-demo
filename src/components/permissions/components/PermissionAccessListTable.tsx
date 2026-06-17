@@ -100,7 +100,7 @@ export const PermissionAccessListTable = <
         <TableCell className={styles.principalColumn}>
           <div className={styles.principalCellContent}>
             <div className={styles.principalCellText}>
-              <Text weight="semibold">{entry.principalName}</Text>
+              <Text weight="semibold">{entry.principalDisplayName}</Text>
               {entry.description ? (
                 <Text size={200} className={styles.principalSecondaryText}>
                   {entry.description}
@@ -138,7 +138,7 @@ export const PermissionAccessListTable = <
           {/* Fluent UI 的 Select 事件值来自原生 select，这里在边界处收敛成业务角色类型。 */}
           <Select
             className={styles.roleSelect}
-            aria-label={`${entry.principalName} role`}
+            aria-label={`${entry.principalDisplayName} role`}
             disabled={isInteractionDisabled || isRoleDisabled(entry)}
             value={entry.role}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
@@ -158,7 +158,7 @@ export const PermissionAccessListTable = <
             appearance="subtle"
             disabled={isInteractionDisabled || isRemoveDisabled(entry)}
             icon={<DeleteRegular />}
-            aria-label={`Remove ${entry.principalName}`}
+            aria-label={`Remove ${entry.principalDisplayName}`}
             onClick={() => onRemove(entry)}
           />
         </TableCell>

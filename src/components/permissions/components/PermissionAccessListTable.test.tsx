@@ -19,7 +19,7 @@ const createEntry = (
   principalObjectId: "user-adele-vance",
   principalUserPrincipalName: "adele.vance@contoso.com",
   principalMail: "adele.vance@contoso.com",
-  principalName: "Adele Vance",
+  principalDisplayName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
   isInherited: false,
@@ -92,7 +92,7 @@ describe("PermissionAccessListTable", () => {
       entries: [
         createEntry({
           id: "permission:perm-inherited",
-          principalName: "Inherited User",
+          principalDisplayName: "Inherited User",
           isInherited: true,
         }),
       ],
@@ -132,7 +132,7 @@ describe("PermissionAccessListTable", () => {
         selectedTab="people"
         entries={[
           createEntry({
-            principalName: "Readonly User",
+            principalDisplayName: "Readonly User",
             isEditable: false,
             isRemovable: false,
           }),

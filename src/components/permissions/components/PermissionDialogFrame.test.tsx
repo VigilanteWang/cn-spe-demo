@@ -34,7 +34,7 @@ const createEntry = (
   principalObjectId: "user-adele-vance",
   principalUserPrincipalName: "adele.vance@contoso.com",
   principalMail: "adele.vance@contoso.com",
-  principalName: "Adele Vance",
+  principalDisplayName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
   isInherited: false,

@@ -23,7 +23,7 @@ import {
   readRequiredString,
   readStringArray,
 } from "./containerPermissionsReaders";
-import { resolveGraphPermissionIdentity } from "../permissionsCore/permissionIdentityAdapters";
+import { resolveGrantedToV2 } from "../permissionsCore/permissionIdentityAdapters";
 
 /**
  * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntryForUI
@@ -35,7 +35,7 @@ export const mapGraphPermissionToEntryOnUI = (
   // Graph permission 的 id 是后续更新、删除这条权限时最稳定的锚点。
   const permissionId = readRequiredString(permissionRecord.id, "permission id");
   const roles = readStringArray(permissionRecord.roles);
-  const principal = resolveGraphPermissionIdentity(permission);
+  const principal = resolveGrantedToV2(permission);
 
   if (!principal) {
     throw new Error(
@@ -62,7 +62,7 @@ export const mapGraphPermissionToEntryOnUI = (
     principalUserPrincipalName:
       principalType === "people" ? principal.userPrincipalName : undefined,
     principalMail: principal.mail,
-    principalName: principal.displayName,
+    principalDisplayName: principal.displayName,
     principalType,
     description: principal.description,
     isInherited: false,

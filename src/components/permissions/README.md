@@ -260,7 +260,7 @@ common/contracts/containerPermissionCommonContracts.ts
   当前人或组的稳定标识
 - `principalUserPrincipalName`
   people 新增权限时必须保留
-- `principalName`
+- `principalDisplayName`
   表格主标题
 - `principalType`
   `people / groups`
@@ -408,7 +408,7 @@ IPermissionPrincipalCandidate
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,
   principalUserPrincipalName: candidate.userPrincipalName,
-  principalName: candidate.name,
+  principalDisplayName: candidate.name,
   principalType: candidate.type,
   description: candidate.secondaryText,
   role: "Reader",

@@ -51,7 +51,7 @@ export const createBasePermissionEntryFromCandidate = (
   principalObjectId: candidate.objectId,
   principalUserPrincipalName: candidate.userPrincipalName,
   principalMail: candidate.mail,
-  principalName: candidate.name,
+  principalDisplayName: candidate.name,
   principalType: candidate.type,
   description: candidate.secondaryText,
   isInherited: false,

@@ -3,7 +3,7 @@ import type {
   IItemPermissionEntryForUI,
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
-import { resolveGraphPermissionIdentity } from "../permissionsCore/permissionIdentityAdapters";
+import { resolveGrantedToV2 } from "../permissionsCore/permissionIdentityAdapters";
 import {
   readGraphToRecord,
   readRequiredString,
@@ -102,7 +102,7 @@ export const mapGraphPermissionCandidate = (
   // Graph roles 是数组；当前 UI 只取第一项作为主角色。
   const roles = readStringArray(permissionRecord.roles);
   // 只解析当前产品支持的 AAD user/group 身份。
-  const principal = resolveGraphPermissionIdentity(permission);
+  const principal = resolveGrantedToV2(permission);
 
   // 没有可支持的身份时，直接交给上层忽略这条 permission。
   if (!principal) {
@@ -126,7 +126,7 @@ export const mapGraphPermissionCandidate = (
         ? principal.userPrincipalName
         : undefined,
     principalMail: principal.mail,
-    principalName: principal.displayName,
+    principalDisplayName: principal.displayName,
     principalType: principal.principalType,
     description: principal.description,
     // 初始先按显式权限处理，继承标记由上层统一覆盖。

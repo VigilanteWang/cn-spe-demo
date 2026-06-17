@@ -92,12 +92,14 @@ describe("mapGraphItemLinkPermission", () => {
     expect(entry?.grantedToIdentities).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          displayName: "Adele Vance",
           principalType: "people",
-          principalObjectId: "user-1",
+          graphId: "user-1",
         }),
         expect.objectContaining({
+          displayName: "Retail Members",
           principalType: "groups",
-          principalObjectId: "group-1",
+          graphId: "group-1",
         }),
       ]),
     );
@@ -149,8 +151,8 @@ describe("mapGraphItemLinkPermission", () => {
     expect(entry?.grantedToCount).toBe(1);
     expect(entry?.grantedToIdentities).toEqual([
       expect.objectContaining({
-        principalObjectId: "user-v2-1",
-        principalName: "V2 User",
+        graphId: "user-v2-1",
+        displayName: "V2 User",
       }),
     ]);
   });

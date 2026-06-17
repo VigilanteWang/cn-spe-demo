@@ -4,16 +4,12 @@ import {
   readOptionalString,
 } from "./permissionGraphReaders";
 
-export interface IResolvedGraphPermissionIdentity
-  extends IGraphPermissionIdentity {
-  principalType: "people" | "groups";
-}
-
 /**
  * 从单个 Graph identity 对象里提取权限模块真正关心的稳定字段。
  */
 export const normalizeGraphPermissionIdentity = (
   identity: unknown,
+  principalType: IGraphPermissionIdentity["principalType"],
 ): IGraphPermissionIdentity | null => {
   if (!identity) {
     return null;
@@ -40,6 +36,7 @@ export const normalizeGraphPermissionIdentity = (
     "";
 
   return {
+    principalType,
     graphId,
     displayName,
     description,
@@ -60,28 +57,65 @@ export const normalizeGraphPermissionIdentity = (
  *   如果 `group` 和 `user` 同时存在，就优先按 `groups` 返回，避免把组权限误判成 people。
  *   如果这条权限只暴露 `siteUser` / `siteGroup` 等未纳管身份，就返回 `null`。
  */
-export const resolveGraphPermissionIdentity = (
+export const resolveGrantedToV2 = (
   permission: unknown,
-): IResolvedGraphPermissionIdentity | null => {
+): IGraphPermissionIdentity | null => {
   const permissionRecord = readGraphToRecord(permission);
   const grantedToV2 = readGraphToRecord(permissionRecord.grantedToV2);
   // 当前只支持 AAD group / user 两种正式可管理主体。
   // 如果两者同时存在，优先使用 group，避免把组权限误当成 people。
-  const groupIdentity = normalizeGraphPermissionIdentity(grantedToV2.group);
+  const groupIdentity = normalizeGraphPermissionIdentity(
+    grantedToV2.group,
+    "groups",
+  );
   if (groupIdentity) {
-    return {
-      principalType: "groups",
-      ...groupIdentity,
-    };
+    return groupIdentity;
   }
 
-  const userIdentity = normalizeGraphPermissionIdentity(grantedToV2.user);
+  const userIdentity = normalizeGraphPermissionIdentity(
+    grantedToV2.user,
+    "people",
+  );
   if (userIdentity) {
-    return {
-      principalType: "people",
-      ...userIdentity,
-    };
+    return userIdentity;
   }
 
   return null;
+};
+
+/**
+ * 从 link permission 的 `grantedToIdentitiesV2` 集合里提取当前项目真正支持管理的主体。
+ *
+ * 说明：
+ * - 当前实现只读取每个元素里的 `group` 和 `user`。
+ * - deprecated 的 `grantedToIdentities` 不在这里回退读取。
+ * - `siteUser` / `siteGroup` 等 SharePoint-specific facet 当前故意忽略。
+ */
+export const resolveGrantedToIdentitiesV2 = (
+  value: unknown,
+): IGraphPermissionIdentity[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    const record = readGraphToRecord(entry);
+    const groupIdentity = normalizeGraphPermissionIdentity(
+      record.group,
+      "groups",
+    );
+    if (groupIdentity) {
+      return [groupIdentity];
+    }
+
+    const userIdentity = normalizeGraphPermissionIdentity(
+      record.user,
+      "people",
+    );
+    if (userIdentity) {
+      return [userIdentity];
+    }
+
+    return [];
+  });
 };

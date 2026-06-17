@@ -1,4 +1,7 @@
-import type { IPermissionEntryBaseForUI } from "./permissionCommonContracts";
+import type {
+  IGraphPermissionIdentity,
+  IPermissionEntryBaseForUI,
+} from "./permissionCommonContracts";
 
 /**
  * item dialog 当前只暴露两种可编辑角色。
@@ -93,20 +96,6 @@ export type ItemLinkPermissionRoleLabelForUI =
   | "Block download";
 
 /**
- * link 已授予主体的最小展示模型。
- */
-export interface IItemLinkPermissionGrantedIdentityForUI {
-  id: string;
-  principalId: string;
-  principalObjectId?: string;
-  principalUserPrincipalName?: string;
-  principalMail?: string;
-  principalName: string;
-  principalType: "people" | "groups";
-  description: string;
-}
-
-/**
  * link 当前可执行的后续操作能力。
  */
 export interface IItemLinkPermissionCapabilitiesForUI {
@@ -127,7 +116,7 @@ export interface IItemLinkPermissionEntryForUI {
   type: ItemLinkPermissionType;
   roleLabel: ItemLinkPermissionRoleLabelForUI;
   preventsDownload: boolean;
-  grantedToIdentities: IItemLinkPermissionGrantedIdentityForUI[];
+  grantedToIdentities: IGraphPermissionIdentity[];
   grantedToCount: number;
   capabilities: IItemLinkPermissionCapabilitiesForUI;
 }

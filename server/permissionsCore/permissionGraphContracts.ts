@@ -1,3 +1,5 @@
+import type { IGraphPermissionIdentity } from "../../common/contracts/permissionCommonContracts";
+
 /**
  * 这个文件存放权限模块共享的 Graph 最小契约。
  *
@@ -20,20 +22,4 @@ export interface IPermissionGraphClient {
   api: (path: string) => IPermissionGraphRequest;
 }
 
-/**
- * 从不同 Graph identity 形状里提炼出的最小公共字段。
- *
- * item / container 未来都可以在各自 adapter 里复用它。
- */
-export interface IGraphPermissionIdentity {
-  // Graph 原始对象上的稳定 id；people 分支可能缺失。
-  graphId?: string;
-  // 前端主标题展示文本。
-  displayName: string;
-  // 前端副标题展示文本，通常取 email / UPN 之类更适合辅助说明的字段。
-  description: string;
-  // 用户或组的 mail 信息。
-  mail?: string;
-  // people 创建权限时后续还要写回 Graph，因此这里显式保留 UPN。
-  userPrincipalName?: string;
-}
+export type { IGraphPermissionIdentity };
