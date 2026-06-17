@@ -7,3 +7,11 @@ export {
   fetchMapItemPermissionsFromGraphToResponse,
   listItemPermissionsFromGraph,
 } from "./itemPermissionsHandlers";
+
+/**
+ * 对外暴露 item link permission 的独立读写入口。
+ */
+export {
+  applyItemLinkPermissionsToGraph,
+  listItemLinkPermissionsFromGraph,
+} from "./linkPermission/itemLinkPermissionHandlers";

@@ -34,7 +34,9 @@ import {
   listContainerPermissions,
 } from "./containerPermissions";
 import {
+  applyItemLinkPermissionsToGraph,
   applyItemPermissionsToGraph,
+  listItemLinkPermissionsFromGraph,
   listItemPermissionsFromGraph,
 } from "./itemPermissions";
 import { deleteItems } from "./deleteItems";
@@ -206,6 +208,28 @@ server.get(
 server.post(
   "/api/itemPermissions/:driveId/:itemId/apply",
   withErrorHandling(applyItemPermissionsToGraph),
+);
+
+/**
+ * GET /api/itemPermissions/:driveId/:itemId/links
+ *
+ * 这个接口专门读取 item-level link share，
+ * 与 people/groups 的显式权限列表保持并列，而不是混入同一套 entry 模型。
+ */
+server.get(
+  "/api/itemPermissions/:driveId/:itemId/links",
+  withErrorHandling(listItemLinkPermissionsFromGraph),
+);
+
+/**
+ * POST /api/itemPermissions/:driveId/:itemId/links/apply
+ *
+ * 这个接口统一编排 link 的 delete / create / grant / revoke，
+ * 让前端只提交业务语义差异，真正的 Graph 写入顺序仍由后端收口。
+ */
+server.post(
+  "/api/itemPermissions/:driveId/:itemId/links/apply",
+  withErrorHandling(applyItemLinkPermissionsToGraph),
 );
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────

@@ -73,3 +73,120 @@ export interface IItemPermissionChangeSetFromUI {
   update: IItemPermissionUpdateChange[];
   remove: IItemPermissionRemoveChange[];
 }
+
+/**
+ * link share 可支持的 scope。
+ */
+export type ItemLinkPermissionScope = "anonymous" | "organization" | "users";
+
+/**
+ * link share 可支持的类型。
+ */
+export type ItemLinkPermissionType = "view" | "edit" | "blocksDownload";
+
+/**
+ * 前端直接展示的 link 只读权限标签。
+ */
+export type ItemLinkPermissionRoleLabelForUI =
+  | "View"
+  | "Edit"
+  | "Block download";
+
+/**
+ * link 已授予主体的最小展示模型。
+ */
+export interface IItemLinkPermissionGrantedIdentityForUI {
+  id: string;
+  principalId: string;
+  principalObjectId?: string;
+  principalUserPrincipalName?: string;
+  principalMail?: string;
+  principalName: string;
+  principalType: "people" | "groups";
+  description: string;
+}
+
+/**
+ * link 当前可执行的后续操作能力。
+ */
+export interface IItemLinkPermissionCapabilitiesForUI {
+  canGrantRecipients: boolean;
+  canRevokeRecipients: boolean;
+  canDeleteLink: boolean;
+}
+
+/**
+ * 单条 link permission 的前端模型。
+ */
+export interface IItemLinkPermissionEntryForUI {
+  id: string;
+  permissionId: string;
+  shareId?: string;
+  webUrl: string;
+  scope: ItemLinkPermissionScope;
+  type: ItemLinkPermissionType;
+  roleLabel: ItemLinkPermissionRoleLabelForUI;
+  preventsDownload: boolean;
+  grantedToIdentities: IItemLinkPermissionGrantedIdentityForUI[];
+  grantedToCount: number;
+  capabilities: IItemLinkPermissionCapabilitiesForUI;
+}
+
+/**
+ * item link permission 列表响应。
+ */
+export interface IItemLinkPermissionsResponseFromApi {
+  entries: IItemLinkPermissionEntryForUI[];
+}
+
+/**
+ * 新建 link change。
+ */
+export interface IItemLinkPermissionCreateChange {
+  scope: ItemLinkPermissionScope;
+  type: ItemLinkPermissionType;
+  recipients?: IItemPermissionRecipientForUI[];
+}
+
+/**
+ * 删除整条 link permission 的 change。
+ */
+export interface IItemLinkPermissionDeleteChange {
+  permissionId: string;
+}
+
+/**
+ * 为 users link 新增 recipients 的 change。
+ */
+export interface IItemLinkPermissionGrantRecipientsChange {
+  permissionId: string;
+  shareId: string;
+  type: ItemLinkPermissionType;
+  recipients: IItemPermissionRecipientForUI[];
+}
+
+/**
+ * 为 users link 移除 recipients 的 change。
+ */
+export interface IItemLinkPermissionRevokeRecipientsChange {
+  permissionId: string;
+  shareId: string;
+  recipients: IItemPermissionRecipientForUI[];
+}
+
+/**
+ * item link permission apply 请求体。
+ */
+export interface IApplyItemLinkPermissionChangesRequest {
+  create: IItemLinkPermissionCreateChange[];
+  deleteLinks: IItemLinkPermissionDeleteChange[];
+  grantRecipients: IItemLinkPermissionGrantRecipientsChange[];
+  revokeRecipients: IItemLinkPermissionRevokeRecipientsChange[];
+}
+
+/**
+ * item link permission apply 响应体。
+ */
+export interface IApplyItemLinkPermissionChangesResponse {
+  entries: IItemLinkPermissionEntryForUI[];
+}
