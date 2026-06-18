@@ -68,21 +68,6 @@ describe("parseItemLinkPermissionChangeSet", () => {
     });
   });
 
-  it("should keep compatibility with delete aliases", () => {
-    const parsed = parseItemLinkPermissionChangeSet({
-      create: [],
-      delete: [{ permissionId: "perm-delete-legacy" }],
-      grantRecipients: [],
-      revokeRecipients: [],
-    });
-
-    expect(parsed?.deleteLinks).toEqual([
-      {
-        permissionId: "perm-delete-legacy",
-      },
-    ]);
-  });
-
   it("should reject unsupported scope, type and empty recipients", () => {
     expect(() =>
       parseItemLinkPermissionChangeSet({

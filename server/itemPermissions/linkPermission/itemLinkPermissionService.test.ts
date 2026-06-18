@@ -47,15 +47,15 @@ describe("isSupportedItemLinkPermissionTarget", () => {
 });
 
 describe("fetchMapItemLinkPermissionsFromGraphToResponse", () => {
-  it("should return only mapped link permissions after support validation", async () => {
+  it("should return only mapped link permissions without target support validation", async () => {
+    const operations: Array<{
+      path: string;
+      method: string;
+      version?: string;
+      body?: unknown;
+    }> = [];
+
     const graphClient = createMockGraphClient({
-      "/drives/drive-1/items/item-1?$select=name,file,folder": {
-        name: "Workbook.xlsx",
-        file: {
-          mimeType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      },
       "/drives/drive-1/items/item-1/permissions": {
         value: [
           {
@@ -79,7 +79,7 @@ describe("fetchMapItemLinkPermissionsFromGraphToResponse", () => {
           },
         ],
       },
-    });
+    }, operations);
 
     const response = await fetchMapItemLinkPermissionsFromGraphToResponse(
       graphClient,
@@ -92,6 +92,13 @@ describe("fetchMapItemLinkPermissionsFromGraphToResponse", () => {
       permissionId: "perm-link-1",
       scope: "organization",
     });
+    expect(operations).toEqual([
+      {
+        path: "/drives/drive-1/items/item-1/permissions",
+        method: "get",
+        version: "v1.0",
+      },
+    ]);
   });
 });
 
@@ -216,11 +223,6 @@ describe("applyItemLinkPermissionChangeSet", () => {
         body: {
           grantees: [{ objectId: "user-revoke-1" }],
         },
-      },
-      {
-        path: "/drives/drive-1/items/item-1?$select=name,file,folder",
-        method: "get",
-        version: "v1.0",
       },
       {
         path: "/drives/drive-1/items/item-1/permissions",
