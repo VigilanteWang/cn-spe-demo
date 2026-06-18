@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { Client } from "@microsoft/microsoft-graph-client";
 import { withErrorHandling } from "../../common/errorResponse";
 import {
   createGraphClient,
@@ -47,7 +48,7 @@ describe("itemLinkPermissionHandlers", () => {
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
     vi.mocked(createGraphClient).mockReturnValue({
       api: vi.fn(),
-    } as ReturnType<typeof createGraphClient>);
+    } as Client);
 
     const req = {
       params: {

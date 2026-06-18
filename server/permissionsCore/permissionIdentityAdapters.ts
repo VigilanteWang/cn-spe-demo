@@ -1,4 +1,4 @@
-import type { IGraphPermissionIdentity } from "./permissionGraphContracts";
+import type { IGraphPermissionIdentity } from "../../common/contracts/permissionCommonContracts";
 import {
   readGraphToRecord,
   readOptionalString,
@@ -98,7 +98,11 @@ export const resolveGrantedToIdentitiesV2 = (
     return [];
   }
 
-  return value.flatMap((entry) => {
+  // Graph 原始集合在进入 adapter 时仍然是不可信输入，这里显式保留 `unknown[]`，
+  // 避免 `Array.isArray` 收窄后把每个元素推成 `any`。
+  const entries = value as unknown[];
+
+  return entries.flatMap((entry: unknown) => {
     const record = readGraphToRecord(entry);
     const groupIdentity = normalizeGraphPermissionIdentity(
       record.group,

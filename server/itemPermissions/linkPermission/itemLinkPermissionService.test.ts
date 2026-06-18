@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type {
-  IPermissionGraphClient,
-  IPermissionGraphRequest,
-} from "../../permissionsCore/permissionGraphContracts";
+  Client,
+  GraphRequest,
+} from "@microsoft/microsoft-graph-client";
 import {
   applyItemLinkPermissionChangeSet,
   fetchMapItemLinkPermissionsFromGraphToResponse,
@@ -233,6 +233,9 @@ describe("applyItemLinkPermissionChangeSet", () => {
   });
 });
 
+type PermissionGraphClient = Client;
+type PermissionGraphRequest = GraphRequest;
+
 const createMockGraphClient = (
   responsesByPath: Record<string, unknown>,
   operations: Array<{
@@ -241,11 +244,11 @@ const createMockGraphClient = (
     version?: string;
     body?: unknown;
   }> = [],
-): IPermissionGraphClient => ({
-  api: (path: string): IPermissionGraphRequest => {
+): PermissionGraphClient => ({
+  api: (path: string): PermissionGraphRequest => {
     let currentVersion: string | undefined;
 
-    const request: IPermissionGraphRequest = {
+    const request: PermissionGraphRequest = {
       version: (value: string) => {
         currentVersion = value;
         return request;

@@ -8,7 +8,6 @@ import type {
   IApplyItemLinkPermissionChangesResponse,
   IItemLinkPermissionsResponseFromApi,
 } from "../../../common/contracts/itemPermissionCommonContracts";
-import type { IPermissionGraphClient } from "../../permissionsCore/permissionGraphContracts";
 import {
   readGraphToRecord,
   readOptionalString,
@@ -41,7 +40,7 @@ export const listItemLinkPermissionsFromGraph = async (
 
   // 后端代前端执行 OBO 换取 Graph token，保持 Graph 调用留在服务端边界内。
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const graphClient = createGraphClient(graphToken);
   const responseBody = await fetchMapItemLinkPermissionsFromGraphToResponse(
     graphClient,
     driveId,
@@ -80,7 +79,7 @@ export const applyItemLinkPermissionsToGraph = async (
 
   // 同一次请求内复用一个 Graph client，保持整批变更使用一致的授权上下文。
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const graphClient = createGraphClient(graphToken);
   const responseBody = await applyItemLinkPermissionChangeSet(
     graphClient,
     driveId,

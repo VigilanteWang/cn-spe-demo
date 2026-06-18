@@ -1,10 +1,10 @@
+import type { Client } from "@microsoft/microsoft-graph-client";
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemLinkPermissionsResponseFromApi,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
 import { sendGraphRequest } from "../../../common/graphError";
-import type { IPermissionGraphClient } from "../../permissionsCore/permissionGraphContracts";
 import {
   readGraphToRecord,
   readOptionalString,
@@ -77,7 +77,7 @@ interface IItemLinkPermissionTargetInfo {
  * @returns 仅包含 link permission 条目的标准响应体。
  */
 export const fetchMapItemLinkPermissionsFromGraphToResponse = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<IItemLinkPermissionsResponseFromApi> => {
@@ -118,7 +118,7 @@ export const fetchMapItemLinkPermissionsFromGraphToResponse = async (
  * @returns 应用完成后的最新 link permission 列表。
  */
 export const applyItemLinkPermissionChangeSet = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
   changeSet: IApplyItemLinkPermissionChangesRequest,
@@ -297,7 +297,7 @@ export const isSupportedItemLinkPermissionTarget = (
  * @throws 当目标不是受支持的 Office 文件时抛出稳定的业务错误。
  */
 const ensureSupportedItemLinkPermissionTarget = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ) => {
@@ -325,7 +325,7 @@ const ensureSupportedItemLinkPermissionTarget = async (
  * @param recipients 需要授予到 link 上的主体列表。
  */
 const grantRecipientsForLink = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   shareId: string,
   type: ItemLinkPermissionType,
   recipients: NonNullable<
@@ -369,7 +369,7 @@ const grantRecipientsForLink = async (
  * @returns 供 `isSupportedItemLinkPermissionTarget(...)` 使用的最小元数据快照。
  */
 const readItemLinkPermissionTarget = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<IItemLinkPermissionTargetInfo> => {
@@ -408,7 +408,7 @@ const readItemLinkPermissionTarget = async (
  * @returns Graph 返回的原始 permission 数组；缺失时回退为空数组。
  */
 const readItemPermissions = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<unknown[]> => {

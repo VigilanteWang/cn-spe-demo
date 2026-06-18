@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
-  IGraphClient,
-  IGraphRequest,
-} from "./containerPermissionsInternalContracts";
+  Client,
+  GraphRequest,
+} from "@microsoft/microsoft-graph-client";
 import {
   applyContainerPermissionChangeSet,
   fetchMapContainerPermissionFromGraphToEntries,
@@ -89,6 +89,9 @@ describe("containerPermissionsHandlers GraphError boundary", () => {
     });
   });
 });
+
+type IGraphClient = Client;
+type IGraphRequest = GraphRequest;
 
 const createMockGraphClient = (
   responsesByPath: Record<string, unknown>,

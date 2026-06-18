@@ -1,4 +1,5 @@
 import { Request, Response } from "restify";
+import type { Client } from "@microsoft/microsoft-graph-client";
 import {
   createGraphClient,
   getGraphOBOToken,
@@ -13,7 +14,6 @@ import {
   mapGraphItemPermissionsToResponse,
   newGraphInvitePermissionBody,
 } from "./itemPermissionsGraphAdapters";
-import type { IPermissionGraphClient } from "../permissionsCore/permissionGraphContracts";
 import { mapUiItemPermissionRoleToGraph } from "./itemPermissionRoleMapper";
 import { parseItemPermissionChangeSet } from "./itemPermissionsRequestParser";
 import {
@@ -56,7 +56,7 @@ export const listItemPermissionsFromGraph = async (
   }
 
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const graphClient = createGraphClient(graphToken);
   const responseBody = await fetchMapItemPermissionsFromGraphToResponse(
     graphClient,
     driveId,
@@ -102,7 +102,7 @@ export const applyItemPermissionsToGraph = async (
   }
 
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IPermissionGraphClient;
+  const graphClient = createGraphClient(graphToken);
 
   await applyItemPermissionChangeSet(graphClient, driveId, itemId, changeSet);
 
@@ -123,7 +123,7 @@ export const applyItemPermissionsToGraph = async (
  * @returns 前端可直接消费的权限列表响应。
  */
 export const fetchMapItemPermissionsFromGraphToResponse = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<IItemPermissionsResponseFromApi> => {
@@ -157,7 +157,7 @@ export const fetchMapItemPermissionsFromGraphToResponse = async (
  * @returns Promise<void>
  */
 export const applyItemPermissionChangeSet = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
   changeSet: IItemPermissionChangeSetFromUI,
@@ -281,7 +281,7 @@ const readItemId = (req: Request): string | undefined => {
  * @returns Graph 返回的权限数组；缺失时保守回退为空数组。
  */
 const readItemPermissions = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<unknown[]> => {
@@ -309,7 +309,7 @@ const readItemPermissions = async (
  * @returns 可比较父项 id；顶层 item 或没有父项时返回 `undefined`。
  */
 const readComparableParentItemId = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   itemId: string,
 ): Promise<string | undefined> => {
@@ -359,7 +359,7 @@ const isDriveRootParentReferencePath = (
  * @returns 父项权限数组；无法读取时返回 `undefined`。
  */
 const tryReadParentPermissions = async (
-  graphClient: IPermissionGraphClient,
+  graphClient: Client,
   driveId: string,
   parentItemId: string,
 ): Promise<unknown[] | undefined> => {
