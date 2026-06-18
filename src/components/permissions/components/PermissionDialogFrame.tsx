@@ -31,6 +31,18 @@ import { usePermissionsStyles } from "./permissionsStyles";
 import type { PermissionApplyFeedbackStatus } from "../utils/permissionDialogSharedUtils";
 
 /**
+ * 权限弹窗顶部 tab 的配置项。
+ *
+ * 共享壳层默认仍渲染 `People / Groups`，
+ * 但 item dialog 现在可以额外插入 `Links` 这类自定义页签。
+ */
+export interface IPermissionDialogTab<TTab extends string> {
+  value: TTab;
+  label: string;
+  disabled?: boolean;
+}
+
+/**
  * 通用权限弹窗框架的输入属性。
  *
  * 这个接口把共享弹窗壳所需的状态、事件和插槽集中起来，
@@ -40,6 +52,7 @@ import type { PermissionApplyFeedbackStatus } from "../utils/permissionDialogSha
  */
 export interface IPermissionDialogFrameProps<
   TEntry extends PermissionAccessListEntryWithRole,
+  TTab extends string = PermissionTabValue,
 > {
   /** 控制弹窗是否打开。 */
   open: boolean;
@@ -50,19 +63,21 @@ export interface IPermissionDialogFrameProps<
   /** 顶部状态区要展示的提示或错误消息。 */
   permissionErrorMessages: string[];
   /** 当前激活的权限 tab。 */
-  selectedTab: PermissionTabValue;
+  selectedTab: TTab;
+  /** 顶部 tab 定义；不传时默认渲染 People / Groups。 */
+  tabs?: IPermissionDialogTab<TTab>[];
   /** 是否需要统一禁用 tab、搜索和列表等交互。 */
   interactionDisabled: boolean;
   /** 搜索输入框的稳定 id，便于无障碍关联。 */
-  searchInputId: string;
+  searchInputId?: string;
   /** 当前搜索框里的文本。 */
-  query: string;
+  query?: string;
   /** 当前搜索结果列表。 */
-  searchResults: IPermissionPrincipalCandidate[];
+  searchResults?: IPermissionPrincipalCandidate[];
   /** 搜索状态机的当前状态。 */
-  searchStatus: PermissionPrincipalSearchStatus;
+  searchStatus?: PermissionPrincipalSearchStatus;
   /** 搜索结果下拉面板是否展开。 */
-  isDropdownOpen: boolean;
+  isDropdownOpen?: boolean;
   /** 是否正在提交 Apply 请求。 */
   isApplyingPermissions: boolean;
   /** Apply 完成后的反馈状态。 */
@@ -71,20 +86,25 @@ export interface IPermissionDialogFrameProps<
   isApplyDisabled: boolean;
   /** Close 按钮是否应禁用。 */
   isCloseDisabled?: boolean;
+  /** 自定义主体内容；用于 item dialog 的 Links 面板等非标准布局。 */
+  bodyContent?: ReactNode;
   /** 插入在 Access List 前方的额外内容插槽。 */
   beforeAccessListContent?: ReactNode;
   /** Access List 表格所需的其余属性，`selectedTab` 由框架统一补入。 */
-  accessListProps: Omit<IPermissionAccessListTableProps<TEntry>, "selectedTab">;
+  accessListProps?: Omit<
+    IPermissionAccessListTableProps<TEntry>,
+    "selectedTab"
+  >;
   /** 请求关闭弹窗时触发。 */
   onRequestClose: () => void;
   /** 切换 People / Groups tab 时触发。 */
-  onSelectedTabChange: (tab: PermissionTabValue) => void;
+  onSelectedTabChange: (tab: TTab) => void;
   /** 搜索框文本变化时触发。 */
-  onSearchQueryChange: (value: string) => void;
+  onSearchQueryChange?: (value: string) => void;
   /** 选中某个搜索候选项时触发。 */
-  onSearchCandidateSelect: (candidateId: string | undefined) => void;
+  onSearchCandidateSelect?: (candidateId: string | undefined) => void;
   /** 判断候选项是否已经被加入当前草稿。 */
-  isCandidateAdded: (
+  isCandidateAdded?: (
     tab: PermissionTabValue,
     candidate: IPermissionPrincipalCandidate,
   ) => boolean;
@@ -110,12 +130,14 @@ export interface IPermissionDialogFrameProps<
  */
 export const PermissionDialogFrame = <
   TEntry extends PermissionAccessListEntryWithRole,
+  TTab extends string = PermissionTabValue,
 >({
   open,
   title,
   headerContent,
   permissionErrorMessages,
   selectedTab,
+  tabs,
   interactionDisabled,
   searchInputId,
   query,
@@ -126,6 +148,7 @@ export const PermissionDialogFrame = <
   applyFeedbackStatus,
   isApplyDisabled,
   isCloseDisabled = false,
+  bodyContent,
   beforeAccessListContent,
   accessListProps,
   onRequestClose,
@@ -134,8 +157,50 @@ export const PermissionDialogFrame = <
   onSearchCandidateSelect,
   isCandidateAdded,
   onApply,
-}: IPermissionDialogFrameProps<TEntry>) => {
+}: IPermissionDialogFrameProps<TEntry, TTab>) => {
   const styles = usePermissionsStyles();
+  const resolvedTabs =
+    tabs ??
+    ([
+      { value: "people" as TTab, label: "People" },
+      { value: "groups" as TTab, label: "Groups" },
+    ] satisfies IPermissionDialogTab<TTab>[]);
+  const resolvedSearchResults = searchResults ?? [];
+  const resolvedSearchStatus = searchStatus ?? "idle";
+  const resolvedIsDropdownOpen = isDropdownOpen ?? false;
+  const resolvedIsCandidateAdded =
+    isCandidateAdded ??
+    ((_tab: PermissionTabValue, _candidate: IPermissionPrincipalCandidate) =>
+      false);
+  const resolvedBodyContent =
+    bodyContent ??
+    (searchInputId &&
+    query !== undefined &&
+    onSearchQueryChange &&
+    onSearchCandidateSelect &&
+    accessListProps ? (
+      <>
+        <PrincipalSearchComboBox
+          selectedTab={selectedTab as PermissionTabValue}
+          interactionDisabled={interactionDisabled}
+          searchInputId={searchInputId}
+          query={query}
+          searchResults={resolvedSearchResults}
+          searchStatus={resolvedSearchStatus}
+          isDropdownOpen={resolvedIsDropdownOpen}
+          onSearchQueryChange={onSearchQueryChange}
+          onSearchCandidateSelect={onSearchCandidateSelect}
+          isCandidateAdded={resolvedIsCandidateAdded}
+        />
+
+        {beforeAccessListContent}
+
+        <PermissionAccessListTable
+          selectedTab={selectedTab as PermissionTabValue}
+          {...accessListProps}
+        />
+      </>
+    ) : null);
 
   return (
     <Dialog
@@ -180,40 +245,22 @@ export const PermissionDialogFrame = <
               <TabList
                 selectedValue={selectedTab}
                 onTabSelect={(_event, data) =>
-                  onSelectedTabChange(data.value as PermissionTabValue)
+                  onSelectedTabChange(data.value as TTab)
                 }
               >
-                <Tab disabled={interactionDisabled} value="people">
-                  People
-                </Tab>
-                <Tab disabled={interactionDisabled} value="groups">
-                  Groups
-                </Tab>
+                {resolvedTabs.map((tab) => (
+                  <Tab
+                    key={tab.value}
+                    disabled={interactionDisabled || tab.disabled}
+                    value={tab.value}
+                  >
+                    {tab.label}
+                  </Tab>
+                ))}
               </TabList>
             </div>
 
-            {/* Principal 搜索框：负责按当前 tab 搜索 People / Groups，并把候选项下拉结果展示给用户。 */}
-            <PrincipalSearchComboBox
-              selectedTab={selectedTab}
-              interactionDisabled={interactionDisabled}
-              searchInputId={searchInputId}
-              query={query}
-              searchResults={searchResults}
-              searchStatus={searchStatus}
-              isDropdownOpen={isDropdownOpen}
-              onSearchQueryChange={onSearchQueryChange}
-              onSearchCandidateSelect={onSearchCandidateSelect}
-              isCandidateAdded={isCandidateAdded}
-            />
-
-            {/* 这里预留给外层插入额外内容，例如补充说明、筛选条件或调试信息。 */}
-            {beforeAccessListContent}
-
-            {/* Access List 表格：展示当前草稿或已存在的权限条目，并支持外层传入的行操作。 */}
-            <PermissionAccessListTable
-              selectedTab={selectedTab}
-              {...accessListProps}
-            />
+            {resolvedBodyContent}
           </DialogContent>
 
           {/* 底部操作区：集中放置提交反馈和关闭 / 应用按钮。 */}

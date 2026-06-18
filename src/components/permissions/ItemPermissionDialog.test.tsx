@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemPermissionDialog } from "./ItemPermissionDialog";
 import type { IItemPermissionEntry } from "./models/itemPermissionModels";
 import {
+  applyItemLinkPermissionChanges,
   applyItemPermissionChanges,
+  listItemLinkPermissions,
   listItemPermissions,
 } from "../../services/itemPermissionApi";
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
@@ -26,35 +28,12 @@ vi.mock(
   },
 );
 
-vi.mock("../../services/itemPermissionApi", () => {
-  class _PermissionApiError extends Error {
-    readonly code: string;
-
-    readonly retryAfterSeconds?: number;
-
-    readonly statusCode?: number;
-
-    constructor(
-      code: string,
-      message: string,
-      options?: {
-        retryAfterSeconds?: number;
-        statusCode?: number;
-      },
-    ) {
-      super(message);
-      this.name = "PermissionApiError";
-      this.code = code;
-      this.retryAfterSeconds = options?.retryAfterSeconds;
-      this.statusCode = options?.statusCode;
-    }
-  }
-
-  return {
-    listItemPermissions: vi.fn(),
-    applyItemPermissionChanges: vi.fn(),
-  };
-});
+vi.mock("../../services/itemPermissionApi", () => ({
+  listItemPermissions: vi.fn(),
+  applyItemPermissionChanges: vi.fn(),
+  listItemLinkPermissions: vi.fn(),
+  applyItemLinkPermissionChanges: vi.fn(),
+}));
 
 vi.mock("./services/itemPermissionDiff", async () => {
   const actual = await vi.importActual<
@@ -70,6 +49,10 @@ vi.mock("./services/itemPermissionDiff", async () => {
 const searchDirectoryPrincipalsMock = vi.mocked(searchDirectoryPrincipals);
 const listItemPermissionsMock = vi.mocked(listItemPermissions);
 const applyItemPermissionChangesMock = vi.mocked(applyItemPermissionChanges);
+const listItemLinkPermissionsMock = vi.mocked(listItemLinkPermissions);
+const applyItemLinkPermissionChangesMock = vi.mocked(
+  applyItemLinkPermissionChanges,
+);
 const computeItemPermissionChangesMock = vi.mocked(
   computeItemPermissionChanges,
 );
@@ -129,6 +112,8 @@ describe("ItemPermissionDialog", () => {
     searchDirectoryPrincipalsMock.mockReset();
     listItemPermissionsMock.mockReset();
     applyItemPermissionChangesMock.mockReset();
+    listItemLinkPermissionsMock.mockReset();
+    applyItemLinkPermissionChangesMock.mockReset();
     computeItemPermissionChangesMock.mockClear();
 
     listItemPermissionsMock.mockResolvedValue({
@@ -137,6 +122,8 @@ describe("ItemPermissionDialog", () => {
         groups: [],
       },
     });
+    listItemLinkPermissionsMock.mockResolvedValue([]);
+    applyItemLinkPermissionChangesMock.mockResolvedValue([]);
 
     Providers.globalProvider = {
       state: ProviderState.SignedIn,
@@ -353,5 +340,69 @@ describe("ItemPermissionDialog", () => {
     expect(
       screen.getByRole("button", { name: "Container Permission" }),
     ).toBeInTheDocument();
+  });
+
+  it("should show the Links tab only for supported Office files and lazy-load links on demand", async () => {
+    renderDialog({
+      fileName: "Quarterly report.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      isFolder: false,
+    });
+    await flushAsyncWork();
+
+    expect(screen.getByRole("tab", { name: "Links" })).toBeInTheDocument();
+    expect(listItemLinkPermissionsMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Links" }));
+    await flushAsyncWork();
+
+    expect(listItemLinkPermissionsMock).toHaveBeenCalledWith(
+      "drive-a",
+      "item-a",
+    );
+  });
+
+  it("should apply link changes before people/groups changes when both sides are dirty", async () => {
+    listItemPermissionsMock.mockResolvedValue({
+      entriesByTab: {
+        people: [createPermissionEntry({ role: "Writer" })],
+        groups: [],
+      },
+    });
+    applyItemPermissionChangesMock.mockResolvedValue({
+      entriesByTab: {
+        people: [createPermissionEntry({ role: "Reader" })],
+        groups: [],
+      },
+    });
+
+    renderDialog({
+      fileName: "Quarterly report.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      isFolder: false,
+    });
+    await flushAsyncWork();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Links" }));
+    await flushAsyncWork();
+    fireEvent.click(screen.getByRole("button", { name: "Add link" }));
+    fireEvent.click(screen.getByRole("tab", { name: "People" }));
+
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Adele Vance role" }),
+      {
+        target: { value: "Reader" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await flushAsyncWork();
+
+    expect(applyItemLinkPermissionChangesMock).toHaveBeenCalledTimes(1);
+    expect(applyItemPermissionChangesMock).toHaveBeenCalledTimes(1);
+    expect(
+      applyItemLinkPermissionChangesMock.mock.invocationCallOrder[0],
+    ).toBeLessThan(applyItemPermissionChangesMock.mock.invocationCallOrder[0]);
   });
 });

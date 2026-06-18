@@ -4,6 +4,10 @@ import type {
   IItemLinkPermissionsResponseFromApi,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
+import {
+  isSupportedItemLinkPermissionTarget,
+  type IItemLinkPermissionTargetInfo,
+} from "../../../common/itemLinkPermissionTargets";
 import { sendGraphRequest } from "../../../common/graphError";
 import {
   readGraphToRecord,
@@ -16,52 +20,6 @@ import {
   newGraphRevokeLinkPermissionBody,
 } from "./itemLinkPermissionGraphAdapters";
 import { createItemLinkPermissionError } from "./itemLinkPermissionErrors";
-
-const SUPPORTED_OFFICE_MIME_TYPES = new Set([
-  "application/msword",
-  "application/vnd.ms-excel",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
-  "application/vnd.ms-word.document.macroEnabled.12",
-  "application/vnd.ms-word.template.macroEnabled.12",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
-  "application/vnd.ms-excel.sheet.macroEnabled.12",
-  "application/vnd.ms-excel.template.macroEnabled.12",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.openxmlformats-officedocument.presentationml.template",
-  "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
-  "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
-  "application/vnd.ms-powerpoint.template.macroEnabled.12",
-  "application/vnd.ms-powerpoint.slideshow.macroEnabled.12",
-]);
-
-const SUPPORTED_OFFICE_EXTENSIONS = new Set([
-  ".doc",
-  ".docx",
-  ".dotx",
-  ".docm",
-  ".dotm",
-  ".xls",
-  ".xlsx",
-  ".xltx",
-  ".xlsm",
-  ".xltm",
-  ".ppt",
-  ".pptx",
-  ".potx",
-  ".ppsx",
-  ".pptm",
-  ".potm",
-  ".ppsm",
-]);
-
-interface IItemLinkPermissionTargetInfo {
-  name?: string;
-  mimeType?: string;
-  isFolder: boolean;
-}
 
 /**
  * 读取指定 item 的 link permissions，并映射成前端可直接消费的响应结构。
@@ -249,43 +207,6 @@ export const applyItemLinkPermissionChangeSet = async (
     driveId,
     itemId,
   );
-};
-
-/**
- * 判断一个 item 是否属于允许执行 link 写入的目标文件。
- *
- * 规则为：
- * 1. 文件夹一律不支持。
- * 2. 优先使用 `file.mimeType`。
- * 3. 若缺少 MIME，再用文件扩展名兜底。
- *
- * 这个函数既服务于后端最终校验，也可以供后续前端做轻量 gating 复用。
- *
- * @param target 目标 item 的最小元数据快照。
- * @returns 若属于受支持 Office 文件则返回 `true`，否则返回 `false`。
- */
-export const isSupportedItemLinkPermissionTarget = (
-  target: IItemLinkPermissionTargetInfo,
-): boolean => {
-  if (target.isFolder) {
-    return false;
-  }
-
-  if (target.mimeType && SUPPORTED_OFFICE_MIME_TYPES.has(target.mimeType)) {
-    return true;
-  }
-
-  const normalizedName = target.name?.toLowerCase();
-
-  if (!normalizedName) {
-    return false;
-  }
-
-  const lastDotIndex = normalizedName.lastIndexOf(".");
-  const extension =
-    lastDotIndex >= 0 ? normalizedName.slice(lastDotIndex) : undefined;
-
-  return extension ? SUPPORTED_OFFICE_EXTENSIONS.has(extension) : false;
 };
 
 /**
@@ -487,3 +408,5 @@ const getSharePermissionGrantPath = (shareId: string): string =>
  */
 const getSharePermissionRevokePath = (shareId: string): string =>
   `/shares/${encodeURIComponent(shareId)}/permission/revokeGrants`;
+
+export { isSupportedItemLinkPermissionTarget };

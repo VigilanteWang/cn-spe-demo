@@ -1,25 +1,43 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Text } from "@fluentui/react-components";
+import { AppError, formatAppErrorMessageForUI } from "../../../common/appError";
+import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
 import type {
-  IItemPermissionEntriesByTab,
+  IItemLinkPermissionEntryForUI,
+  IItemPermissionChangeSetFromUI,
+  ItemLinkPermissionScope,
+  ItemLinkPermissionType,
+} from "../../../common/contracts/itemPermissionCommonContracts";
+import type {
   IItemPermissionEntry,
   ItemPermissionRole,
 } from "./models/itemPermissionModels";
 import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
-import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
+import type { ItemPermissionDialogTabValue } from "./models/itemLinkPermissionModels";
 import { usePermissionDialogUIState } from "./hooks/usePermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
+import { useItemLinkPermissionDraft } from "./hooks/useItemLinkPermissionDraft";
+import { useItemLinkPermissionLoadState } from "./hooks/useItemLinkPermissionLoadState";
+import { useItemLinkPermissionDerivedEntries } from "./hooks/useItemLinkPermissionDerivedEntries";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
+import { PermissionAccessListTable } from "./components/PermissionAccessListTable";
+import { PrincipalSearchComboBox } from "./components/PrincipalSearchComboBox";
+import { ItemLinkPermissionsPanel } from "./components/ItemLinkPermissionsPanel";
 import { usePermissionsStyles } from "./components/permissionsStyles";
 import type { IItemPermissionDialogProps } from "./components/permissionsTypes";
 import {
+  applyItemLinkPermissionChanges,
   applyItemPermissionChanges,
+  listItemLinkPermissions,
   listItemPermissions,
 } from "../../services/itemPermissionApi";
 import { computeItemPermissionChanges } from "./services/itemPermissionDiff";
+import { createItemLinkPermissionChangeSet } from "./services/itemLinkPermissionUiUtils";
 import {
+  buildPermissionErrorMessages,
   createBasePermissionEntryFromCandidate,
   createEmptyPermissionEntriesByTab,
+  type PermissionApplyFeedbackStatus,
 } from "./utils/permissionDialogSharedUtils";
 
 const ITEM_PERMISSION_ROLES: ItemPermissionRole[] = ["Reader", "Writer"];
@@ -63,12 +81,10 @@ const truncateItemName = (itemName: string, maxLength = 32) => {
 /**
  * Item 权限管理对话框。
  *
- * 这个组件沿用容器权限弹窗的交互骨架，但保留了 Item 特有的两部分文案：
- * 1. “权限可见性”免责声明
- * 2. 跳转到容器权限的入口
- *
- * 组件层自己负责把共享的 `usePermissionDialogUIState` 具体化成
- * Item 权限条目，再与目录搜索和请求状态拼成完整交互。
+ * 当前版本在原有 people/groups 权限基础上，新增了一个独立的 `Links` 页签：
+ * - people/groups 继续沿用旧的 access list 与 diff 模型
+ * - links 改成独立的读取、草稿与 apply 编排
+ * - 底部 `Apply` 统一提交两边的未保存变更
  *
  * @returns 渲染后的 Item 权限管理对话框。
  */
@@ -77,22 +93,44 @@ export const ItemPermissionDialog = ({
   driveId,
   itemId,
   itemName,
+  isFolder,
+  mimeType,
+  fileName,
   onClose,
   onManageContainerPermission,
 }: IItemPermissionDialogProps) => {
   const styles = usePermissionsStyles();
-  // 先准备一份空的按 tab 分组结构，供首次渲染和重置时复用。
   const initialEntriesByTab =
     createEmptyPermissionEntriesByTab<IItemPermissionEntry>();
+  const targetResetKey = `${driveId ?? "__no-drive__"}:${itemId ?? "__no-item__"}`;
+  const [selectedDialogTab, setSelectedDialogTab] =
+    useState<ItemPermissionDialogTabValue>("people");
+  const [createLinkScope, setCreateLinkScope] =
+    useState<ItemLinkPermissionScope>("anonymous");
+  const [createLinkType, setCreateLinkType] =
+    useState<ItemLinkPermissionType>("view");
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
+  const [isLoadingLinkPermissions, setIsLoadingLinkPermissions] =
+    useState(false);
+  const [isApplyingPermissions, setIsApplyingPermissions] = useState(false);
+  const [permissionRequestErrorMessage, setPermissionRequestErrorMessage] =
+    useState<string | null>(null);
+  const [applyFeedbackStatus, setApplyFeedbackStatus] =
+    useState<PermissionApplyFeedbackStatus>(null);
+  const isSupportedLinkTarget = isSupportedItemLinkPermissionTarget({
+    name: fileName ?? itemName,
+    mimeType,
+    isFolder: Boolean(isFolder),
+  });
 
   const {
-    selectedTab,
-    setSelectedTab,
+    selectedTab: selectedExplicitTab,
+    setSelectedTab: setSelectedExplicitTab,
     filterByTab,
     setFilter,
     originalEntriesByTab,
     draftEntriesByTab,
-    hasUnsavedChanges,
+    hasUnsavedChanges: hasUnsavedExplicitPermissionChanges,
     addCandidate,
     updateEntryRole,
     removeEntry,
@@ -102,7 +140,7 @@ export const ItemPermissionDialog = ({
     isCandidateAdded,
   } = usePermissionDialogUIState(
     initialEntriesByTab,
-    `${driveId ?? "__no-drive__"}:${itemId ?? "__no-item__"}`,
+    targetResetKey,
     createItemPermissionEntryFromCandidate,
   );
 
@@ -115,95 +153,194 @@ export const ItemPermissionDialog = ({
     handleQueryChange,
     handleCandidateSelect,
   } = usePermissionPrincipalSearch({
-    selectedTab,
+    selectedTab: selectedExplicitTab,
     queryByTab: filterByTab,
     setQuery: setFilter,
     addCandidate,
     isCandidateAdded,
   });
 
-  /**
-   * 为 API 状态 Hook 提供“空结果工厂”，缺少 item 时用它重置本地列表。
-   *
-   * @returns 空的 people/groups 权限分组结构。
-   */
-  const createEmptyEntries = useCallback(() => {
-    return createEmptyPermissionEntriesByTab<IItemPermissionEntry>();
-  }, []);
-
-  /**
-   * 加载当前 item 的真实权限列表。
-   *
-   * @returns 后端返回的最新 item 权限分组。
-   */
-  const loadPermissions = useCallback(async () => {
-    const { entriesByTab } = await listItemPermissions(driveId!, itemId!);
-    return entriesByTab;
-  }, [driveId, itemId]);
-
-  /**
-   * 把草稿差异写回后端，并返回服务端最新权限快照。
-   *
-   * @param changes 当前草稿相对原始数据的增删改集合。
-   * @returns 应用变更后的最新 item 权限分组。
-   */
-  const applyChanges = useCallback(
-    async (changes: ReturnType<typeof computeItemPermissionChanges>) => {
-      const { entriesByTab } = await applyItemPermissionChanges(
-        driveId!,
-        itemId!,
-        changes,
-      );
-      return entriesByTab;
-    },
-    [driveId, itemId],
+  const {
+    originalEntries: originalItemLinkPermissionEntries,
+    hasLoadedOnce: hasLoadedItemLinkPermissionsOnce,
+    replaceEntries: replaceItemLinkPermissionEntries,
+    reset: resetItemLinkPermissionLoadState,
+  } = useItemLinkPermissionLoadState(targetResetKey);
+  const {
+    draft: itemLinkPermissionDraftState,
+    hasUnsavedChanges: hasUnsavedItemLinkPermissionChanges,
+    addCreatedLink,
+    removeCreatedLink,
+    deletePersistedLink,
+    addRecipientToCreatedLink,
+    removeRecipientFromCreatedLink,
+    addGrantRecipient,
+    addRevokeRecipient,
+    resetDraft: resetItemLinkPermissionDraft,
+  } = useItemLinkPermissionDraft(targetResetKey);
+  const derivedItemLinkPermissions = useItemLinkPermissionDerivedEntries(
+    originalItemLinkPermissionEntries,
+    itemLinkPermissionDraftState,
+  );
+  const hasUnsavedChanges =
+    hasUnsavedExplicitPermissionChanges || hasUnsavedItemLinkPermissionChanges;
+  const missingTargetError = useMemo(
+    () =>
+      new AppError({
+        name: "PermissionValidationError",
+        code: "missingTarget",
+        message: "No item selected.",
+        originError: {
+          source: "validation",
+        },
+      }),
+    [],
+  );
+  const permissionErrorMessages = useMemo(
+    () =>
+      buildPermissionErrorMessages(
+        permissionRequestErrorMessage,
+        selectedDialogTab === "links" ? null : searchError,
+      ),
+    [permissionRequestErrorMessage, searchError, selectedDialogTab],
   );
 
-  const {
-    isLoadingPermissions,
-    isApplyingPermissions,
-    permissionRequestErrorMessage,
-    applyFeedbackStatus,
-    permissionErrorMessages,
-    handleApply,
-  } = usePermissionDialogApiRequestState<
-    IItemPermissionEntriesByTab,
-    ReturnType<typeof computeItemPermissionChanges>
-  >({
+  useEffect(() => {
+    if (selectedDialogTab === "links" && !isSupportedLinkTarget) {
+      setSelectedDialogTab(selectedExplicitTab);
+    }
+  }, [isSupportedLinkTarget, selectedDialogTab, selectedExplicitTab]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    if (!driveId || !itemId) {
+      setIsLoadingPermissions(false);
+      replaceEntries(createEmptyPermissionEntriesByTab<IItemPermissionEntry>());
+      resetItemLinkPermissionLoadState();
+      resetItemLinkPermissionDraft();
+      setPermissionRequestErrorMessage(
+        formatAppErrorMessageForUI(
+          missingTargetError,
+          missingTargetError.message,
+        ),
+      );
+      setApplyFeedbackStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPermissions(true);
+    setPermissionRequestErrorMessage(null);
+    setApplyFeedbackStatus(null);
+
+    void listItemPermissions(driveId, itemId)
+      .then(({ entriesByTab }) => {
+        if (!cancelled) {
+          replaceEntries(entriesByTab);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          replaceEntries(
+            createEmptyPermissionEntriesByTab<IItemPermissionEntry>(),
+          );
+          setPermissionRequestErrorMessage(
+            formatAppErrorMessageForUI(
+              error,
+              "Unable to load current item permissions.",
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingPermissions(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    driveId,
+    itemId,
+    missingTargetError,
     open,
-    isTargetReady: Boolean(driveId && itemId),
-    searchError,
-    resourceLabel: "item",
-    createEmptyEntriesByTab: createEmptyEntries,
-    originalEntriesByTab,
-    draftEntriesByTab,
     replaceEntries,
-    loadPermissions,
-    computeChanges: computeItemPermissionChanges,
-    applyChanges,
-  });
+    resetItemLinkPermissionDraft,
+    resetItemLinkPermissionLoadState,
+  ]);
 
-  // access list 只渲染当前 tab 对应的那一组草稿权限。
-  const visibleEntries = getVisibleEntries(selectedTab);
-  // 缺少目标 item、正在加载或正在保存时，都要统一禁用交互控件。
-  const interactionDisabled =
-    isLoadingPermissions || isApplyingPermissions || !driveId || !itemId;
-  // 用全部草稿条目数量判断是否要显示“权限可能不可见”的免责声明。
-  const totalVisibleEntriesCount =
-    draftEntriesByTab.people.length + draftEntriesByTab.groups.length;
-  // 只有加载完成、没有请求错误且列表确实为空时，才提示“Graph 可能没有返回权限”。
-  const shouldShowEmptyVisibilityDisclaimer =
-    !isLoadingPermissions &&
-    !permissionRequestErrorMessage &&
-    totalVisibleEntriesCount === 0;
-  // 标题里优先展示截断后的名称，避免长文件名把布局撑乱。
-  const truncatedItemName = itemName ? truncateItemName(itemName) : undefined;
+  useEffect(() => {
+    if (
+      !open ||
+      !driveId ||
+      !itemId ||
+      !isSupportedLinkTarget ||
+      selectedDialogTab !== "links" ||
+      hasLoadedItemLinkPermissionsOnce
+    ) {
+      return;
+    }
 
-  /**
-   * 从 Item 权限切换到容器权限。
-   *
-   * 如果当前还有未保存草稿，先确认是否放弃，再执行跳转。
-   */
+    let cancelled = false;
+    setIsLoadingLinkPermissions(true);
+
+    void listItemLinkPermissions(driveId, itemId)
+      .then((entries) => {
+        if (!cancelled) {
+          replaceItemLinkPermissionEntries(entries);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPermissionRequestErrorMessage(
+            formatAppErrorMessageForUI(
+              error,
+              "Unable to load current item link permissions.",
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingLinkPermissions(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    driveId,
+    hasLoadedItemLinkPermissionsOnce,
+    isSupportedLinkTarget,
+    itemId,
+    open,
+    replaceItemLinkPermissionEntries,
+    selectedDialogTab,
+  ]);
+
+  const resetLinkPanelState = useCallback(() => {
+    resetItemLinkPermissionDraft();
+    resetItemLinkPermissionLoadState();
+    setCreateLinkScope("anonymous");
+    setCreateLinkType("view");
+  }, [resetItemLinkPermissionDraft, resetItemLinkPermissionLoadState]);
+
+  const handleDialogClose = useCallback(() => {
+    discardDraftAndClose(() => {
+      resetLinkPanelState();
+      setSelectedDialogTab("people");
+      setPermissionRequestErrorMessage(null);
+      setApplyFeedbackStatus(null);
+      onClose();
+    });
+  }, [discardDraftAndClose, onClose, resetLinkPanelState]);
+
   const handleManageContainerPermissionClick = () => {
     if (
       hasUnsavedChanges &&
@@ -214,14 +351,32 @@ export const ItemPermissionDialog = ({
       return;
     }
 
-    // 先丢弃本地草稿并关闭当前弹窗，再切到容器权限弹窗。
     discardDraftAndClose(() => {
+      resetLinkPanelState();
+      setSelectedDialogTab("people");
+      setPermissionRequestErrorMessage(null);
+      setApplyFeedbackStatus(null);
       onClose();
       onManageContainerPermission();
     });
   };
 
-  // 只有“列表为空且当前没有请求错误”时，才展示 item 权限可见性免责声明。
+  const explicitVisibleEntries = getVisibleEntries(selectedExplicitTab);
+  const totalVisibleEntriesCount =
+    draftEntriesByTab.people.length + draftEntriesByTab.groups.length;
+  const shouldShowEmptyVisibilityDisclaimer =
+    !isLoadingPermissions &&
+    !permissionRequestErrorMessage &&
+    totalVisibleEntriesCount === 0;
+  const truncatedItemName = itemName ? truncateItemName(itemName) : undefined;
+  const interactionDisabled =
+    isLoadingPermissions || isApplyingPermissions || !driveId || !itemId;
+  const isApplyDisabled =
+    interactionDisabled ||
+    (selectedDialogTab === "links" && isLoadingLinkPermissions) ||
+    !hasUnsavedChanges ||
+    derivedItemLinkPermissions.hasBlockingValidationError;
+
   const beforeAccessListContent = shouldShowEmptyVisibilityDisclaimer ? (
     <div
       className={styles.disclaimerBox}
@@ -249,8 +404,211 @@ export const ItemPermissionDialog = ({
     </div>
   ) : null;
 
+  const explicitPermissionsBody = (
+    <>
+      <PrincipalSearchComboBox
+        selectedTab={selectedExplicitTab}
+        interactionDisabled={interactionDisabled}
+        searchInputId="item-permission-principal-input"
+        query={query}
+        searchResults={results}
+        searchStatus={status}
+        isDropdownOpen={isDropdownOpen}
+        onSearchQueryChange={handleQueryChange}
+        onSearchCandidateSelect={handleCandidateSelect}
+        isCandidateAdded={isCandidateAdded}
+      />
+
+      {beforeAccessListContent}
+
+      <PermissionAccessListTable
+        selectedTab={selectedExplicitTab}
+        entries={explicitVisibleEntries}
+        isLoading={isLoadingPermissions}
+        roleOptions={ITEM_PERMISSION_ROLES}
+        isInteractionDisabled={interactionDisabled}
+        inheritedTooltipText={ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT}
+        onRoleChange={(entry, role) => {
+          updateEntryRole(selectedExplicitTab, entry.id, role);
+        }}
+        onRemove={(entry) => {
+          removeEntry(selectedExplicitTab, entry.id);
+        }}
+        isRoleDisabled={(entry) => !entry.isEditable}
+        isRemoveDisabled={(entry) => !entry.isRemovable}
+      />
+    </>
+  );
+
+  const linksPermissionsBody = (
+    <ItemLinkPermissionsPanel
+      entries={derivedItemLinkPermissions.entries}
+      isLoading={isLoadingLinkPermissions}
+      interactionDisabled={isApplyingPermissions || !driveId || !itemId}
+      createScope={createLinkScope}
+      createType={createLinkType}
+      onCreateScopeChange={setCreateLinkScope}
+      onCreateTypeChange={setCreateLinkType}
+      onAddLink={() => addCreatedLink(createLinkScope, createLinkType)}
+      onDeleteLink={(entry) => {
+        if (entry.source === "draft") {
+          removeCreatedLink(entry.id);
+          return;
+        }
+
+        if (entry.permissionId) {
+          deletePersistedLink(entry.permissionId);
+        }
+      }}
+      onCopyLink={(webUrl) => {
+        void navigator.clipboard?.writeText(webUrl);
+      }}
+      onAddRecipient={(entry, candidate) => {
+        if (entry.source === "draft") {
+          addRecipientToCreatedLink(entry.id, candidate);
+          return;
+        }
+
+        if (entry.permissionId) {
+          addGrantRecipient(entry.permissionId, candidate);
+        }
+      }}
+      onRemoveRecipient={(entry, recipientKey) => {
+        if (entry.source === "draft") {
+          removeRecipientFromCreatedLink(entry.id, recipientKey);
+          return;
+        }
+
+        if (!entry.permissionId) {
+          return;
+        }
+
+        const recipient = entry.recipients.find(
+          (currentRecipient) => currentRecipient.key === recipientKey,
+        );
+
+        if (!recipient) {
+          return;
+        }
+
+        addRevokeRecipient(entry.permissionId, recipient.candidate);
+      }}
+    />
+  );
+
+  const handleApply = async () => {
+    let explicitChanges: IItemPermissionChangeSetFromUI | null = null;
+    let linkChanges: ReturnType<
+      typeof createItemLinkPermissionChangeSet
+    > | null = null;
+
+    try {
+      if (hasUnsavedExplicitPermissionChanges) {
+        explicitChanges = computeItemPermissionChanges(
+          originalEntriesByTab,
+          draftEntriesByTab,
+        );
+      }
+
+      if (hasUnsavedItemLinkPermissionChanges) {
+        linkChanges = createItemLinkPermissionChangeSet(
+          originalItemLinkPermissionEntries,
+          itemLinkPermissionDraftState,
+        );
+      }
+    } catch (error: unknown) {
+      setPermissionRequestErrorMessage(
+        formatAppErrorMessageForUI(
+          error,
+          "Unable to prepare item permission changes.",
+        ),
+      );
+      setApplyFeedbackStatus("error");
+      return;
+    }
+
+    const shouldApplyExplicitChanges =
+      explicitChanges !== null &&
+      (explicitChanges.create.length > 0 ||
+        explicitChanges.update.length > 0 ||
+        explicitChanges.remove.length > 0);
+    const shouldApplyLinkChanges = linkChanges !== null;
+
+    if (!shouldApplyExplicitChanges && !shouldApplyLinkChanges) {
+      return;
+    }
+
+    setIsApplyingPermissions(true);
+    setPermissionRequestErrorMessage(null);
+    setApplyFeedbackStatus(null);
+
+    let refreshedLinkEntries: IItemLinkPermissionEntryForUI[] | null = null;
+
+    if (shouldApplyLinkChanges && linkChanges) {
+      try {
+        refreshedLinkEntries = await applyItemLinkPermissionChanges(
+          driveId!,
+          itemId!,
+          linkChanges,
+        );
+      } catch (error: unknown) {
+        setPermissionRequestErrorMessage(
+          formatAppErrorMessageForUI(
+            error,
+            "Unable to apply item link permission changes.",
+          ),
+        );
+        setApplyFeedbackStatus("error");
+        setIsApplyingPermissions(false);
+        return;
+      }
+    }
+
+    if (shouldApplyExplicitChanges && explicitChanges) {
+      try {
+        const { entriesByTab } = await applyItemPermissionChanges(
+          driveId!,
+          itemId!,
+          explicitChanges,
+        );
+        replaceEntries(entriesByTab);
+      } catch (error: unknown) {
+        if (refreshedLinkEntries) {
+          replaceItemLinkPermissionEntries(refreshedLinkEntries);
+          resetItemLinkPermissionDraft();
+          setPermissionRequestErrorMessage(
+            `Links were saved, but people/groups changes failed: ${formatAppErrorMessageForUI(
+              error,
+              "Unable to apply item permission changes.",
+            )}`,
+          );
+        } else {
+          setPermissionRequestErrorMessage(
+            formatAppErrorMessageForUI(
+              error,
+              "Unable to apply item permission changes.",
+            ),
+          );
+        }
+
+        setApplyFeedbackStatus("error");
+        setIsApplyingPermissions(false);
+        return;
+      }
+    }
+
+    if (refreshedLinkEntries) {
+      replaceItemLinkPermissionEntries(refreshedLinkEntries);
+      resetItemLinkPermissionDraft();
+    }
+
+    setPermissionRequestErrorMessage(null);
+    setApplyFeedbackStatus("success");
+    setIsApplyingPermissions(false);
+  };
+
   return (
-    <PermissionDialogFrame
+    <PermissionDialogFrame<IItemPermissionEntry, ItemPermissionDialogTabValue>
       open={open}
       title="Manage Item Permission"
       headerContent={
@@ -279,40 +637,32 @@ export const ItemPermissionDialog = ({
         </div>
       }
       permissionErrorMessages={permissionErrorMessages}
-      selectedTab={selectedTab}
+      selectedTab={selectedDialogTab}
+      tabs={[
+        { value: "people", label: "People" },
+        { value: "groups", label: "Groups" },
+        ...(isSupportedLinkTarget
+          ? ([{ value: "links", label: "Links" }] as const)
+          : []),
+      ]}
       interactionDisabled={interactionDisabled}
-      searchInputId="item-permission-principal-input"
-      query={query}
-      searchResults={results}
-      searchStatus={status}
-      isDropdownOpen={isDropdownOpen}
       isApplyingPermissions={isApplyingPermissions}
       applyFeedbackStatus={applyFeedbackStatus}
-      isApplyDisabled={interactionDisabled || !hasUnsavedChanges}
+      isApplyDisabled={isApplyDisabled}
       isCloseDisabled={isApplyingPermissions}
-      beforeAccessListContent={beforeAccessListContent}
-      accessListProps={{
-        entries: visibleEntries,
-        isLoading: isLoadingPermissions,
-        roleOptions: ITEM_PERMISSION_ROLES,
-        isInteractionDisabled: interactionDisabled,
-        inheritedTooltipText: ITEM_PERMISSION_INHERITED_TOOLTIP_TEXT,
-        // 角色修改要带上当前 tab，才能精确更新对应分组里的那条草稿。
-        onRoleChange: (entry, role) => {
-          updateEntryRole(selectedTab, entry.id, role);
-        },
-        // 删除同样基于当前 tab 执行，避免误删另一组草稿数据。
-        onRemove: (entry) => {
-          removeEntry(selectedTab, entry.id);
-        },
-        isRoleDisabled: (entry) => !entry.isEditable,
-        isRemoveDisabled: (entry) => !entry.isRemovable,
+      bodyContent={
+        selectedDialogTab === "links"
+          ? linksPermissionsBody
+          : explicitPermissionsBody
+      }
+      onRequestClose={handleDialogClose}
+      onSelectedTabChange={(nextTab) => {
+        setSelectedDialogTab(nextTab);
+
+        if (nextTab === "people" || nextTab === "groups") {
+          setSelectedExplicitTab(nextTab);
+        }
       }}
-      onRequestClose={() => discardDraftAndClose(onClose)}
-      onSelectedTabChange={setSelectedTab}
-      onSearchQueryChange={handleQueryChange}
-      onSearchCandidateSelect={handleCandidateSelect}
-      isCandidateAdded={isCandidateAdded}
       onApply={() => {
         void handleApply();
       }}
