@@ -1,16 +1,16 @@
 import { AppError } from "../../../../common/appError";
 import type {
-  IItemPermissionChangeSetFromUI,
-  IItemPermissionCreateChange,
-  IItemPermissionRemoveChange,
-  IItemPermissionUpdateChange,
+  IItemUserPermissionChangeSetFromUI,
+  IItemUserPermissionCreateChange,
+  IItemUserPermissionRemoveChange,
+  IItemUserPermissionUpdateChange,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IItemUserPermissionEntriesByTab,
   IItemUserPermissionEntry,
 } from "../models/itemUserPermissionModels";
 
-export { type IItemPermissionChangeSetFromUI as IItemPermissionChangeSet } from "../../../../common/contracts/itemPermissionCommonContracts";
+export { type IItemUserPermissionChangeSetFromUI as IItemUserPermissionChangeSet } from "../../../../common/contracts/itemPermissionCommonContracts";
 
 /**
  * 构造 item 权限草稿校验错误。
@@ -62,10 +62,10 @@ interface IRequiredFieldErrorOptions {
 export const computeItemPermissionChanges = (
   originalEntriesByTab: IItemUserPermissionEntriesByTab,
   draftEntriesByTab: IItemUserPermissionEntriesByTab,
-): IItemPermissionChangeSetFromUI => {
-  const create: IItemPermissionCreateChange[] = [];
-  const update: IItemPermissionUpdateChange[] = [];
-  const remove: IItemPermissionRemoveChange[] = [];
+): IItemUserPermissionChangeSetFromUI => {
+  const create: IItemUserPermissionCreateChange[] = [];
+  const update: IItemUserPermissionUpdateChange[] = [];
+  const remove: IItemUserPermissionRemoveChange[] = [];
 
   for (const tab of ["people", "groups"] as const) {
     const originalEntries = originalEntriesByTab[tab];
@@ -147,7 +147,7 @@ export const computeItemPermissionChanges = (
  */
 const createItemPermissionChangeFromEntry = (
   entry: IItemUserPermissionEntry,
-): IItemPermissionCreateChange => ({
+): IItemUserPermissionCreateChange => ({
   principalType: entry.principalType,
   principalId: entry.principalId,
   ...readRecipientFromEntry(entry),

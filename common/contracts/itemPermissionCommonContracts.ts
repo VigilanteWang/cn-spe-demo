@@ -13,15 +13,16 @@ export type ItemPermissionRoleForUI = "Reader" | "Writer";
  *
  * 这里沿用共享基础字段，再补上 item 自己的 role。
  */
-export interface IItemPermissionEntryForUI extends IPermissionEntryBaseForUI {
+export interface IItemUserPermissionEntryForUI
+  extends IPermissionEntryBaseForUI {
   role: ItemPermissionRoleForUI;
 }
 
 /**
  * item 权限列表响应。
  */
-export interface IItemPermissionsResponseFromApi {
-  entries: IItemPermissionEntryForUI[];
+export interface IItemUserPermissionsResponseFromApi {
+  entries: IItemUserPermissionEntryForUI[];
 }
 
 /**
@@ -30,7 +31,7 @@ export interface IItemPermissionsResponseFromApi {
  * 这里不直接暴露 Graph 的 driveRecipient 名称，
  * 而是把前后端真正稳定协作需要的三种候选标识收口成共同契约。
  */
-export interface IItemPermissionRecipientForUI {
+export interface IItemUserPermissionRecipientForUI {
   recipientObjectId?: string;
   recipientEmail?: string;
   recipientAlias?: string;
@@ -39,8 +40,8 @@ export interface IItemPermissionRecipientForUI {
 /**
  * item create change。
  */
-export interface IItemPermissionCreateChange
-  extends IItemPermissionRecipientForUI {
+export interface IItemUserPermissionCreateChange
+  extends IItemUserPermissionRecipientForUI {
   principalType: "people" | "groups";
   principalId: string;
   role: ItemPermissionRoleForUI;
@@ -53,8 +54,8 @@ export interface IItemPermissionCreateChange
  * 这样当后端需要走“删除旧显式权限，再重建新显式权限”时，
  * 无需再反查前端本地状态或依赖服务端内存。
  */
-export interface IItemPermissionUpdateChange
-  extends IItemPermissionRecipientForUI {
+export interface IItemUserPermissionUpdateChange
+  extends IItemUserPermissionRecipientForUI {
   permissionId: string;
   principalType: "people" | "groups";
   principalId: string;
@@ -64,17 +65,17 @@ export interface IItemPermissionUpdateChange
 /**
  * item remove change。
  */
-export interface IItemPermissionRemoveChange {
+export interface IItemUserPermissionRemoveChange {
   permissionId: string;
 }
 
 /**
  * item apply 变更集。
  */
-export interface IItemPermissionChangeSetFromUI {
-  create: IItemPermissionCreateChange[];
-  update: IItemPermissionUpdateChange[];
-  remove: IItemPermissionRemoveChange[];
+export interface IItemUserPermissionChangeSetFromUI {
+  create: IItemUserPermissionCreateChange[];
+  update: IItemUserPermissionUpdateChange[];
+  remove: IItemUserPermissionRemoveChange[];
 }
 
 /**
@@ -134,7 +135,7 @@ export interface IItemLinkPermissionsResponseFromApi {
 export interface IItemLinkPermissionCreateChange {
   scope: ItemLinkPermissionScope;
   type: ItemLinkPermissionType;
-  recipients?: IItemPermissionRecipientForUI[];
+  recipients?: IItemUserPermissionRecipientForUI[];
 }
 
 /**
@@ -151,7 +152,7 @@ export interface IItemLinkPermissionGrantRecipientsChange {
   permissionId: string;
   shareId: string;
   type: ItemLinkPermissionType;
-  recipients: IItemPermissionRecipientForUI[];
+  recipients: IItemUserPermissionRecipientForUI[];
 }
 
 /**
@@ -160,7 +161,7 @@ export interface IItemLinkPermissionGrantRecipientsChange {
 export interface IItemLinkPermissionRevokeRecipientsChange {
   permissionId: string;
   shareId: string;
-  recipients: IItemPermissionRecipientForUI[];
+  recipients: IItemUserPermissionRecipientForUI[];
 }
 
 /**

@@ -2,10 +2,10 @@ import { sendAuthorizedRequest } from "./apiClient";
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IApplyItemLinkPermissionChangesResponse,
-  IItemPermissionChangeSetFromUI,
   IItemLinkPermissionEntryForUI,
   IItemLinkPermissionsResponseFromApi,
-  IItemPermissionsResponseFromApi,
+  IItemUserPermissionChangeSetFromUI,
+  IItemUserPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
 import type { IItemUserPermissionEntriesLoadResult } from "../components/permissions/models/itemUserPermissionModels";
@@ -42,7 +42,8 @@ export const listItemPermissions = async (
   }
 
   // 响应体先还原成共享合同，再按权限 tab 需要的结构重新分组。
-  const payload = (await response.json()) as IItemPermissionsResponseFromApi;
+  const payload =
+    (await response.json()) as IItemUserPermissionsResponseFromApi;
   return {
     entriesByTab: mapPermissionEntriesToTabs(payload.entries),
   };
@@ -63,7 +64,7 @@ export const listItemPermissions = async (
 export const applyItemPermissionChanges = async (
   driveId: string,
   itemId: string,
-  changes: IItemPermissionChangeSetFromUI,
+  changes: IItemUserPermissionChangeSetFromUI,
 ): Promise<IItemUserPermissionEntriesLoadResult> => {
   const response = await sendAuthorizedRequest(
     // `/apply` 端点表示由后端统一执行新增、更新、删除三类写回。
@@ -87,7 +88,8 @@ export const applyItemPermissionChanges = async (
   }
 
   // 成功后以后端确认结果为准，避免前端继续依赖旧草稿状态。
-  const payload = (await response.json()) as IItemPermissionsResponseFromApi;
+  const payload =
+    (await response.json()) as IItemUserPermissionsResponseFromApi;
   return {
     entriesByTab: mapPermissionEntriesToTabs(payload.entries),
   };

@@ -1,9 +1,9 @@
 import type {
-  IItemPermissionChangeSetFromUI,
-  IItemPermissionCreateChange,
-  IItemPermissionRecipientForUI,
-  IItemPermissionRemoveChange,
-  IItemPermissionUpdateChange,
+  IItemUserPermissionChangeSetFromUI,
+  IItemUserPermissionCreateChange,
+  IItemUserPermissionRecipientForUI,
+  IItemUserPermissionRemoveChange,
+  IItemUserPermissionUpdateChange,
   ItemPermissionRoleForUI,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import {
@@ -24,7 +24,7 @@ import { createValidationError } from "../common/appErrorHelpers";
  */
 export const parseItemPermissionChangeSet = (
   body: unknown,
-): IItemPermissionChangeSetFromUI | null => {
+): IItemUserPermissionChangeSetFromUI | null => {
   const bodyRecord = readGraphToRecord(body);
   const create = bodyRecord.create;
   const update = bodyRecord.update;
@@ -55,7 +55,7 @@ export const parseItemPermissionChangeSet = (
  */
 const mapCreateChangeFromUI = (
   change: unknown,
-): IItemPermissionCreateChange => {
+): IItemUserPermissionCreateChange => {
   const record = readGraphToRecord(change);
   return {
     principalType: readPrincipalType(record.principalType),
@@ -73,7 +73,7 @@ const mapCreateChangeFromUI = (
  */
 const mapUpdateChangeFromUI = (
   change: unknown,
-): IItemPermissionUpdateChange => {
+): IItemUserPermissionUpdateChange => {
   const record = readGraphToRecord(change);
   return {
     // update 必须携带 permissionId，后端才能精确命中既有显式权限。
@@ -96,7 +96,7 @@ const mapUpdateChangeFromUI = (
  */
 const mapRemoveChangeFromUI = (
   change: unknown,
-): IItemPermissionRemoveChange => {
+): IItemUserPermissionRemoveChange => {
   const record = readGraphToRecord(change);
   return {
     permissionId: readRequiredString(
@@ -117,7 +117,7 @@ const mapRemoveChangeFromUI = (
 const readRecipient = (
   record: Record<string, unknown>,
   operationLabel: "create" | "update",
-): IItemPermissionRecipientForUI => {
+): IItemUserPermissionRecipientForUI => {
   const recipientObjectId = readOptionalString(record.recipientObjectId);
   const recipientEmail = readOptionalString(record.recipientEmail);
   const recipientAlias = readOptionalString(record.recipientAlias);

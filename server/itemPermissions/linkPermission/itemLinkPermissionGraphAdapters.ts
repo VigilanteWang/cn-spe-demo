@@ -1,6 +1,6 @@
 import type {
   IItemLinkPermissionEntryForUI,
-  IItemPermissionRecipientForUI,
+  IItemUserPermissionRecipientForUI,
   ItemLinkPermissionRoleLabelForUI,
   ItemLinkPermissionScope,
   ItemLinkPermissionType,
@@ -144,7 +144,7 @@ export const mapItemLinkPermissionTypeToGrantRole = (
  */
 export const newGraphGrantLinkPermissionBody = (change: {
   type: ItemLinkPermissionType;
-  recipients: IItemPermissionRecipientForUI[];
+  recipients: IItemUserPermissionRecipientForUI[];
 }): {
   roles: Array<"read" | "write">;
   recipients: Array<{
@@ -166,7 +166,7 @@ export const newGraphGrantLinkPermissionBody = (change: {
  * @returns 可直接发送给 Graph 的 revoke body。
  */
 export const newGraphRevokeLinkPermissionBody = (change: {
-  recipients: IItemPermissionRecipientForUI[];
+  recipients: IItemUserPermissionRecipientForUI[];
 }): {
   grantees: Array<{
     objectId?: string;

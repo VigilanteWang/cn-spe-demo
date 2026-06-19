@@ -4,7 +4,7 @@ import type {
   IItemLinkPermissionDeleteChange,
   IItemLinkPermissionGrantRecipientsChange,
   IItemLinkPermissionRevokeRecipientsChange,
-  IItemPermissionRecipientForUI,
+  IItemUserPermissionRecipientForUI,
   ItemLinkPermissionScope,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
@@ -140,7 +140,7 @@ const mapRevokeRecipientsChange = (
 const readOptionalRecipients = (
   value: unknown,
   fieldName: string,
-): IItemPermissionRecipientForUI[] | undefined => {
+): IItemUserPermissionRecipientForUI[] | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -158,7 +158,7 @@ const readOptionalRecipients = (
 const readRequiredRecipients = (
   value: unknown,
   fieldName: string,
-): IItemPermissionRecipientForUI[] => {
+): IItemUserPermissionRecipientForUI[] => {
   if (!Array.isArray(value) || value.length === 0) {
     throw createValidationError(
       `recipients of ${fieldName} must be a non-empty array.`,
@@ -184,7 +184,7 @@ const readRequiredRecipients = (
 const readRecipient = (
   record: Record<string, unknown>,
   fieldName: string,
-): IItemPermissionRecipientForUI => {
+): IItemUserPermissionRecipientForUI => {
   const recipientObjectId = readOptionalString(record.recipientObjectId);
   const recipientEmail = readOptionalString(record.recipientEmail);
   const recipientAlias = readOptionalString(record.recipientAlias);

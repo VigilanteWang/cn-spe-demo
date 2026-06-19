@@ -9,7 +9,7 @@ import type { IPermissionPrincipalCandidate } from "./models/permissionSharedMod
 import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
 import { useUserPermissionDialogUIState } from "./hooks/useUserPermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
-import { UserPermissionEditorBody } from "./components/UserPermissionEditorBody";
+import { UserPermissionPanel } from "./components/UserPermissionPanel";
 import { IContainerPermissionDialogProps } from "./components/permissionsTypes";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
 import {
@@ -168,7 +168,7 @@ export const ContainerPermissionDialog = ({
       applyFeedbackStatus={applyFeedbackStatus}
       isApplyDisabled={!hasUnsavedChanges || interactionDisabled}
       bodyContent={
-        <UserPermissionEditorBody
+        <UserPermissionPanel
           selectedTab={selectedTab}
           interactionDisabled={interactionDisabled}
           searchInputId="permission-principal-input"

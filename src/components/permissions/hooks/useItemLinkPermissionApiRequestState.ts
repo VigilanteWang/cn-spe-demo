@@ -4,6 +4,7 @@ import type {
   IItemLinkPermissionDraftState,
   IItemLinkPermissionEntryForUI,
 } from "../models/itemLinkPermissionModels";
+import type { IApplyItemLinkPermissionChangesRequest } from "../../../../common/contracts/itemPermissionCommonContracts";
 import { useItemLinkPermissionLoadState } from "./useItemLinkPermissionLoadState";
 import {
   applyItemLinkPermissionChanges,
@@ -104,7 +105,7 @@ export const useItemLinkPermissionApiRequestState = ({
   );
 
   const applyPreparedChanges = useCallback(
-    async (changes: ReturnType<typeof createItemLinkPermissionChangeSet>) => {
+    async (changes: IApplyItemLinkPermissionChangesRequest) => {
       return applyItemLinkPermissionChanges(driveId!, itemId!, changes);
     },
     [driveId, itemId],

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { UserPermissionEditorBody } from "./UserPermissionEditorBody";
+import { UserPermissionPanel } from "./UserPermissionPanel";
 import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
 import type { UserPermissionAccessListEntryWithRole } from "./UserPermissionAccessListTable";
 
@@ -48,7 +48,7 @@ const renderBody = () => {
   const onRemove = vi.fn();
 
   render(
-    <UserPermissionEditorBody
+    <UserPermissionPanel
       selectedTab="people"
       interactionDisabled={false}
       searchInputId="permission-search"
@@ -81,7 +81,7 @@ const renderBody = () => {
   };
 };
 
-describe("UserPermissionEditorBody", () => {
+describe("UserPermissionPanel", () => {
   it("should render search guidance and candidate results", () => {
     const { onSearchCandidateSelect } = renderBody();
 

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Text } from "@fluentui/react-components";
 import { AppError, formatAppErrorMessageForUI } from "../../../common/appError";
 import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
-import type { IItemPermissionChangeSetFromUI } from "../../../common/contracts/itemPermissionCommonContracts";
+import type {
+  IApplyItemLinkPermissionChangesRequest,
+  IItemUserPermissionChangeSetFromUI,
+} from "../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IItemUserPermissionEntry,
   ItemUserPermissionRole,
@@ -13,7 +16,7 @@ import { useUserPermissionDialogUIState } from "./hooks/useUserPermissionDialogU
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
 import { useItemLinkPermissionUIState } from "./hooks/useItemLinkPermissionUIState";
 import { useItemLinkPermissionApiRequestState } from "./hooks/useItemLinkPermissionApiRequestState";
-import { UserPermissionEditorBody } from "./components/UserPermissionEditorBody";
+import { UserPermissionPanel } from "./components/UserPermissionPanel";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
 import { ItemLinkPermissionPanel } from "./components/ItemLinkPermissionPanel";
 import { usePermissionsStyles } from "./components/permissionsStyles";
@@ -391,8 +394,8 @@ export const ItemPermissionDialog = ({
   ) : null;
 
   // people/groups 的主体区域由“搜索框 + 可选说明 + 权限表格”三段组成。
-  const userPermissionEditorBody = (
-    <UserPermissionEditorBody
+  const userPermissionPanel = (
+    <UserPermissionPanel
       selectedTab={selectedUserPermissionTab}
       interactionDisabled={userPermissionInteractionDisabled}
       searchInputId="item-permission-principal-input"
@@ -423,7 +426,7 @@ export const ItemPermissionDialog = ({
   );
 
   // links  tab 交给独立面板渲染，当前组件只负责把状态和事件接起来。
-  const linksPermissionsBody = (
+  const itemLinkPermissionPanel = (
     <ItemLinkPermissionPanel
       entries={itemLinkEntries}
       isLoading={isLoadingLinkPermissions}
@@ -450,8 +453,9 @@ export const ItemPermissionDialog = ({
    * 4. 如果 links 已成功而 people/groups 失败，保留“部分成功”的错误反馈
    */
   const handleApply = async () => {
-    let userPermissionChanges: IItemPermissionChangeSetFromUI | null = null;
-    let linkChanges: ReturnType<typeof prepareItemLinkChangeSet> = null;
+    let userPermissionChanges: IItemUserPermissionChangeSetFromUI | null = null;
+    let linkPermissionChanges: IApplyItemLinkPermissionChangesRequest | null =
+      null;
 
     try {
       //  User 权限只有在草稿真的有变化时才计算 diff，避免无意义提交。
@@ -463,7 +467,7 @@ export const ItemPermissionDialog = ({
       }
 
       // links 变更集内部还会做自己的空变更判断和校验。
-      linkChanges = prepareItemLinkChangeSet(
+      linkPermissionChanges = prepareItemLinkChangeSet(
         itemLinkDraft,
         hasUnsavedItemLinkPermissionChanges,
       );
@@ -483,7 +487,7 @@ export const ItemPermissionDialog = ({
       (userPermissionChanges.create.length > 0 ||
         userPermissionChanges.update.length > 0 ||
         userPermissionChanges.remove.length > 0);
-    const shouldApplyLinkChanges = linkChanges !== null;
+    const shouldApplyLinkChanges = linkPermissionChanges !== null;
 
     if (!shouldApplyUserPermissionChanges && !shouldApplyLinkChanges) {
       return;
@@ -495,10 +499,12 @@ export const ItemPermissionDialog = ({
 
     let refreshedLinkEntries = null;
 
-    if (shouldApplyLinkChanges && linkChanges) {
+    if (shouldApplyLinkChanges && linkPermissionChanges) {
       try {
         // 先提交 links，确保后续 people/groups 失败时仍能回写 links 的最新基线。
-        refreshedLinkEntries = await applyItemLinkPreparedChanges(linkChanges);
+        refreshedLinkEntries = await applyItemLinkPreparedChanges(
+          linkPermissionChanges,
+        );
       } catch (error: unknown) {
         setPermissionRequestErrorMessage(
           formatAppErrorMessageForUI(
@@ -608,8 +614,8 @@ export const ItemPermissionDialog = ({
       isCloseDisabled={isApplyingPermissions}
       bodyContent={
         selectedDialogTab === "links"
-          ? linksPermissionsBody
-          : userPermissionEditorBody
+          ? itemLinkPermissionPanel
+          : userPermissionPanel
       }
       onRequestClose={handleDialogClose}
       onSelectedTabChange={(nextTab) => {

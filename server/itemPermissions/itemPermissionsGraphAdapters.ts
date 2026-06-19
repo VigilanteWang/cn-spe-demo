@@ -1,7 +1,7 @@
 import type {
-  IItemPermissionCreateChange,
-  IItemPermissionEntryForUI,
-  IItemPermissionsResponseFromApi,
+  IItemUserPermissionCreateChange,
+  IItemUserPermissionEntryForUI,
+  IItemUserPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import { resolveGrantedToV2 } from "../permissionsCore/permissionIdentityAdapters";
 import {
@@ -15,7 +15,7 @@ import {
 } from "./itemPermissionRoleMapper";
 
 interface ISupportedItemPermissionCandidate {
-  entry: IItemPermissionEntryForUI;
+  entry: IItemUserPermissionEntryForUI;
   permissionId: string;
 }
 
@@ -35,7 +35,7 @@ export interface IItemPermissionListContext {
  */
 export const mapGraphItemPermissionsToResponse = (
   context: IItemPermissionListContext,
-): IItemPermissionsResponseFromApi => {
+): IItemUserPermissionsResponseFromApi => {
   // 先把当前 item 的每条 Graph permission 转成统一候选结构。
   const currentCandidates = context.currentPermissions.map(
     mapGraphPermissionCandidate,
@@ -111,7 +111,7 @@ export const mapGraphPermissionCandidate = (
 
   // Graph 没有返回角色时，保守回退到 `read`。
   const primaryRole = roles[0] ?? "read";
-  const entry: IItemPermissionEntryForUI = {
+  const entry: IItemUserPermissionEntryForUI = {
     // 前端列表项本地 id 统一用 `permissionId` 派生。
     id: `permission:${permissionId}`,
     permissionId,
@@ -153,7 +153,7 @@ export const mapGraphPermissionCandidate = (
  * @returns 可直接发送给 Graph `/invite` 的最小请求体。
  */
 export const newGraphInvitePermissionBody = (
-  createChange: IItemPermissionCreateChange,
+  createChange: IItemUserPermissionCreateChange,
 ): {
   recipients: Array<{
     objectId?: string;
@@ -186,7 +186,7 @@ export const newGraphInvitePermissionBody = (
  */
 export const buildGraphInviteRecipient = (
   change: Pick<
-    IItemPermissionCreateChange,
+    IItemUserPermissionCreateChange,
     "recipientObjectId" | "recipientEmail" | "recipientAlias"
   >,
 ): {

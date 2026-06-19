@@ -11,7 +11,7 @@ import type {
   PermissionTabValue,
 } from "../models/permissionSharedModels";
 
-export interface IUserPermissionEditorBodyProps<
+export interface IUserPermissionPanelProps<
   TEntry extends UserPermissionAccessListEntryWithRole,
 > {
   selectedTab: PermissionTabValue;
@@ -35,12 +35,12 @@ export interface IUserPermissionEditorBodyProps<
 }
 
 /**
- * people/groups 显式权限编辑体。
+ * people/groups 显式权限面板。
  *
  * 它统一承载搜索入口、可选的前置说明和 access list 表格，
  * 让 container 与 item 的显式权限页都复用同一套主体结构。
  */
-export const UserPermissionEditorBody = <
+export const UserPermissionPanel = <
   TEntry extends UserPermissionAccessListEntryWithRole,
 >({
   selectedTab,
@@ -55,7 +55,7 @@ export const UserPermissionEditorBody = <
   isCandidateAdded,
   beforeAccessListContent,
   accessListProps,
-}: IUserPermissionEditorBodyProps<TEntry>) => {
+}: IUserPermissionPanelProps<TEntry>) => {
   return (
     <>
       <PrincipalSearchComboBox

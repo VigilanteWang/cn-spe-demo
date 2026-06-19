@@ -1,6 +1,6 @@
 import type {
   IItemLinkPermissionEntryForUI,
-  IItemPermissionRecipientForUI,
+  IItemUserPermissionRecipientForUI,
   ItemLinkPermissionRoleLabelForUI,
   ItemLinkPermissionScope,
   ItemLinkPermissionType,
@@ -94,7 +94,7 @@ export interface IItemLinkPermissionDerivedEntry {
  */
 export const mapItemLinkRecipientCandidateToRequest = (
   candidate: IItemLinkPermissionRecipientCandidate,
-): IItemPermissionRecipientForUI => ({
+): IItemUserPermissionRecipientForUI => ({
   recipientObjectId: candidate.objectId,
   recipientEmail: candidate.mail,
   recipientAlias: candidate.userPrincipalName,

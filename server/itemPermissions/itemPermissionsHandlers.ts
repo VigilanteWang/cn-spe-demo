@@ -6,8 +6,8 @@ import {
   requireContainerManageRequest,
 } from "../auth";
 import type {
-  IItemPermissionChangeSetFromUI,
-  IItemPermissionsResponseFromApi,
+  IItemUserPermissionChangeSetFromUI,
+  IItemUserPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import { sendGraphRequest } from "../../common/graphError";
 import {
@@ -126,7 +126,7 @@ export const fetchMapItemPermissionsFromGraphToResponse = async (
   graphClient: Client,
   driveId: string,
   itemId: string,
-): Promise<IItemPermissionsResponseFromApi> => {
+): Promise<IItemUserPermissionsResponseFromApi> => {
   const currentPermissions = await readItemPermissions(
     graphClient,
     driveId,
@@ -160,7 +160,7 @@ export const applyItemPermissionChangeSet = async (
   graphClient: Client,
   driveId: string,
   itemId: string,
-  changeSet: IItemPermissionChangeSetFromUI,
+  changeSet: IItemUserPermissionChangeSetFromUI,
 ): Promise<void> => {
   for (const removeChange of changeSet.remove) {
     await sendGraphRequest(
