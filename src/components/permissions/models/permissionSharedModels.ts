@@ -38,7 +38,7 @@ export interface IPermissionPrincipalCandidate {
 }
 
 /**
- * 按页签分组的权限列表。
+ * 按 tab 分组的权限列表。
  */
 export type PermissionEntriesByTab<
   TEntry extends IPermissionEntryBaseForUI = IPermissionEntryBaseForUI,

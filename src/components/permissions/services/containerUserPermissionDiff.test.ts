@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { IContainerPermissionEntry } from "../models/containerPermissionModels";
-import { computeContainerPermissionChanges } from "./containerPermissionDiff";
+import type { IContainerUserPermissionEntry } from "../models/containerUserPermissionModels";
+import { computeContainerPermissionChanges } from "./containerUserPermissionDiff";
 
 const createPermissionEntry = (
-  overrides: Partial<IContainerPermissionEntry>,
-): IContainerPermissionEntry => ({
+  overrides: Partial<IContainerUserPermissionEntry>,
+): IContainerUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",

@@ -4,7 +4,8 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemPermissionDialog } from "./ItemPermissionDialog";
-import type { IItemPermissionEntry } from "./models/itemPermissionModels";
+import type { IItemUserPermissionEntry } from "./models/itemUserPermissionModels";
+import type { IItemLinkPermissionEntryForUI } from "../../../common/contracts/itemPermissionCommonContracts";
 import {
   applyItemLinkPermissionChanges,
   applyItemPermissionChanges,
@@ -12,7 +13,7 @@ import {
   listItemPermissions,
 } from "../../services/itemPermissionApi";
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
-import { computeItemPermissionChanges } from "./services/itemPermissionDiff";
+import { computeItemPermissionChanges } from "./services/itemUserPermissionDiff";
 
 vi.mock(
   "./services/directoryPrincipalSearch/directoryPrincipalSearch",
@@ -35,10 +36,10 @@ vi.mock("../../services/itemPermissionApi", () => ({
   applyItemLinkPermissionChanges: vi.fn(),
 }));
 
-vi.mock("./services/itemPermissionDiff", async () => {
+vi.mock("./services/itemUserPermissionDiff", async () => {
   const actual = await vi.importActual<
-    typeof import("./services/itemPermissionDiff")
-  >("./services/itemPermissionDiff");
+    typeof import("./services/itemUserPermissionDiff")
+  >("./services/itemUserPermissionDiff");
 
   return {
     ...actual,
@@ -57,9 +58,6 @@ const computeItemPermissionChangesMock = vi.mocked(
   computeItemPermissionChanges,
 );
 
-/**
- * 渲染一个最小可用的 item 权限弹窗。
- */
 const renderDialog = (
   overrides?: Partial<ComponentProps<typeof ItemPermissionDialog>>,
 ) =>
@@ -75,9 +73,6 @@ const renderDialog = (
     />,
   );
 
-/**
- * 冲刷一次 effect + Promise 链带来的异步渲染。
- */
 const flushAsyncWork = async () => {
   await act(async () => {
     await Promise.resolve();
@@ -85,12 +80,9 @@ const flushAsyncWork = async () => {
   });
 };
 
-/**
- * 构造一条统一的 item 权限记录。
- */
 const createPermissionEntry = (
-  overrides: Partial<IItemPermissionEntry>,
-): IItemPermissionEntry => ({
+  overrides: Partial<IItemUserPermissionEntry>,
+): IItemUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
@@ -104,6 +96,27 @@ const createPermissionEntry = (
   isEditable: true,
   isRemovable: true,
   role: "Writer",
+  ...overrides,
+});
+
+const createLinkEntry = (
+  overrides: Partial<IItemLinkPermissionEntryForUI> = {},
+): IItemLinkPermissionEntryForUI => ({
+  id: "link-1",
+  permissionId: "perm-link-1",
+  shareId: "share-link-1",
+  webUrl: "https://contoso.example/link-1",
+  scope: "anonymous",
+  type: "view",
+  roleLabel: "View",
+  preventsDownload: false,
+  grantedToIdentities: [],
+  grantedToCount: 0,
+  capabilities: {
+    canGrantRecipients: true,
+    canRevokeRecipients: true,
+    canDeleteLink: true,
+  },
   ...overrides,
 });
 
@@ -148,7 +161,7 @@ describe("ItemPermissionDialog", () => {
     vi.restoreAllMocks();
   });
 
-  it("should render inherited rows as readonly and keep explicit rows editable", async () => {
+  it("should render inherited rows as readonly and keep user permission rows editable", async () => {
     listItemPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [
@@ -161,9 +174,9 @@ describe("ItemPermissionDialog", () => {
             isRemovable: false,
           }),
           createPermissionEntry({
-            id: "permission:perm-explicit",
-            permissionId: "perm-explicit",
-            principalDisplayName: "Explicit User",
+            id: "permission:perm-user-permission",
+            permissionId: "perm-user-permission",
+            principalDisplayName: "User Permission User",
           }),
         ],
         groups: [],
@@ -195,10 +208,10 @@ describe("ItemPermissionDialog", () => {
     ).not.toBeInTheDocument();
 
     expect(
-      screen.getByRole("combobox", { name: "Explicit User role" }),
+      screen.getByRole("combobox", { name: "User Permission User role" }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "Remove Explicit User" }),
+      screen.getByRole("button", { name: "Remove User Permission User" }),
     ).toBeEnabled();
 
     const inheritedIcon = within(inheritedRow).getByTestId(
@@ -404,5 +417,56 @@ describe("ItemPermissionDialog", () => {
     expect(
       applyItemLinkPermissionChangesMock.mock.invocationCallOrder[0],
     ).toBeLessThan(applyItemPermissionChangesMock.mock.invocationCallOrder[0]);
+  });
+
+  it("should keep refreshed links and show partial failure message when user permission apply fails after links succeed", async () => {
+    listItemPermissionsMock.mockResolvedValue({
+      entriesByTab: {
+        people: [createPermissionEntry({ role: "Writer" })],
+        groups: [],
+      },
+    });
+    listItemLinkPermissionsMock.mockResolvedValue([]);
+    applyItemLinkPermissionChangesMock.mockResolvedValue([
+      createLinkEntry({
+        id: "link-2",
+        permissionId: "perm-link-2",
+        webUrl: "https://contoso.example/link-2",
+        scope: "anonymous",
+      }),
+    ]);
+    applyItemPermissionChangesMock.mockRejectedValue(
+      new Error("user permission apply failed"),
+    );
+
+    renderDialog({
+      fileName: "Quarterly report.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      isFolder: false,
+    });
+    await flushAsyncWork();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Links" }));
+    await flushAsyncWork();
+    fireEvent.click(screen.getByRole("button", { name: "Add link" }));
+    fireEvent.click(screen.getByRole("tab", { name: "People" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Adele Vance role" }),
+      {
+        target: { value: "Reader" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await flushAsyncWork();
+
+    expect(
+      screen.getByText(/Links were saved, but people\/groups changes failed:/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Links" }));
+    expect(
+      screen.getByRole("button", { name: /Copy Anyone link/i }),
+    ).toBeInTheDocument();
   });
 });

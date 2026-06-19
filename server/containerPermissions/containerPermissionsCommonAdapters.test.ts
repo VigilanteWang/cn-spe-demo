@@ -39,7 +39,7 @@ describe("mapGraphPermissionToEntryOnUI", () => {
   ])(
     "should map %s identities into common entries",
     (_kind, permission, expectedTab) => {
-      // user / group 两种主体都应该落到共享的 people/groups 页签模型上。
+      // user / group 两种主体都应该落到共享的 people/groups  tab 模型上。
       const entry = mapGraphPermissionToEntryOnUI(permission);
 
       expect(entry.principalType).toBe(expectedTab);

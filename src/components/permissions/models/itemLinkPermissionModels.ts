@@ -15,7 +15,7 @@ export type {
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 
 /**
- * Item 权限弹窗顶层页签。
+ * Item 权限弹窗顶层 tab 。
  */
 export type ItemPermissionDialogTabValue = PermissionTabValue | "links";
 

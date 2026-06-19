@@ -23,7 +23,7 @@ import { usePermissionsStyles } from "./permissionsStyles";
  * 在共享基础权限字段之上补充 `role`，让 container / item
  * 两类权限弹窗都能复用同一套表格渲染逻辑。
  */
-export type PermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
+export type UserPermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
   role: string;
 };
 
@@ -32,8 +32,8 @@ export type PermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
  *
  * @typeParam TEntry 单条权限记录的具体类型。
  */
-export interface IPermissionAccessListTableProps<
-  TEntry extends PermissionAccessListEntryWithRole,
+export interface IUserPermissionAccessListTableProps<
+  TEntry extends UserPermissionAccessListEntryWithRole,
 > {
   /** 当前激活的 tab，用来生成表格的可访问名称。 */
   selectedTab: PermissionTabValue;
@@ -68,8 +68,8 @@ export interface IPermissionAccessListTableProps<
  * @typeParam TEntry 单条权限记录的具体类型。
  * @returns 渲染后的权限列表表格。
  */
-export const PermissionAccessListTable = <
-  TEntry extends PermissionAccessListEntryWithRole,
+export const UserPermissionAccessListTable = <
+  TEntry extends UserPermissionAccessListEntryWithRole,
 >({
   selectedTab,
   entries,
@@ -81,7 +81,7 @@ export const PermissionAccessListTable = <
   onRemove,
   isRoleDisabled,
   isRemoveDisabled,
-}: IPermissionAccessListTableProps<TEntry>) => {
+}: IUserPermissionAccessListTableProps<TEntry>) => {
   const styles = usePermissionsStyles();
 
   // 把 loading、空列表、正常行三种状态统一折叠成同一个 TableBody 内容，避免 return 分支过多。

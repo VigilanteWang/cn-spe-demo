@@ -23,7 +23,7 @@ import {
 } from "@fluentui/react-icons";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type { PermissionTabValue } from "../../../../common/contracts/permissionCommonContracts";
-import { usePermissionPrincipalSearch } from "../hooks/usePermissionPrincipalSearch";
+import { useItemLinkPermissionRecipientSearch } from "../hooks/useItemLinkPermissionRecipientSearch";
 import type {
   IItemLinkPermissionDerivedEntry,
   IItemLinkPermissionRecipientCandidate,
@@ -37,7 +37,7 @@ import {
   getItemLinkPermissionScopeLabel,
 } from "../services/itemLinkPermissionUiUtils";
 
-interface IItemLinkPermissionsPanelProps {
+interface IItemLinkPermissionPanelProps {
   entries: IItemLinkPermissionDerivedEntry[];
   isLoading: boolean;
   interactionDisabled: boolean;
@@ -59,7 +59,7 @@ interface IItemLinkPermissionsPanelProps {
 }
 
 /**
- * Links 列表里的卡片图标需要和创建下拉框保持一致，避免同一种 scope 在两个位置出现不同视觉语义。
+ * Links 列表里的卡片图标需要和创建下拉框保持一致，避免同一类 scope 在两个位置出现不同视觉语义。
  */
 const renderLinkScopeIcon = (scope: ItemLinkPermissionScope) => {
   if (scope === "anonymous") {
@@ -78,7 +78,7 @@ const renderLinkScopeIcon = (scope: ItemLinkPermissionScope) => {
  *
  * 它只负责 links 自己的 UI 和本地交互，不混入 people/groups 的 access list 结构。
  */
-export const ItemLinkPermissionsPanel = ({
+export const ItemLinkPermissionPanel = ({
   entries,
   isLoading,
   interactionDisabled,
@@ -91,7 +91,7 @@ export const ItemLinkPermissionsPanel = ({
   onCopyLink,
   onAddRecipient,
   onRemoveRecipient,
-}: IItemLinkPermissionsPanelProps) => {
+}: IItemLinkPermissionPanelProps) => {
   const styles = usePermissionsStyles();
   const [autoExpandedUsersEntryId, setAutoExpandedUsersEntryId] = useState<
     string | null
@@ -125,7 +125,7 @@ export const ItemLinkPermissionsPanel = ({
   };
 
   /**
-   * 第二个下拉框收敛 link type。
+   * 第二个下拉框收集 link type。
    */
   const handleTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const nextType = event.currentTarget.value;
@@ -339,13 +339,6 @@ const UserLinkPermissionRow = ({
   onRemoveRecipient,
 }: IUserLinkPermissionRowProps) => {
   const styles = usePermissionsStyles();
-  const [searchTab, setSearchTab] = useState<PermissionTabValue>("people");
-  const [queryByTab, setQueryByTab] = useState<
-    Record<PermissionTabValue, string>
-  >({
-    people: "",
-    groups: "",
-  });
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
 
   useEffect(() => {
@@ -355,6 +348,8 @@ const UserLinkPermissionRow = ({
   }, [autoExpand]);
 
   const {
+    searchTab,
+    setSearchTab,
     query,
     results,
     status,
@@ -362,38 +357,9 @@ const UserLinkPermissionRow = ({
     isDropdownOpen,
     handleQueryChange,
     handleCandidateSelect,
-  } = usePermissionPrincipalSearch({
-    selectedTab: searchTab,
-    queryByTab,
-    setQuery: (tab, value) => {
-      setQueryByTab((currentQueryByTab) => ({
-        ...currentQueryByTab,
-        [tab]: value,
-      }));
-    },
-    addCandidate: (_tab, candidate) => {
-      onAddRecipient(entry, {
-        id: candidate.id,
-        objectId: candidate.objectId,
-        name: candidate.name,
-        type: candidate.type,
-        secondaryText: candidate.secondaryText,
-        initials: candidate.initials,
-        mail: candidate.mail,
-        userPrincipalName: candidate.userPrincipalName,
-      });
-    },
-    isCandidateAdded: (_tab, candidate) =>
-      entry.recipients.some(
-        (recipient) =>
-          recipient.key ===
-          getItemLinkPermissionRecipientKey({
-            objectId: candidate.objectId,
-            userPrincipalName: candidate.userPrincipalName,
-            mail: candidate.mail,
-            name: candidate.name,
-          }),
-      ),
+  } = useItemLinkPermissionRecipientSearch({
+    entry,
+    onAddRecipient,
   });
 
   return (

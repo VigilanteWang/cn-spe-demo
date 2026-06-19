@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { IItemPermissionEntry } from "../models/itemPermissionModels";
+import type { IItemUserPermissionEntry } from "../models/itemUserPermissionModels";
 import {
   computeItemPermissionChanges,
   buildItemPermissionValidationError,
-} from "./itemPermissionDiff";
+} from "./itemUserPermissionDiff";
 
 /**
  * 构造一条默认可编辑的 item 权限行，便于测试时只覆盖当前场景关心的字段。
@@ -12,8 +12,8 @@ import {
  * @returns 带稳定默认值的测试权限行。
  */
 const createPermissionEntry = (
-  overrides: Partial<IItemPermissionEntry>,
-): IItemPermissionEntry => ({
+  overrides: Partial<IItemUserPermissionEntry>,
+): IItemUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",

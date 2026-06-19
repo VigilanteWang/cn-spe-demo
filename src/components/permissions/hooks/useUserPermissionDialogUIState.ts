@@ -5,8 +5,8 @@ import type {
   PermissionEntriesByTab,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
-import { usePermissionDraft } from "./usePermissionDraft";
-import { usePermissionTabs } from "./usePermissionTabs";
+import { useUserPermissionDraft } from "./useUserPermissionDraft";
+import { useUserPermissionTabs } from "./useUserPermissionTabs";
 
 /**
  * 把目录搜索候选项转换成权限草稿记录的工厂函数。
@@ -19,19 +19,19 @@ export type CreatePermissionEntryFromCandidateFn<
 > = (candidate: IPermissionPrincipalCandidate) => TEntry;
 
 /**
- * 组合权限弹窗共用的页签、搜索词和草稿状态。
+ * 组合权限弹窗共用的 tab 、搜索词和草稿状态。
  *
  * 这个 Hook 不关心当前是容器权限还是 Item 权限，
  * 只关心两类弹窗都需要的“按 tab 编辑权限草稿”能力。
  */
-export const usePermissionDialogUIState = <
+export const useUserPermissionDialogUIState = <
   TEntry extends IPermissionEntryBaseForUI & { role: string },
 >(
   initialEntriesByTab: PermissionEntriesByTab<TEntry>,
   resetKey: string,
   createEntryFromCandidate: CreatePermissionEntryFromCandidateFn<TEntry>,
 ) => {
-  const { selectedTab, setSelectedTab } = usePermissionTabs("people");
+  const { selectedTab, setSelectedTab } = useUserPermissionTabs("people");
   const {
     originalEntriesByTab,
     draftEntriesByTab,
@@ -41,9 +41,9 @@ export const usePermissionDialogUIState = <
     removeEntry,
     resetDraft,
     replaceEntries,
-  } = usePermissionDraft(initialEntriesByTab, resetKey);
+  } = useUserPermissionDraft(initialEntriesByTab, resetKey);
 
-  // people / groups 各自保留输入上下文，避免切页签时互相覆盖。
+  // people / groups 各自保留输入上下文，避免切 tab 时互相覆盖。
   const [filterByTab, setFilterByTab] = useState<
     Record<PermissionTabValue, string>
   >({
@@ -52,7 +52,7 @@ export const usePermissionDialogUIState = <
   });
 
   /**
-   * 更新指定页签的搜索输入值。
+   * 更新指定 tab 的搜索输入值。
    */
   const setFilter = (tab: PermissionTabValue, value: string) => {
     setFilterByTab((currentFilters) => ({
@@ -80,13 +80,13 @@ export const usePermissionDialogUIState = <
   };
 
   /**
-   * 返回当前 access list 应该展示的页签草稿列表。
+   * 返回当前 access list 应该展示的 tab 草稿列表。
    */
   const getVisibleEntries = (tab: PermissionTabValue): TEntry[] =>
     draftEntriesByTab[tab];
 
   /**
-   * 判断候选对象是否已经存在于当前页签列表里，避免重复添加。
+   * 判断候选对象是否已经存在于当前 tab 列表里，避免重复添加。
    *
    * groups 直接按 `principalId` 去重；
    * people 优先按规范化后的 UPN 去重，以兼容大小写差异。

@@ -8,7 +8,7 @@ import type {
   IItemPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
-import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
+import type { IItemUserPermissionEntriesLoadResult } from "../components/permissions/models/itemUserPermissionModels";
 import { mapPermissionEntriesToTabs } from "./permissionApiShared";
 
 /**
@@ -25,7 +25,7 @@ import { mapPermissionEntriesToTabs } from "./permissionApiShared";
 export const listItemPermissions = async (
   driveId: string,
   itemId: string,
-): Promise<IItemPermissionEntriesLoadResult> => {
+): Promise<IItemUserPermissionEntriesLoadResult> => {
   const response = await sendAuthorizedRequest(
     // 路径参数先做 URL 编码，避免 driveId 或 itemId 中的特殊字符破坏路由。
     `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}`,
@@ -41,7 +41,7 @@ export const listItemPermissions = async (
     });
   }
 
-  // 响应体先还原成共享合同，再按权限页签需要的结构重新分组。
+  // 响应体先还原成共享合同，再按权限 tab 需要的结构重新分组。
   const payload = (await response.json()) as IItemPermissionsResponseFromApi;
   return {
     entriesByTab: mapPermissionEntriesToTabs(payload.entries),
@@ -64,7 +64,7 @@ export const applyItemPermissionChanges = async (
   driveId: string,
   itemId: string,
   changes: IItemPermissionChangeSetFromUI,
-): Promise<IItemPermissionEntriesLoadResult> => {
+): Promise<IItemUserPermissionEntriesLoadResult> => {
   const response = await sendAuthorizedRequest(
     // `/apply` 端点表示由后端统一执行新增、更新、删除三类写回。
     `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}/apply`,

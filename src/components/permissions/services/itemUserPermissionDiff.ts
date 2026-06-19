@@ -6,9 +6,9 @@ import type {
   IItemPermissionUpdateChange,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type {
-  IItemPermissionEntry,
-  IItemPermissionEntriesByTab,
-} from "../models/itemPermissionModels";
+  IItemUserPermissionEntriesByTab,
+  IItemUserPermissionEntry,
+} from "../models/itemUserPermissionModels";
 
 export { type IItemPermissionChangeSetFromUI as IItemPermissionChangeSet } from "../../../../common/contracts/itemPermissionCommonContracts";
 
@@ -60,8 +60,8 @@ interface IRequiredFieldErrorOptions {
  * @returns 可直接提交给后端 apply 接口的差异结果。
  */
 export const computeItemPermissionChanges = (
-  originalEntriesByTab: IItemPermissionEntriesByTab,
-  draftEntriesByTab: IItemPermissionEntriesByTab,
+  originalEntriesByTab: IItemUserPermissionEntriesByTab,
+  draftEntriesByTab: IItemUserPermissionEntriesByTab,
 ): IItemPermissionChangeSetFromUI => {
   const create: IItemPermissionCreateChange[] = [];
   const update: IItemPermissionUpdateChange[] = [];
@@ -146,7 +146,7 @@ export const computeItemPermissionChanges = (
  * @returns 可写入 create 变更集合的对象。
  */
 const createItemPermissionChangeFromEntry = (
-  entry: IItemPermissionEntry,
+  entry: IItemUserPermissionEntry,
 ): IItemPermissionCreateChange => ({
   principalType: entry.principalType,
   principalId: entry.principalId,
@@ -165,7 +165,7 @@ const createItemPermissionChangeFromEntry = (
  * @throws 当 entry 既没有 objectId 也没有 email/UPN 时抛出校验错误。
  */
 const readRecipientFromEntry = (
-  entry: IItemPermissionEntry,
+  entry: IItemUserPermissionEntry,
 ): {
   recipientObjectId?: string;
   recipientEmail?: string;
@@ -199,7 +199,7 @@ const readRecipientFromEntry = (
  * @throws 当行继承自父级或被标记为只读时抛出错误。
  */
 const ensureEntryIsEditable = (
-  entry: IItemPermissionEntry,
+  entry: IItemUserPermissionEntry,
   operation: string,
 ) => {
   // 继承行和只读行都不应该进入 update 变更集。
@@ -220,7 +220,7 @@ const ensureEntryIsEditable = (
  * @throws 当行继承自父级或被标记为不可删除时抛出错误。
  */
 const ensureEntryIsRemovable = (
-  entry: IItemPermissionEntry,
+  entry: IItemUserPermissionEntry,
   operation: string,
 ) => {
   // 删除保护和更新保护分开封装，便于未来按产品规则分别收紧。

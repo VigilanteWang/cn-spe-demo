@@ -6,6 +6,7 @@ import type {
   ItemLinkPermissionType,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../../common/contracts/permissionCommonContracts";
+import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
 import type {
   IItemLinkPermissionDraftState,
   IItemLinkPermissionRecipientCandidate,
@@ -82,6 +83,22 @@ export const mapGraphIdentityToItemLinkRecipientCandidate = (
   initials: getInitials(identity.displayName),
   mail: identity.mail,
   userPrincipalName: identity.userPrincipalName,
+});
+
+/**
+ * 把 people/groups 搜索候选项转换成 links 面板可复用的 recipient 候选项。
+ */
+export const mapPermissionCandidateToItemLinkRecipientCandidate = (
+  candidate: IPermissionPrincipalCandidate,
+): IItemLinkPermissionRecipientCandidate => ({
+  id: candidate.id,
+  objectId: candidate.objectId,
+  name: candidate.name,
+  type: candidate.type,
+  secondaryText: candidate.secondaryText,
+  initials: candidate.initials,
+  mail: candidate.mail,
+  userPrincipalName: candidate.userPrincipalName,
 });
 
 /**

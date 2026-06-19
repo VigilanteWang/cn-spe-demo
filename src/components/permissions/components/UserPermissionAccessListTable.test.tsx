@@ -2,12 +2,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
-  PermissionAccessListTable,
-  type IPermissionAccessListTableProps,
-  type PermissionAccessListEntryWithRole,
-} from "./PermissionAccessListTable";
+  UserPermissionAccessListTable,
+  type IUserPermissionAccessListTableProps,
+  type UserPermissionAccessListEntryWithRole,
+} from "./UserPermissionAccessListTable";
 
-type ITestPermissionEntry = PermissionAccessListEntryWithRole & {
+type ITestPermissionEntry = UserPermissionAccessListEntryWithRole & {
   role: "Reader" | "Writer";
 };
 
@@ -31,14 +31,14 @@ const createEntry = (
 
 const renderTable = (
   overrides: Partial<
-    IPermissionAccessListTableProps<ITestPermissionEntry>
+    IUserPermissionAccessListTableProps<ITestPermissionEntry>
   > = {},
 ) => {
   const onRoleChange = vi.fn();
   const onRemove = vi.fn();
 
   render(
-    <PermissionAccessListTable<ITestPermissionEntry>
+    <UserPermissionAccessListTable<ITestPermissionEntry>
       selectedTab="people"
       entries={[createEntry()]}
       isLoading={false}
@@ -58,7 +58,7 @@ const renderTable = (
   };
 };
 
-describe("PermissionAccessListTable", () => {
+describe("UserPermissionAccessListTable", () => {
   it("should render the shared principal cell layout and role options", () => {
     const { onRoleChange, onRemove } = renderTable();
 
@@ -112,7 +112,7 @@ describe("PermissionAccessListTable", () => {
 
   it("should honor loading, empty state and row-level disabled flags", () => {
     const { rerender } = render(
-      <PermissionAccessListTable<ITestPermissionEntry>
+      <UserPermissionAccessListTable<ITestPermissionEntry>
         selectedTab="people"
         entries={[]}
         isLoading
@@ -128,7 +128,7 @@ describe("PermissionAccessListTable", () => {
     expect(screen.getByText("Loading current permissions")).toBeInTheDocument();
 
     rerender(
-      <PermissionAccessListTable<ITestPermissionEntry>
+      <UserPermissionAccessListTable<ITestPermissionEntry>
         selectedTab="people"
         entries={[
           createEntry({
@@ -155,7 +155,7 @@ describe("PermissionAccessListTable", () => {
     ).toBeDisabled();
 
     rerender(
-      <PermissionAccessListTable<ITestPermissionEntry>
+      <UserPermissionAccessListTable<ITestPermissionEntry>
         selectedTab="people"
         entries={[]}
         isLoading={false}

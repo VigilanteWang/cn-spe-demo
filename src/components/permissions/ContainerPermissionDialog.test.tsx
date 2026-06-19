@@ -4,7 +4,7 @@ import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../../../common/appError";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
-import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
+import type { IContainerUserPermissionEntry } from "./models/containerUserPermissionModels";
 import {
   applyContainerPermissionChanges,
   listContainerPermissions,
@@ -106,8 +106,8 @@ const createSearchResult = (
  * 构造一个 access list 行模型。
  */
 const createPermissionEntry = (
-  overrides: Partial<IContainerPermissionEntry>,
-): IContainerPermissionEntry => ({
+  overrides: Partial<IContainerUserPermissionEntry>,
+): IContainerUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
@@ -311,8 +311,8 @@ describe("ContainerPermissionDialog", () => {
 
   it("should show saving feedback while apply request is still pending", async () => {
     const deferred = createDeferred<{
-      people: IContainerPermissionEntry[];
-      groups: IContainerPermissionEntry[];
+      people: IContainerUserPermissionEntry[];
+      groups: IContainerUserPermissionEntry[];
     }>();
 
     listContainerPermissionsMock.mockResolvedValue({
