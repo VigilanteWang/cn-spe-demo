@@ -104,27 +104,27 @@ describe("ItemLinkPermissionPanel", () => {
     ).toBeDisabled();
   });
 
-  it("should auto expand a newly added users link row", async () => {
+  it("should auto expand a newly added specific link row", async () => {
     render(
       <ItemLinkPermissionPanel
         entries={[
           createEntry({
-            id: "draft-users-1",
+            id: "draft-specific-1",
             source: "draft",
             permissionId: undefined,
             shareId: undefined,
-            scope: "users",
+            scope: "specific",
             type: "view",
             roleLabel: "View",
           }),
         ]}
         isLoading={false}
         interactionDisabled={false}
-        createScope="users"
+        createScope="specific"
         createType="edit"
         onCreateScopeChange={vi.fn()}
         onCreateTypeChange={vi.fn()}
-        onAddLink={() => "draft-users-1"}
+        onAddLink={() => "draft-specific-1"}
         onDeleteLink={vi.fn()}
         onCopyLink={vi.fn()}
         onAddRecipient={vi.fn()}
@@ -136,7 +136,7 @@ describe("ItemLinkPermissionPanel", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Specified users and groups" }),
+        screen.getByRole("button", { name: "Specific people and groups" }),
       ).toHaveAttribute("aria-expanded", "true");
     });
   });

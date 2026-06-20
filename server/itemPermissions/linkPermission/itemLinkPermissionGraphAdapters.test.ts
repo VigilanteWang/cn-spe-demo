@@ -71,12 +71,12 @@ describe("mapGraphItemLinkPermission", () => {
     });
   });
 
-  it("should map users link identities and grant capabilities", () => {
+  it("should map specific link identities and grant capabilities", () => {
     const entry = mapGraphItemLinkPermission({
       id: "perm-link-3",
       shareId: "u!share-id-3",
       link: {
-        scope: "users",
+        scope: "specific",
         type: "edit",
         webUrl: "https://contoso.sharepoint.com/link-3",
       },
@@ -99,7 +99,7 @@ describe("mapGraphItemLinkPermission", () => {
     });
 
     expect(entry).toMatchObject({
-      scope: "users",
+      scope: "specific",
       type: "edit",
       roleLabel: "Edit",
       grantedToCount: 2,
@@ -130,7 +130,7 @@ describe("mapGraphItemLinkPermission", () => {
       id: "perm-link-4",
       shareId: "u!share-id-4",
       link: {
-        scope: "users",
+        scope: "specific",
         type: "view",
         webUrl: "https://contoso.sharepoint.com/link-4",
       },

@@ -28,7 +28,7 @@ const createPersistedEntry = (
   permissionId: "perm-1",
   shareId: "share-1",
   webUrl: "https://contoso.example/link-1",
-  scope: "users",
+  scope: "specific",
   type: "view",
   roleLabel: "View",
   preventsDownload: false,

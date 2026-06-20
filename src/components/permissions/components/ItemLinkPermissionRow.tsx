@@ -6,9 +6,9 @@ import { usePermissionsStyles } from "./permissionsStyles";
 import { renderItemLinkPermissionScopeIcon } from "./itemLinkPermissionRowShared";
 
 /**
- * 普通 link 行组件的输入属性。
+ * 普通 item link 行组件的输入属性。
  */
-export interface ILinkPermissionRowProps {
+export interface IItemLinkPermissionRowProps {
   entry: IItemLinkPermissionDerivedEntry;
   interactionDisabled: boolean;
   onCopyLink: (webUrl: string) => void;
@@ -18,12 +18,12 @@ export interface ILinkPermissionRowProps {
 /**
  * 渲染 anonymous / organization 等无需行内 recipient 管理的 link 行。
  */
-export const LinkPermissionRow = ({
+export const ItemLinkPermissionRow = ({
   entry,
   interactionDisabled,
   onCopyLink,
   onDeleteLink,
-}: ILinkPermissionRowProps) => {
+}: IItemLinkPermissionRowProps) => {
   const styles = usePermissionsStyles();
 
   return (

@@ -85,7 +85,7 @@ export interface IItemUserPermissionChangeSetFromUI {
 export const ITEM_LINK_PERMISSION_SCOPES = [
   "anonymous",
   "organization",
-  "users",
+  "specific",
 ] as const;
 
 export type ItemLinkPermissionScope =
@@ -206,7 +206,7 @@ export interface IItemLinkPermissionDeleteChange {
 }
 
 /**
- * 为 users link 新增 recipients 的 change。
+ * 为 specific link 新增 recipients 的 change。
  */
 export interface IItemLinkPermissionGrantRecipientsChange {
   permissionId: string;
@@ -216,7 +216,7 @@ export interface IItemLinkPermissionGrantRecipientsChange {
 }
 
 /**
- * 为 users link 移除 recipients 的 change。
+ * 为 specific link 移除 recipients 的 change。
  */
 export interface IItemLinkPermissionRevokeRecipientsChange {
   permissionId: string;

@@ -11,7 +11,7 @@ const createPersistedEntry = (
   permissionId: "perm-1",
   shareId: "share-1",
   webUrl: "https://contoso.example/link-1",
-  scope: "users",
+  scope: "specific",
   type: "view",
   roleLabel: "View",
   preventsDownload: false,
@@ -26,7 +26,7 @@ const createPersistedEntry = (
 });
 
 describe("useItemLinkPermissionUIState", () => {
-  it("should auto-create a users link draft entry that the panel can expand", () => {
+  it("should auto-create a specific link draft entry that the panel can expand", () => {
     const { result } = renderHook(() =>
       useItemLinkPermissionUIState({
         resetKey: "drive-a:item-a",
@@ -35,7 +35,7 @@ describe("useItemLinkPermissionUIState", () => {
     );
 
     act(() => {
-      result.current.setCreateLinkScope("users");
+      result.current.setCreateLinkScope("specific");
     });
 
     act(() => {
@@ -45,7 +45,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0]).toMatchObject({
       source: "draft",
-      scope: "users",
+      scope: "specific",
       hasValidationError: true,
     });
   });
@@ -59,7 +59,7 @@ describe("useItemLinkPermissionUIState", () => {
     );
 
     act(() => {
-      result.current.setCreateLinkScope("users");
+      result.current.setCreateLinkScope("specific");
       result.current.setCreateLinkType("view");
     });
 
@@ -78,7 +78,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.entries).toHaveLength(2);
     expect(
       result.current.entries.map((entry) => `${entry.scope}:${entry.type}`),
-    ).toEqual(["users:view", "users:review"]);
+    ).toEqual(["specific:view", "specific:review"]);
   });
 
   it("should switch to the next available type when the current scope:type is occupied", () => {

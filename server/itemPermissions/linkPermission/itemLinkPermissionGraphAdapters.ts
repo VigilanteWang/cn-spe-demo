@@ -66,9 +66,9 @@ export const mapGraphItemLinkPermission = (
     // `grantedToCount` 直接基于整理后的 identity 列表长度计算，避免前端重复推导。
     grantedToCount: grantedToIdentities.length,
     capabilities: {
-      // 只有 `users` link 且拿到 `shareId` 时，后续 grant / revoke 才有合法目标。
-      canGrantRecipients: scope === "users" && hasShareId,
-      canRevokeRecipients: scope === "users" && hasShareId,
+      // 只有 `specific` link 且拿到 `shareId` 时，后续 grant / revoke 才有合法目标。
+      canGrantRecipients: scope === "specific" && hasShareId,
+      canRevokeRecipients: scope === "specific" && hasShareId,
       canDeleteLink: true,
     },
   };

@@ -124,7 +124,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
           id: "perm-create-1",
           shareId: "u!share-created-1",
           link: {
-            scope: "users",
+            scope: "specific",
             type: "review",
             webUrl: "https://contoso.sharepoint.com/link-created",
           },
@@ -135,7 +135,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
               id: "perm-create-1",
               shareId: "u!share-created-1",
               link: {
-                scope: "users",
+                scope: "specific",
                 type: "review",
                 webUrl: "https://contoso.sharepoint.com/link-created",
               },
@@ -153,7 +153,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
       {
         create: [
           {
-            scope: "users",
+            scope: "specific",
             type: "review",
             recipients: [{ recipientObjectId: "user-created-1" }],
           },
@@ -194,7 +194,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
         method: "post",
         version: "v1.0",
         body: {
-          scope: "users",
+          scope: "specific",
           type: "review",
         },
       },

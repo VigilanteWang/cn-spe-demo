@@ -6,7 +6,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
     const parsed = parseItemLinkPermissionChangeSet({
       create: [
         {
-          scope: "users",
+          scope: "specific",
           type: "review",
           recipients: [
             {
@@ -44,7 +44,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
     expect(parsed).toEqual({
       create: [
         {
-          scope: "users",
+          scope: "specific",
           type: "review",
           recipients: [
             {

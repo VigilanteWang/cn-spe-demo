@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { LinkPermissionRow } from "./LinkPermissionRow";
+import { ItemLinkPermissionRow } from "./ItemLinkPermissionRow";
 import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
 
 const createEntry = (
@@ -22,14 +22,14 @@ const createEntry = (
   ...overrides,
 });
 
-describe("LinkPermissionRow", () => {
+describe("ItemLinkPermissionRow", () => {
   it("should render organization grantedToCount and invoke copy/delete handlers", () => {
     const onCopyLink = vi.fn();
     const onDeleteLink = vi.fn();
     const entry = createEntry();
 
     render(
-      <LinkPermissionRow
+      <ItemLinkPermissionRow
         entry={entry}
         interactionDisabled={false}
         onCopyLink={onCopyLink}
@@ -54,7 +54,7 @@ describe("LinkPermissionRow", () => {
 
   it("should disable copy when webUrl is missing", () => {
     render(
-      <LinkPermissionRow
+      <ItemLinkPermissionRow
         entry={createEntry({ webUrl: undefined })}
         interactionDisabled={false}
         onCopyLink={vi.fn()}

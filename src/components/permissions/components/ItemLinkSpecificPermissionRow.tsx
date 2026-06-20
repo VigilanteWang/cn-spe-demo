@@ -26,9 +26,9 @@ import { usePermissionsStyles } from "./permissionsStyles";
 import { renderItemLinkPermissionScopeIcon } from "./itemLinkPermissionRowShared";
 
 /**
- * specific users/groups link 行组件的输入属性。
+ * specific item link 行组件的输入属性。
  */
-export interface IUserLinkPermissionRowProps {
+export interface IItemLinkSpecificPermissionRowProps {
   entry: IItemLinkPermissionDerivedEntry;
   interactionDisabled: boolean;
   autoExpand: boolean;
@@ -45,9 +45,9 @@ export interface IUserLinkPermissionRowProps {
 }
 
 /**
- * 渲染带 recipient 搜索与列表管理的 specific users/groups link 行。
+ * 渲染带 recipient 搜索与列表管理的 specific item link 行。
  */
-export const UserLinkPermissionRow = ({
+export const ItemLinkSpecificPermissionRow = ({
   entry,
   interactionDisabled,
   autoExpand,
@@ -55,7 +55,7 @@ export const UserLinkPermissionRow = ({
   onDeleteLink,
   onAddRecipient,
   onRemoveRecipient,
-}: IUserLinkPermissionRowProps) => {
+}: IItemLinkSpecificPermissionRowProps) => {
   const styles = usePermissionsStyles();
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
 
@@ -103,7 +103,7 @@ export const UserLinkPermissionRow = ({
         <div className={styles.linkRowActions}>
           <Button
             appearance="subtle"
-            aria-label="Copy specific users/groups link"
+            aria-label="Copy specific link"
             disabled={interactionDisabled || !entry.webUrl}
             icon={<CopyRegular />}
             onClick={() => {
@@ -114,7 +114,7 @@ export const UserLinkPermissionRow = ({
           />
           <Button
             appearance="subtle"
-            aria-label="Delete specific users/groups link"
+            aria-label="Delete specific link"
             disabled={interactionDisabled}
             icon={<DeleteRegular />}
             onClick={() => onDeleteLink(entry)}
@@ -124,13 +124,13 @@ export const UserLinkPermissionRow = ({
 
       <Accordion
         collapsible
-        openItems={isAccordionOpen ? ["specified-users"] : []}
+        openItems={isAccordionOpen ? ["specific-recipients"] : []}
         onToggle={(_event, data) => {
-          setIsAccordionOpen(data.openItems.includes("specified-users"));
+          setIsAccordionOpen(data.openItems.includes("specific-recipients"));
         }}
       >
-        <AccordionItem value="specified-users">
-          <AccordionHeader>Specified users and groups</AccordionHeader>
+        <AccordionItem value="specific-recipients">
+          <AccordionHeader>Specific people and groups</AccordionHeader>
           <AccordionPanel>
             <div className={styles.userLinkPanelContent}>
               <TabList
@@ -195,7 +195,7 @@ export const UserLinkPermissionRow = ({
                     </div>
                     <Button
                       appearance="subtle"
-                      aria-label={`Remove ${recipient.candidate.name} from specific users/groups link`}
+                      aria-label={`Remove ${recipient.candidate.name} from specific link`}
                       disabled={interactionDisabled}
                       icon={<DeleteRegular />}
                       onClick={() => onRemoveRecipient(entry, recipient.key)}
@@ -206,8 +206,8 @@ export const UserLinkPermissionRow = ({
 
               {entry.hasValidationError ? (
                 <Text size={200} className={styles.errorStatusText}>
-                  Specific Users/Groups links must include at least one person
-                  or group before Apply.
+                  Specific links must include at least one person or group
+                  before Apply.
                 </Text>
               ) : null}
             </div>

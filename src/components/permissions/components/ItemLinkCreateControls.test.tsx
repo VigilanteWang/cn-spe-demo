@@ -13,7 +13,7 @@ describe("ItemLinkCreateControls", () => {
         scopeOptionDisabledState={{
           anonymous: false,
           organization: true,
-          users: false,
+          specific: false,
         }}
         typeOptionDisabledState={{
           view: false,
@@ -45,7 +45,7 @@ describe("ItemLinkCreateControls", () => {
         scopeOptionDisabledState={{
           anonymous: false,
           organization: false,
-          users: false,
+          specific: false,
         }}
         typeOptionDisabledState={{
           view: false,

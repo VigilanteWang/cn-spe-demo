@@ -79,7 +79,7 @@ export const useItemLinkPermissionDerivedEntries = (
           (recipient) => !revokedRecipientKeys.has(recipient.key),
         );
         const recipients =
-          entry.scope === "users"
+          entry.scope === "specific"
             ? [...visiblePersistedRecipients, ...grantedRecipients]
             : [];
 
@@ -94,7 +94,9 @@ export const useItemLinkPermissionDerivedEntries = (
           roleLabel: entry.roleLabel,
           preventsDownload: entry.preventsDownload,
           grantedToCount:
-            entry.scope === "users" ? recipients.length : entry.grantedToCount,
+            entry.scope === "specific"
+              ? recipients.length
+              : entry.grantedToCount,
           recipients,
           hasValidationError: false,
         };
@@ -108,9 +110,10 @@ export const useItemLinkPermissionDerivedEntries = (
         type: entry.type,
         roleLabel: getItemLinkPermissionRoleLabel(entry.type),
         preventsDownload: entry.type === "blocksDownload",
-        grantedToCount: entry.scope === "users" ? entry.recipients.length : 0,
+        grantedToCount:
+          entry.scope === "specific" ? entry.recipients.length : 0,
         recipients:
-          entry.scope === "users"
+          entry.scope === "specific"
             ? entry.recipients.map<IItemLinkPermissionDisplayRecipient>(
                 (candidate) => ({
                   key: getItemLinkPermissionRecipientKey({
@@ -125,7 +128,7 @@ export const useItemLinkPermissionDerivedEntries = (
               )
             : [],
         hasValidationError:
-          entry.scope === "users" && entry.recipients.length === 0,
+          entry.scope === "specific" && entry.recipients.length === 0,
       }));
 
     const sortedEntries = [...persistedEntries, ...createdEntries].sort(

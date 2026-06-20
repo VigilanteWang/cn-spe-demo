@@ -65,8 +65,8 @@ export const fetchMapItemLinkPermissionsFromGraphToResponse = async (
  * 当前顺序为：
  * 1. 删除整条 link
  * 2. 创建新 link
- * 3. 对已有 users link 新增 recipients
- * 4. 对已有 users link 撤销 recipients
+ * 3. 对已有 specific link 新增 recipients
+ * 4. 对已有 specific link 撤销 recipients
  * 5. 重新读取最新 link 列表
  *
  * @param graphClient 当前请求复用的 Graph client。
@@ -125,15 +125,18 @@ export const applyItemLinkPermissionChangeSet = async (
         500,
       );
 
-      // 只有 users scope 才需要继续补一段 grant，把具体主体授予到刚创建的 link 上。
-      if (createChange.scope === "users" && createChange.recipients?.length) {
+      // 只有 specific scope 才需要继续补一段 grant，把具体主体授予到刚创建的 link 上。
+      if (
+        createChange.scope === "specific" &&
+        createChange.recipients?.length
+      ) {
         const createResponseRecord = readGraphToRecord(createResponse);
         const shareId = readOptionalString(createResponseRecord.shareId);
 
         if (!shareId) {
           throw createItemLinkPermissionError(
             "itemLinkPermissionCreateFailed",
-            "The created users link did not return a shareId.",
+            "The created specific link did not return a shareId.",
             { statusCode: 502, cause: createResponse },
           );
         }

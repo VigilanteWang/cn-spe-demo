@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { UserLinkPermissionRow } from "./UserLinkPermissionRow";
+import { ItemLinkSpecificPermissionRow } from "./ItemLinkSpecificPermissionRow";
 import type {
   IItemLinkPermissionDerivedEntry,
   IItemLinkPermissionRecipientCandidate,
@@ -55,12 +55,12 @@ const createRecipientCandidate = (
 const createEntry = (
   overrides: Partial<IItemLinkPermissionDerivedEntry> = {},
 ): IItemLinkPermissionDerivedEntry => ({
-  id: "entry-users-1",
+  id: "entry-specific-1",
   source: "persisted",
-  permissionId: "perm-users-1",
-  shareId: "share-users-1",
-  webUrl: "https://contoso.example/users-link",
-  scope: "users",
+  permissionId: "perm-specific-1",
+  shareId: "share-specific-1",
+  webUrl: "https://contoso.example/specific-link",
+  scope: "specific",
   type: "view",
   roleLabel: "View",
   preventsDownload: false,
@@ -76,7 +76,7 @@ const createEntry = (
   ...overrides,
 });
 
-describe("UserLinkPermissionRow", () => {
+describe("ItemLinkSpecificPermissionRow", () => {
   beforeEach(() => {
     hookState.setSearchTab.mockClear();
     hookState.handleQueryChange.mockClear();
@@ -85,7 +85,7 @@ describe("UserLinkPermissionRow", () => {
 
   it("should auto expand and render recipients and search UI", () => {
     render(
-      <UserLinkPermissionRow
+      <ItemLinkSpecificPermissionRow
         entry={createEntry()}
         interactionDisabled={false}
         autoExpand
@@ -97,7 +97,7 @@ describe("UserLinkPermissionRow", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Specified users and groups" }),
+      screen.getByRole("button", { name: "Specific people and groups" }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("tab", { name: "People" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Groups" })).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("UserLinkPermissionRow", () => {
     const entry = createEntry({ hasValidationError: true });
 
     render(
-      <UserLinkPermissionRow
+      <ItemLinkSpecificPermissionRow
         entry={entry}
         interactionDisabled={false}
         autoExpand
@@ -122,14 +122,14 @@ describe("UserLinkPermissionRow", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Remove Adele Vance from specific users/groups link",
+        name: "Remove Adele Vance from specific link",
       }),
     );
 
     expect(onRemoveRecipient).toHaveBeenCalledWith(entry, "user-adele-vance");
     expect(
       screen.getByText(
-        "Specific Users/Groups links must include at least one person or group before Apply.",
+        "Specific links must include at least one person or group before Apply.",
       ),
     ).toBeInTheDocument();
   });

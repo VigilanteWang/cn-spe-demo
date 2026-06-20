@@ -25,7 +25,7 @@ export const getItemLinkPermissionScopeLabel = (
     return "People in Organization";
   }
 
-  return "Specific Users/Groups";
+  return "Specific";
 };
 
 /**

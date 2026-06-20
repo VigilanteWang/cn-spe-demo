@@ -19,7 +19,7 @@ interface IUseItemLinkPermissionRecipientSearchOptions {
 }
 
 /**
- * 管理 specific users/groups link 行内 recipient 搜索状态。
+ * 管理 specific link 行内 recipient 搜索状态。
  *
  * 这层 Hook 让行组件只负责展示，把搜索 tab、query 和记候选项桥接留在这里。
  */
@@ -45,7 +45,10 @@ export const useItemLinkPermissionRecipientSearch = ({
       }));
     },
     addCandidate: (_tab, candidate) => {
-      onAddRecipient(entry, mapPermissionCandidateToItemLinkRecipientCandidate(candidate));
+      onAddRecipient(
+        entry,
+        mapPermissionCandidateToItemLinkRecipientCandidate(candidate),
+      );
     },
     isCandidateAdded: (_tab, candidate) =>
       entry.recipients.some(
