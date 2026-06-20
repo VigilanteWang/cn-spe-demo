@@ -3,10 +3,10 @@ import type {
   Client,
   GraphRequest,
 } from "@microsoft/microsoft-graph-client";
+import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
 import {
   applyItemLinkPermissionChangeSet,
   fetchMapItemLinkPermissionsFromGraphToResponse,
-  isSupportedItemLinkPermissionTarget,
 } from "./itemLinkPermissionService";
 
 describe("isSupportedItemLinkPermissionTarget", () => {

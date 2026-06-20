@@ -602,7 +602,7 @@ export const ItemPermissionDialog = ({
       tabs={[
         { value: "people", label: "People" },
         { value: "groups", label: "Groups" },
-        // 只有当前资源支持 link 权限时，才暴露 links  tab 。
+        // 只有当前资源支持 link 权限时，才显示 links tab。
         ...(isSupportedLinkTarget
           ? ([{ value: "links", label: "Links" }] as const)
           : []),
@@ -621,7 +621,7 @@ export const ItemPermissionDialog = ({
       onSelectedTabChange={(nextTab) => {
         setSelectedDialogTab(nextTab);
 
-        // links 以外的 tab 需要同步回 people/groups 自己的选中状态。
+        // 切到 people/groups 时，同时更新 User 权限 tab 状态，供 access list 使用。
         if (nextTab === "people" || nextTab === "groups") {
           setSelectedUserPermissionTab(nextTab);
         }

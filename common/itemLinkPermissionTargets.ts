@@ -1,6 +1,6 @@
 /**
- * item link share 做支持性判断时需要的最小目标信息。
- *
+ * 判断文件是否支持 item link share 的所需信息。
+ * 原则上，只有 office 文件支持 item link share。
  * 前后端都只依赖这三个字段：
  * - `name`：用于扩展名兜底
  * - `mimeType`：优先判断是否为支持的 Office 文件
@@ -66,23 +66,29 @@ const SUPPORTED_OFFICE_EXTENSIONS = new Set([
 export const isSupportedItemLinkPermissionTarget = (
   target: IItemLinkPermissionTargetInfo,
 ): boolean => {
+  // 文件夹不支持 item-level link share，先在最前面直接拦截。
   if (target.isFolder) {
     return false;
   }
 
+  // 优先使用后端返回的 MIME 类型判断，命中 allowlist 就可以立即确认支持。
   if (target.mimeType && SUPPORTED_OFFICE_MIME_TYPES.has(target.mimeType)) {
     return true;
   }
 
+  // MIME 缺失或不在 allowlist 时，再把文件名统一转成小写做扩展名兜底判断。
   const normalizedName = target.name?.toLowerCase();
 
+  // 连文件名都没有时，无法继续做扩展名判断，只能按不支持处理。
   if (!normalizedName) {
     return false;
   }
 
+  // 只截取最后一个 `.` 之后的扩展名，避免把中间的点误判成文件类型。
   const lastDotIndex = normalizedName.lastIndexOf(".");
   const extension =
     lastDotIndex >= 0 ? normalizedName.slice(lastDotIndex) : undefined;
 
+  // 只有解析出扩展名时才检查扩展名 allowlist，否则视为不支持。
   return extension ? SUPPORTED_OFFICE_EXTENSIONS.has(extension) : false;
 };

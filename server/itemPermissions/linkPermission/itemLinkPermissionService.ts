@@ -408,5 +408,3 @@ const getSharePermissionGrantPath = (shareId: string): string =>
  */
 const getSharePermissionRevokePath = (shareId: string): string =>
   `/shares/${encodeURIComponent(shareId)}/permission/revokeGrants`;
-
-export { isSupportedItemLinkPermissionTarget };
