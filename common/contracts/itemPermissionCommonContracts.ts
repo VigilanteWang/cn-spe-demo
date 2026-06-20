@@ -81,12 +81,27 @@ export interface IItemUserPermissionChangeSetFromUI {
 /**
  * link share 可支持的 scope。
  */
-export type ItemLinkPermissionScope = "anonymous" | "organization" | "users";
+export const ITEM_LINK_PERMISSION_SCOPES = [
+  "anonymous",
+  "organization",
+  "users",
+] as const;
+
+export type ItemLinkPermissionScope =
+  (typeof ITEM_LINK_PERMISSION_SCOPES)[number];
 
 /**
  * link share 可支持的类型。
  */
-export type ItemLinkPermissionType = "view" | "edit" | "blocksDownload";
+export const ITEM_LINK_PERMISSION_TYPES = [
+  "view",
+  "edit",
+  "review",
+  "blocksDownload",
+] as const;
+
+export type ItemLinkPermissionType =
+  (typeof ITEM_LINK_PERMISSION_TYPES)[number];
 
 /**
  * 前端直接展示的 link 只读权限标签。
@@ -94,6 +109,7 @@ export type ItemLinkPermissionType = "view" | "edit" | "blocksDownload";
 export type ItemLinkPermissionRoleLabelForUI =
   | "View"
   | "Edit"
+  | "Review"
   | "Block download";
 
 /**

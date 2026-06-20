@@ -30,23 +30,37 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
 
   const addCreatedLink = useCallback(
     (scope: ItemLinkPermissionScope, type: ItemLinkPermissionType): string => {
-      const nextId = `draft-item-link:${createdLinkSequence.current + 1}`;
-      createdLinkSequence.current += 1;
+      let createdOrExistingId = "";
 
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        createdLinks: [
-          ...currentDraft.createdLinks,
-          {
-            id: nextId,
-            scope,
-            type,
-            recipients: [],
-          },
-        ],
-      }));
+      setDraft((currentDraft) => {
+        const existingEntry = currentDraft.createdLinks.find(
+          (entry) => entry.scope === scope && entry.type === type,
+        );
 
-      return nextId;
+        if (existingEntry) {
+          createdOrExistingId = existingEntry.id;
+          return currentDraft;
+        }
+
+        const nextId = `draft-item-link:${createdLinkSequence.current + 1}`;
+        createdLinkSequence.current += 1;
+        createdOrExistingId = nextId;
+
+        return {
+          ...currentDraft,
+          createdLinks: [
+            ...currentDraft.createdLinks,
+            {
+              id: nextId,
+              scope,
+              type,
+              recipients: [],
+            },
+          ],
+        };
+      });
+
+      return createdOrExistingId;
     },
     [],
   );

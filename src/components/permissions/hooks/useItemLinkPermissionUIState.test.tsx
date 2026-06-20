@@ -50,6 +50,92 @@ describe("useItemLinkPermissionUIState", () => {
     });
   });
 
+  it("should allow multiple types under the same scope", () => {
+    const { result } = renderHook(() =>
+      useItemLinkPermissionUIState({
+        resetKey: "drive-a:item-a",
+        originalEntries: [],
+      }),
+    );
+
+    act(() => {
+      result.current.setCreateLinkScope("users");
+      result.current.setCreateLinkType("view");
+    });
+
+    act(() => {
+      result.current.onAddLink();
+    });
+
+    act(() => {
+      result.current.setCreateLinkType("review");
+    });
+
+    act(() => {
+      result.current.onAddLink();
+    });
+
+    expect(result.current.entries).toHaveLength(2);
+    expect(
+      result.current.entries.map((entry) => `${entry.scope}:${entry.type}`),
+    ).toEqual(["users:view", "users:review"]);
+  });
+
+  it("should switch to the next available type when the current scope:type is occupied", () => {
+    const { result } = renderHook(() =>
+      useItemLinkPermissionUIState({
+        resetKey: "drive-a:item-a",
+        originalEntries: [
+          createPersistedEntry({ scope: "anonymous", type: "view" }),
+        ],
+      }),
+    );
+
+    expect(result.current.createLinkScope).toBe("anonymous");
+    expect(result.current.createLinkType).toBe("edit");
+  });
+
+  it("should switch to the next non-full scope when the current scope is full", () => {
+    const { result } = renderHook(() =>
+      useItemLinkPermissionUIState({
+        resetKey: "drive-a:item-a",
+        originalEntries: [
+          createPersistedEntry({
+            id: "link-a",
+            permissionId: "perm-a",
+            scope: "anonymous",
+            type: "view",
+          }),
+          createPersistedEntry({
+            id: "link-b",
+            permissionId: "perm-b",
+            scope: "anonymous",
+            type: "edit",
+            roleLabel: "Edit",
+          }),
+          createPersistedEntry({
+            id: "link-c",
+            permissionId: "perm-c",
+            scope: "anonymous",
+            type: "review",
+            roleLabel: "Review",
+          }),
+          createPersistedEntry({
+            id: "link-d",
+            permissionId: "perm-d",
+            scope: "anonymous",
+            type: "blocksDownload",
+            roleLabel: "Block download",
+            preventsDownload: true,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.current.createLinkScope).toBe("organization");
+    expect(result.current.createLinkType).toBe("view");
+  });
+
   it("should clear local draft state after resetDraftState", () => {
     const { result } = renderHook(() =>
       useItemLinkPermissionUIState({

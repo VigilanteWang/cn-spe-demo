@@ -7,7 +7,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
       create: [
         {
           scope: "users",
-          type: "edit",
+          type: "review",
           recipients: [
             {
               recipientObjectId: "user-1",
@@ -20,7 +20,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
         {
           permissionId: "perm-grant-1",
           shareId: "u!share-id-1",
-          type: "view",
+          type: "review",
           recipients: [
             {
               recipientEmail: "adele@contoso.com",
@@ -45,8 +45,14 @@ describe("parseItemLinkPermissionChangeSet", () => {
       create: [
         {
           scope: "users",
-          type: "edit",
-          recipients: [{ recipientObjectId: "user-1" }],
+          type: "review",
+          recipients: [
+            {
+              recipientObjectId: "user-1",
+              recipientEmail: undefined,
+              recipientAlias: undefined,
+            },
+          ],
         },
       ],
       deleteLinks: [{ permissionId: "perm-delete-1" }],
@@ -54,15 +60,27 @@ describe("parseItemLinkPermissionChangeSet", () => {
         {
           permissionId: "perm-grant-1",
           shareId: "u!share-id-1",
-          type: "view",
-          recipients: [{ recipientEmail: "adele@contoso.com" }],
+          type: "review",
+          recipients: [
+            {
+              recipientObjectId: undefined,
+              recipientEmail: "adele@contoso.com",
+              recipientAlias: undefined,
+            },
+          ],
         },
       ],
       revokeRecipients: [
         {
           permissionId: "perm-revoke-1",
           shareId: "u!share-id-2",
-          recipients: [{ recipientAlias: "retail-members" }],
+          recipients: [
+            {
+              recipientObjectId: undefined,
+              recipientEmail: undefined,
+              recipientAlias: "retail-members",
+            },
+          ],
         },
       ],
     });

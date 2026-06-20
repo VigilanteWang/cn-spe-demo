@@ -1,10 +1,12 @@
-import { useCallback, useState } from "react";
-import type {
-  IItemLinkPermissionDerivedEntry,
-  IItemLinkPermissionEntryForUI,
-  IItemLinkPermissionRecipientCandidate,
-  ItemLinkPermissionScope,
-  ItemLinkPermissionType,
+import { useCallback, useEffect, useState } from "react";
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_TYPES,
+  type IItemLinkPermissionDerivedEntry,
+  type IItemLinkPermissionEntryForUI,
+  type IItemLinkPermissionRecipientCandidate,
+  type ItemLinkPermissionScope,
+  type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
 import { useItemLinkPermissionDerivedEntries } from "./useItemLinkPermissionDerivedEntries";
 import { useItemLinkPermissionDraft } from "./useItemLinkPermissionDraft";
@@ -24,9 +26,10 @@ export const useItemLinkPermissionUIState = ({
   onResetLoadState,
 }: IUseItemLinkPermissionUIStateOptions) => {
   const [createLinkScope, setCreateLinkScope] =
-    useState<ItemLinkPermissionScope>("anonymous");
-  const [createLinkType, setCreateLinkType] =
-    useState<ItemLinkPermissionType>("view");
+    useState<ItemLinkPermissionScope>(ITEM_LINK_PERMISSION_SCOPES[0]);
+  const [createLinkType, setCreateLinkType] = useState<ItemLinkPermissionType>(
+    ITEM_LINK_PERMISSION_TYPES[0],
+  );
   const {
     draft,
     hasUnsavedChanges,
@@ -46,8 +49,8 @@ export const useItemLinkPermissionUIState = ({
 
   const resetDraftState = useCallback(() => {
     resetDraft();
-    setCreateLinkScope("anonymous");
-    setCreateLinkType("view");
+    setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPES[0]);
+    setCreateLinkType(ITEM_LINK_PERMISSION_TYPES[0]);
   }, [resetDraft]);
 
   const resetSectionState = useCallback(() => {
@@ -114,6 +117,26 @@ export const useItemLinkPermissionUIState = ({
     [addRevokeRecipient, removeRecipientFromCreatedLink],
   );
 
+  useEffect(() => {
+    const nextAvailableCombo = resolveNextAvailableCreateLinkCombo(
+      derivedPermissions.entries,
+      createLinkScope,
+      createLinkType,
+    );
+
+    if (!nextAvailableCombo) {
+      return;
+    }
+
+    if (nextAvailableCombo.scope !== createLinkScope) {
+      setCreateLinkScope(nextAvailableCombo.scope);
+    }
+
+    if (nextAvailableCombo.type !== createLinkType) {
+      setCreateLinkType(nextAvailableCombo.type);
+    }
+  }, [createLinkScope, createLinkType, derivedPermissions.entries]);
+
   return {
     entries: derivedPermissions.entries,
     createLinkScope,
@@ -134,3 +157,51 @@ export const useItemLinkPermissionUIState = ({
     onRemoveRecipient,
   };
 };
+
+const resolveNextAvailableCreateLinkCombo = (
+  entries: IItemLinkPermissionDerivedEntry[],
+  currentScope: ItemLinkPermissionScope,
+  currentType: ItemLinkPermissionType,
+): { scope: ItemLinkPermissionScope; type: ItemLinkPermissionType } | null => {
+  const occupiedKeys = new Set(
+    entries.map((entry) => createScopeTypeKey(entry.scope, entry.type)),
+  );
+
+  if (!occupiedKeys.has(createScopeTypeKey(currentScope, currentType))) {
+    return {
+      scope: currentScope,
+      type: currentType,
+    };
+  }
+
+  const currentScopeAvailableType = ITEM_LINK_PERMISSION_TYPES.find(
+    (type) => !occupiedKeys.has(createScopeTypeKey(currentScope, type)),
+  );
+
+  if (currentScopeAvailableType) {
+    return {
+      scope: currentScope,
+      type: currentScopeAvailableType,
+    };
+  }
+
+  for (const scope of ITEM_LINK_PERMISSION_SCOPES) {
+    const availableType = ITEM_LINK_PERMISSION_TYPES.find(
+      (type) => !occupiedKeys.has(createScopeTypeKey(scope, type)),
+    );
+
+    if (availableType) {
+      return {
+        scope,
+        type: availableType,
+      };
+    }
+  }
+
+  return null;
+};
+
+const createScopeTypeKey = (
+  scope: ItemLinkPermissionScope,
+  type: ItemLinkPermissionType,
+) => `${scope}:${type}`;

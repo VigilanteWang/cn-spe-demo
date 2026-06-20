@@ -24,16 +24,19 @@ import {
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type { PermissionTabValue } from "../../../../common/contracts/permissionCommonContracts";
 import { useItemLinkPermissionRecipientSearch } from "../hooks/useItemLinkPermissionRecipientSearch";
-import type {
-  IItemLinkPermissionDerivedEntry,
-  IItemLinkPermissionRecipientCandidate,
-  ItemLinkPermissionScope,
-  ItemLinkPermissionType,
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_TYPES,
+  type IItemLinkPermissionDerivedEntry,
+  type IItemLinkPermissionRecipientCandidate,
+  type ItemLinkPermissionScope,
+  type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
 import { PrincipalSearchComboBox } from "./PrincipalSearchComboBox";
 import { usePermissionsStyles } from "./permissionsStyles";
 import {
   getItemLinkPermissionRecipientKey,
+  getItemLinkPermissionRoleLabel,
   getItemLinkPermissionScopeLabel,
 } from "../services/itemLinkPermissionUiUtils";
 
@@ -96,13 +99,25 @@ export const ItemLinkPermissionPanel = ({
   const [autoExpandedUsersEntryId, setAutoExpandedUsersEntryId] = useState<
     string | null
   >(null);
-  const scopeOptionDisabledState = {
-    anonymous: entries.some((entry) => entry.scope === "anonymous"),
-    organization: entries.some((entry) => entry.scope === "organization"),
-    users: false,
-  } satisfies Record<ItemLinkPermissionScope, boolean>;
+  const occupiedScopeTypeKeys = new Set(
+    entries.map((entry) => createScopeTypeKey(entry.scope, entry.type)),
+  );
+  const scopeOptionDisabledState = Object.fromEntries(
+    ITEM_LINK_PERMISSION_SCOPES.map((scope) => [
+      scope,
+      ITEM_LINK_PERMISSION_TYPES.every((type) =>
+        occupiedScopeTypeKeys.has(createScopeTypeKey(scope, type)),
+      ),
+    ]),
+  ) as Record<ItemLinkPermissionScope, boolean>;
+  const typeOptionDisabledState = Object.fromEntries(
+    ITEM_LINK_PERMISSION_TYPES.map((type) => [
+      type,
+      occupiedScopeTypeKeys.has(createScopeTypeKey(createScope, type)),
+    ]),
+  ) as Record<ItemLinkPermissionType, boolean>;
   const canAddLink =
-    !interactionDisabled && !scopeOptionDisabledState[createScope];
+    !interactionDisabled && !typeOptionDisabledState[createType];
   const userEntries = entries.filter((entry) => entry.scope === "users");
   const plainEntries = entries.filter((entry) => entry.scope !== "users");
 
@@ -115,11 +130,7 @@ export const ItemLinkPermissionPanel = ({
   ) => {
     const nextScope = data.optionValue;
 
-    if (
-      nextScope === "anonymous" ||
-      nextScope === "organization" ||
-      nextScope === "users"
-    ) {
+    if (isItemLinkPermissionScope(nextScope)) {
       onCreateScopeChange(nextScope);
     }
   };
@@ -130,11 +141,7 @@ export const ItemLinkPermissionPanel = ({
   const handleTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const nextType = event.currentTarget.value;
 
-    if (
-      nextType === "view" ||
-      nextType === "edit" ||
-      nextType === "blocksDownload"
-    ) {
+    if (isItemLinkPermissionType(nextType)) {
       onCreateTypeChange(nextType);
     }
   };
@@ -161,32 +168,19 @@ export const ItemLinkPermissionPanel = ({
           disabled={interactionDisabled}
           onOptionSelect={handleScopeSelect}
         >
-          <Option
-            disabled={scopeOptionDisabledState.anonymous}
-            text="Anyone"
-            value="anonymous"
-          >
-            <div className={styles.linkScopeOption}>
-              <GlobeRegular />
-              <span>Anyone</span>
-            </div>
-          </Option>
-          <Option
-            disabled={scopeOptionDisabledState.organization}
-            text="People in Organization"
-            value="organization"
-          >
-            <div className={styles.linkScopeOption}>
-              <PeopleRegular />
-              <span>People in Organization</span>
-            </div>
-          </Option>
-          <Option text="Specific Users/Groups" value="users">
-            <div className={styles.linkScopeOption}>
-              <PersonRegular />
-              <span>Specific Users/Groups</span>
-            </div>
-          </Option>
+          {ITEM_LINK_PERMISSION_SCOPES.map((scope) => (
+            <Option
+              key={scope}
+              disabled={scopeOptionDisabledState[scope]}
+              text={getItemLinkPermissionScopeLabel(scope)}
+              value={scope}
+            >
+              <div className={styles.linkScopeOption}>
+                {renderLinkScopeIcon(scope)}
+                <span>{getItemLinkPermissionScopeLabel(scope)}</span>
+              </div>
+            </Option>
+          ))}
         </Combobox>
 
         <Select
@@ -196,9 +190,15 @@ export const ItemLinkPermissionPanel = ({
           value={createType}
           onChange={handleTypeChange}
         >
-          <option value="view">View</option>
-          <option value="edit">Edit</option>
-          <option value="blocksDownload">Block download</option>
+          {ITEM_LINK_PERMISSION_TYPES.map((type) => (
+            <option
+              key={type}
+              disabled={typeOptionDisabledState[type]}
+              value={type}
+            >
+              {getItemLinkPermissionRoleLabel(type)}
+            </option>
+          ))}
         </Select>
 
         <Button
@@ -251,6 +251,22 @@ export const ItemLinkPermissionPanel = ({
     </div>
   );
 };
+
+const createScopeTypeKey = (
+  scope: ItemLinkPermissionScope,
+  type: ItemLinkPermissionType,
+) => `${scope}:${type}`;
+
+const isItemLinkPermissionScope = (
+  value: string | undefined,
+): value is ItemLinkPermissionScope =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
+
+const isItemLinkPermissionType = (
+  value: string,
+): value is ItemLinkPermissionType =>
+  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);
 
 interface ILinkPermissionRowProps {
   entry: IItemLinkPermissionDerivedEntry;

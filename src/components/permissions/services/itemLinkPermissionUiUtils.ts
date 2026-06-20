@@ -40,6 +40,10 @@ export const getItemLinkPermissionRoleLabel = (
     return "Edit";
   }
 
+  if (type === "review") {
+    return "Review";
+  }
+
   if (type === "blocksDownload") {
     return "Block download";
   }

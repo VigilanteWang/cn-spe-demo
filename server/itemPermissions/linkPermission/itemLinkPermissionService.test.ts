@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  Client,
-  GraphRequest,
-} from "@microsoft/microsoft-graph-client";
+import type { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
 import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
 import {
   applyItemLinkPermissionChangeSet,
@@ -55,31 +52,34 @@ describe("fetchMapItemLinkPermissionsFromGraphToResponse", () => {
       body?: unknown;
     }> = [];
 
-    const graphClient = createMockGraphClient({
-      "/drives/drive-1/items/item-1/permissions": {
-        value: [
-          {
-            id: "perm-link-1",
-            shareId: "u!share-id-1",
-            link: {
-              scope: "organization",
-              type: "view",
-              webUrl: "https://contoso.sharepoint.com/link-1",
-            },
-          },
-          {
-            id: "perm-people-1",
-            grantedToV2: {
-              user: {
-                id: "user-1",
-                displayName: "Adele Vance",
+    const graphClient = createMockGraphClient(
+      {
+        "/drives/drive-1/items/item-1/permissions": {
+          value: [
+            {
+              id: "perm-link-1",
+              shareId: "u!share-id-1",
+              link: {
+                scope: "organization",
+                type: "view",
+                webUrl: "https://contoso.sharepoint.com/link-1",
               },
             },
-            roles: ["read"],
-          },
-        ],
+            {
+              id: "perm-people-1",
+              grantedToV2: {
+                user: {
+                  id: "user-1",
+                  displayName: "Adele Vance",
+                },
+              },
+              roles: ["read"],
+            },
+          ],
+        },
       },
-    }, operations);
+      operations,
+    );
 
     const response = await fetchMapItemLinkPermissionsFromGraphToResponse(
       graphClient,
@@ -125,7 +125,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
           shareId: "u!share-created-1",
           link: {
             scope: "users",
-            type: "edit",
+            type: "review",
             webUrl: "https://contoso.sharepoint.com/link-created",
           },
         },
@@ -136,7 +136,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
               shareId: "u!share-created-1",
               link: {
                 scope: "users",
-                type: "edit",
+                type: "review",
                 webUrl: "https://contoso.sharepoint.com/link-created",
               },
             },
@@ -154,7 +154,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
         create: [
           {
             scope: "users",
-            type: "edit",
+            type: "review",
             recipients: [{ recipientObjectId: "user-created-1" }],
           },
         ],
@@ -195,7 +195,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
         version: "v1.0",
         body: {
           scope: "users",
-          type: "edit",
+          type: "review",
         },
       },
       {
@@ -203,7 +203,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
         method: "post",
         version: "v1.0",
         body: {
-          roles: ["write"],
+          roles: ["read"],
           recipients: [{ objectId: "user-created-1" }],
         },
       },

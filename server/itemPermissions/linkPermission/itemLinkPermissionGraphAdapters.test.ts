@@ -51,6 +51,26 @@ describe("mapGraphItemLinkPermission", () => {
     expect(entry?.grantedToCount).toBe(0);
   });
 
+  it("should map review links to the review role label", () => {
+    const entry = mapGraphItemLinkPermission({
+      id: "perm-link-review",
+      shareId: "u!share-review",
+      link: {
+        scope: "anonymous",
+        type: "review",
+        webUrl: "https://contoso.sharepoint.com/link-review",
+      },
+      grantedToIdentitiesV2: [],
+    });
+
+    expect(entry).toMatchObject({
+      scope: "anonymous",
+      type: "review",
+      roleLabel: "Review",
+      preventsDownload: false,
+    });
+  });
+
   it("should map users link identities and grant capabilities", () => {
     const entry = mapGraphItemLinkPermission({
       id: "perm-link-3",
@@ -161,6 +181,7 @@ describe("mapGraphItemLinkPermission", () => {
 describe("link permission Graph payload builders", () => {
   it("should keep grant role mapping stable", () => {
     expect(mapItemLinkPermissionTypeToGrantRole("view")).toBe("read");
+    expect(mapItemLinkPermissionTypeToGrantRole("review")).toBe("read");
     expect(mapItemLinkPermissionTypeToGrantRole("blocksDownload")).toBe("read");
     expect(mapItemLinkPermissionTypeToGrantRole("edit")).toBe("write");
   });

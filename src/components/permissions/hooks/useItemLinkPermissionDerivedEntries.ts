@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import type { IItemLinkPermissionEntryForUI } from "../models/itemLinkPermissionModels";
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_TYPES,
+  type IItemLinkPermissionEntryForUI,
+} from "../models/itemLinkPermissionModels";
 import type {
   IItemLinkPermissionDerivedEntry,
   IItemLinkPermissionDraftState,
@@ -126,11 +130,18 @@ export const useItemLinkPermissionDerivedEntries = (
 
     const sortedEntries = [...persistedEntries, ...createdEntries].sort(
       (left, right) => {
-        const rankDiff =
+        const scopeRankDiff =
           getScopeSortRank(left.scope) - getScopeSortRank(right.scope);
 
-        if (rankDiff !== 0) {
-          return rankDiff;
+        if (scopeRankDiff !== 0) {
+          return scopeRankDiff;
+        }
+
+        const typeRankDiff =
+          getTypeSortRank(left.type) - getTypeSortRank(right.type);
+
+        if (typeRankDiff !== 0) {
+          return typeRankDiff;
         }
 
         if (left.source === right.source) {
@@ -150,14 +161,8 @@ export const useItemLinkPermissionDerivedEntries = (
   }, [draft, originalEntries]);
 };
 
-const getScopeSortRank = (scope: IItemLinkPermissionEntryForUI["scope"]) => {
-  if (scope === "anonymous") {
-    return 0;
-  }
+const getScopeSortRank = (scope: IItemLinkPermissionEntryForUI["scope"]) =>
+  ITEM_LINK_PERMISSION_SCOPES.indexOf(scope);
 
-  if (scope === "organization") {
-    return 1;
-  }
-
-  return 2;
-};
+const getTypeSortRank = (type: IItemLinkPermissionEntryForUI["type"]) =>
+  ITEM_LINK_PERMISSION_TYPES.indexOf(type);

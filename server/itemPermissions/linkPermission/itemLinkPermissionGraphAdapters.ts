@@ -1,3 +1,4 @@
+import { ITEM_LINK_PERMISSION_TYPES } from "../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IItemLinkPermissionEntryForUI,
   IItemUserPermissionRecipientForUI,
@@ -36,10 +37,7 @@ export const mapGraphItemLinkPermission = (
   const scope = readLinkPermissionScope(linkRecord.scope);
   const rawType = readOptionalString(linkRecord.type);
   // 这里直接信任 Graph 返回的 `type`，只接受当前 UI 支持的三种枚举值。
-  const type =
-    rawType === "view" || rawType === "edit" || rawType === "blocksDownload"
-      ? rawType
-      : undefined;
+  const type = isItemLinkPermissionType(rawType) ? rawType : undefined;
 
   if (!permissionId || !webUrl || !scope || !type) {
     // 当前前端只接收“字段完整且 scope/type 在支持范围内”的 link permission。
@@ -96,7 +94,7 @@ export const mapGraphItemLinkPermissions = (
 export const readLinkPermissionScope = (
   value: unknown,
 ): ItemLinkPermissionScope | undefined => {
-  if (value === "anonymous" || value === "organization" || value === "users") {
+  if (isItemLinkPermissionScope(value)) {
     return value;
   }
 
@@ -114,6 +112,10 @@ export const mapLinkPermissionTypeToRoleLabel = (
 ): ItemLinkPermissionRoleLabelForUI => {
   if (type === "edit") {
     return "Edit";
+  }
+
+  if (type === "review") {
+    return "Review";
   }
 
   if (type === "blocksDownload") {
@@ -221,3 +223,14 @@ const readGrantedToIdentities = (
       (identity): identity is IGraphPermissionIdentity => identity !== null,
     );
 };
+
+const isItemLinkPermissionScope = (
+  value: unknown,
+): value is ItemLinkPermissionScope =>
+  value === "anonymous" || value === "organization" || value === "users";
+
+const isItemLinkPermissionType = (
+  value: unknown,
+): value is ItemLinkPermissionType =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);

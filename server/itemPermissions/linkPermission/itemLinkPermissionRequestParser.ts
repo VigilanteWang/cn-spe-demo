@@ -1,3 +1,7 @@
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_TYPES,
+} from "../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemLinkPermissionCreateChange,
@@ -209,7 +213,7 @@ const readRecipient = (
  */
 const readLinkPermissionScope = (value: unknown): ItemLinkPermissionScope => {
   // 这里用白名单把外部输入收窄成合同允许的 scope，避免非法值继续流向 Graph 请求。
-  if (value === "anonymous" || value === "organization" || value === "users") {
+  if (isItemLinkPermissionScope(value)) {
     return value;
   }
 
@@ -228,7 +232,7 @@ const readLinkPermissionScope = (value: unknown): ItemLinkPermissionScope => {
  */
 const readLinkPermissionType = (value: unknown): ItemLinkPermissionType => {
   // type 会直接决定 Graph createLink / grant 的行为，因此只接受当前合同明确支持的枚举值。
-  if (value === "view" || value === "edit" || value === "blocksDownload") {
+  if (isItemLinkPermissionType(value)) {
     return value;
   }
 
@@ -238,3 +242,15 @@ const readLinkPermissionType = (value: unknown): ItemLinkPermissionType => {
     { statusCode: 400, cause: value },
   );
 };
+
+const isItemLinkPermissionScope = (
+  value: unknown,
+): value is ItemLinkPermissionScope =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
+
+const isItemLinkPermissionType = (
+  value: unknown,
+): value is ItemLinkPermissionType =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);
