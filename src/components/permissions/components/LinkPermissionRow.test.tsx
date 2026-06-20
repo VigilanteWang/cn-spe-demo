@@ -1,0 +1,71 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { LinkPermissionRow } from "./LinkPermissionRow";
+import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
+
+const createEntry = (
+  overrides: Partial<IItemLinkPermissionDerivedEntry> = {},
+): IItemLinkPermissionDerivedEntry => ({
+  id: "entry-1",
+  source: "persisted",
+  permissionId: "perm-1",
+  shareId: "share-1",
+  webUrl: "https://contoso.example/link-1",
+  scope: "organization",
+  type: "view",
+  roleLabel: "View",
+  preventsDownload: false,
+  grantedToCount: 3,
+  recipients: [],
+  hasValidationError: false,
+  ...overrides,
+});
+
+describe("LinkPermissionRow", () => {
+  it("should render organization grantedToCount and invoke copy/delete handlers", () => {
+    const onCopyLink = vi.fn();
+    const onDeleteLink = vi.fn();
+    const entry = createEntry();
+
+    render(
+      <LinkPermissionRow
+        entry={entry}
+        interactionDisabled={false}
+        onCopyLink={onCopyLink}
+        onDeleteLink={onDeleteLink}
+      />,
+    );
+
+    expect(screen.getByText("people who have access: 3")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy People in Organization link" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Delete People in Organization link",
+      }),
+    );
+
+    expect(onCopyLink).toHaveBeenCalledWith("https://contoso.example/link-1");
+    expect(onDeleteLink).toHaveBeenCalledWith(entry);
+  });
+
+  it("should disable copy when webUrl is missing", () => {
+    render(
+      <LinkPermissionRow
+        entry={createEntry({ webUrl: undefined })}
+        interactionDisabled={false}
+        onCopyLink={vi.fn()}
+        onDeleteLink={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Copy People in Organization link",
+      }),
+    ).toBeDisabled();
+  });
+});

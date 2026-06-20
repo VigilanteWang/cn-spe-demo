@@ -1,6 +1,6 @@
 import {
-  ITEM_LINK_PERMISSION_SCOPES,
-  ITEM_LINK_PERMISSION_TYPES,
+  isItemLinkPermissionScope,
+  isItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IApplyItemLinkPermissionChangesRequest,
@@ -242,15 +242,3 @@ const readLinkPermissionType = (value: unknown): ItemLinkPermissionType => {
     { statusCode: 400, cause: value },
   );
 };
-
-const isItemLinkPermissionScope = (
-  value: unknown,
-): value is ItemLinkPermissionScope =>
-  typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
-
-const isItemLinkPermissionType = (
-  value: unknown,
-): value is ItemLinkPermissionType =>
-  typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);

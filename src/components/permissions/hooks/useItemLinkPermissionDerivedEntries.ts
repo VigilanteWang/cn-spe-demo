@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { getItemLinkPermissionRoleLabel } from "../../../../common/contracts/itemPermissionCommonContracts";
 import {
   ITEM_LINK_PERMISSION_SCOPES,
   ITEM_LINK_PERMISSION_TYPES,
@@ -11,7 +12,6 @@ import type {
 } from "../models/itemLinkPermissionModels";
 import {
   getItemLinkPermissionRecipientKey,
-  getItemLinkPermissionRoleLabel,
   mapGraphIdentityToItemLinkRecipientCandidate,
 } from "../services/itemLinkPermissionUiUtils";
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ItemLinkPermissionPanel } from "./ItemLinkPermissionPanel";
 import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
@@ -102,5 +102,42 @@ describe("ItemLinkPermissionPanel", () => {
     expect(
       screen.getByRole("option", { name: "Block download" }),
     ).toBeDisabled();
+  });
+
+  it("should auto expand a newly added users link row", async () => {
+    render(
+      <ItemLinkPermissionPanel
+        entries={[
+          createEntry({
+            id: "draft-users-1",
+            source: "draft",
+            permissionId: undefined,
+            shareId: undefined,
+            scope: "users",
+            type: "view",
+            roleLabel: "View",
+          }),
+        ]}
+        isLoading={false}
+        interactionDisabled={false}
+        createScope="users"
+        createType="edit"
+        onCreateScopeChange={vi.fn()}
+        onCreateTypeChange={vi.fn()}
+        onAddLink={() => "draft-users-1"}
+        onDeleteLink={vi.fn()}
+        onCopyLink={vi.fn()}
+        onAddRecipient={vi.fn()}
+        onRemoveRecipient={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add link" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Specified users and groups" }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
   });
 });

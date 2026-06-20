@@ -1,9 +1,11 @@
-import { ITEM_LINK_PERMISSION_TYPES } from "../../../common/contracts/itemPermissionCommonContracts";
+import {
+  getItemLinkPermissionRoleLabel,
+  isItemLinkPermissionScope,
+  isItemLinkPermissionType,
+} from "../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IItemLinkPermissionEntryForUI,
   IItemUserPermissionRecipientForUI,
-  ItemLinkPermissionRoleLabelForUI,
-  ItemLinkPermissionScope,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../common/contracts/permissionCommonContracts";
@@ -34,10 +36,12 @@ export const mapGraphItemLinkPermission = (
   const shareId = readOptionalString(permissionRecord.shareId);
   const linkRecord = readGraphToRecord(permissionRecord.link);
   const webUrl = readOptionalString(linkRecord.webUrl);
-  const scope = readLinkPermissionScope(linkRecord.scope);
-  const rawType = readOptionalString(linkRecord.type);
-  // 这里直接信任 Graph 返回的 `type`，只接受当前 UI 支持的三种枚举值。
-  const type = isItemLinkPermissionType(rawType) ? rawType : undefined;
+  const scope = isItemLinkPermissionScope(linkRecord.scope)
+    ? linkRecord.scope
+    : undefined;
+  const type = isItemLinkPermissionType(linkRecord.type)
+    ? linkRecord.type
+    : undefined;
 
   if (!permissionId || !webUrl || !scope || !type) {
     // 当前前端只接收“字段完整且 scope/type 在支持范围内”的 link permission。
@@ -45,7 +49,7 @@ export const mapGraphItemLinkPermission = (
   }
 
   const grantedToIdentities = readGrantedToIdentities(permissionRecord);
-  const roleLabel = mapLinkPermissionTypeToRoleLabel(type);
+  const roleLabel = getItemLinkPermissionRoleLabel(type);
   const hasShareId = Boolean(shareId);
 
   return {
@@ -82,48 +86,6 @@ export const mapGraphItemLinkPermissions = (
   permissions
     .map(mapGraphItemLinkPermission)
     .filter((entry): entry is IItemLinkPermissionEntryForUI => entry !== null);
-
-/**
- * 读取并校验 link scope。
- *
- * 当前只接受产品已纳管的三种 scope，其余值一律视为不支持。
- *
- * @param value Graph 返回的原始 scope。
- * @returns 合法的 link scope；不支持时返回 `undefined`。
- */
-export const readLinkPermissionScope = (
-  value: unknown,
-): ItemLinkPermissionScope | undefined => {
-  if (isItemLinkPermissionScope(value)) {
-    return value;
-  }
-
-  return undefined;
-};
-
-/**
- * 把 link type 转成前端只读标签。
- *
- * @param type 后端统一使用的 link type。
- * @returns 前端列表里展示的只读权限标签。
- */
-export const mapLinkPermissionTypeToRoleLabel = (
-  type: ItemLinkPermissionType,
-): ItemLinkPermissionRoleLabelForUI => {
-  if (type === "edit") {
-    return "Edit";
-  }
-
-  if (type === "review") {
-    return "Review";
-  }
-
-  if (type === "blocksDownload") {
-    return "Block download";
-  }
-
-  return "View";
-};
 
 /**
  * 把 link type 映射成 `permission/grant` 需要的 Graph role。
@@ -223,14 +185,3 @@ const readGrantedToIdentities = (
       (identity): identity is IGraphPermissionIdentity => identity !== null,
     );
 };
-
-const isItemLinkPermissionScope = (
-  value: unknown,
-): value is ItemLinkPermissionScope =>
-  value === "anonymous" || value === "organization" || value === "users";
-
-const isItemLinkPermissionType = (
-  value: unknown,
-): value is ItemLinkPermissionType =>
-  typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);

@@ -1,9 +1,7 @@
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemLinkPermissionEntryForUI,
-  ItemLinkPermissionRoleLabelForUI,
   ItemLinkPermissionScope,
-  ItemLinkPermissionType,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../../common/contracts/permissionCommonContracts";
 import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
@@ -28,27 +26,6 @@ export const getItemLinkPermissionScopeLabel = (
   }
 
   return "Specific Users/Groups";
-};
-
-/**
- * 把 link type 转成 UI 只读权限标签。
- */
-export const getItemLinkPermissionRoleLabel = (
-  type: ItemLinkPermissionType,
-): ItemLinkPermissionRoleLabelForUI => {
-  if (type === "edit") {
-    return "Edit";
-  }
-
-  if (type === "review") {
-    return "Review";
-  }
-
-  if (type === "blocksDownload") {
-    return "Block download";
-  }
-
-  return "View";
 };
 
 /**
