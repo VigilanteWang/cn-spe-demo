@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
+import { Text } from "@fluentui/react-components";
 import { describe, expect, it, vi } from "vitest";
-import { ItemLinkPermissionRow } from "./ItemLinkPermissionRow";
+import { ItemLinkPermissionRowShell } from "./itemLinkPermissionRowShared";
 import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
 
 const createEntry = (
@@ -22,18 +23,19 @@ const createEntry = (
   ...overrides,
 });
 
-describe("ItemLinkPermissionRow", () => {
+describe("ItemLinkPermissionRowShell", () => {
   it("should render organization grantedToCount and invoke copy/delete handlers", () => {
     const onCopyLink = vi.fn();
     const onDeleteLink = vi.fn();
     const entry = createEntry();
 
     render(
-      <ItemLinkPermissionRow
+      <ItemLinkPermissionRowShell
         entry={entry}
         interactionDisabled={false}
         onCopyLink={onCopyLink}
         onDeleteLink={onDeleteLink}
+        subtitle={<Text size={200}>people who have access: 3</Text>}
       />,
     );
 
@@ -54,7 +56,7 @@ describe("ItemLinkPermissionRow", () => {
 
   it("should disable copy when webUrl is missing", () => {
     render(
-      <ItemLinkPermissionRow
+      <ItemLinkPermissionRowShell
         entry={createEntry({ webUrl: undefined })}
         interactionDisabled={false}
         onCopyLink={vi.fn()}

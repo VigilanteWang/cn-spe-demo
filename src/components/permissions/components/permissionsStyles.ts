@@ -242,6 +242,9 @@ export const usePermissionsStyles = makeStyles({
     flexDirection: "column",
     rowGap: "10px",
   },
+  linkRowCardWithoutChildrenGap: {
+    rowGap: "0",
+  },
   linkRowMain: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) auto auto",

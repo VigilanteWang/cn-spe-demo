@@ -9,7 +9,7 @@ import {
   TabList,
   Text,
 } from "@fluentui/react-components";
-import { CopyRegular, DeleteRegular } from "@fluentui/react-icons";
+import { DeleteRegular } from "@fluentui/react-icons";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type { PermissionTabValue } from "../../../../common/contracts/permissionCommonContracts";
 import { useItemLinkPermissionRecipientSearch } from "../hooks/useItemLinkPermissionRecipientSearch";
@@ -17,13 +17,10 @@ import type {
   IItemLinkPermissionDerivedEntry,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
-import {
-  getItemLinkPermissionRecipientKey,
-  getItemLinkPermissionScopeLabel,
-} from "../services/itemLinkPermissionUiUtils";
+import { getItemLinkPermissionRecipientKey } from "../services/itemLinkPermissionUiUtils";
 import { PrincipalSearchComboBox } from "./PrincipalSearchComboBox";
+import { ItemLinkPermissionRowShell } from "./itemLinkPermissionRowShared";
 import { usePermissionsStyles } from "./permissionsStyles";
-import { renderItemLinkPermissionScopeIcon } from "./itemLinkPermissionRowShared";
 
 /**
  * specific item link 行组件的输入属性。
@@ -81,47 +78,15 @@ export const ItemLinkSpecificPermissionRow = ({
   });
 
   return (
-    <div className={styles.linkRowCard}>
-      <div className={styles.linkRowMain}>
-        <div className={styles.linkRowLeading}>
-          <span className={styles.linkRowIcon}>
-            {renderItemLinkPermissionScopeIcon(entry.scope)}
-          </span>
-          <div className={styles.linkRowText}>
-            <Text weight="semibold">
-              {getItemLinkPermissionScopeLabel(entry.scope)}
-            </Text>
-          </div>
-        </div>
-
-        <div className={styles.linkRowRoleBlock}>
-          <Text weight="semibold" className={styles.linkRowRoleText}>
-            {entry.roleLabel}
-          </Text>
-        </div>
-
-        <div className={styles.linkRowActions}>
-          <Button
-            appearance="subtle"
-            aria-label="Copy specific link"
-            disabled={interactionDisabled || !entry.webUrl}
-            icon={<CopyRegular />}
-            onClick={() => {
-              if (entry.webUrl) {
-                onCopyLink(entry.webUrl);
-              }
-            }}
-          />
-          <Button
-            appearance="subtle"
-            aria-label="Delete specific link"
-            disabled={interactionDisabled}
-            icon={<DeleteRegular />}
-            onClick={() => onDeleteLink(entry)}
-          />
-        </div>
-      </div>
-
+    <ItemLinkPermissionRowShell
+      entry={entry}
+      interactionDisabled={interactionDisabled}
+      onCopyLink={onCopyLink}
+      onDeleteLink={onDeleteLink}
+      copyAriaLabel="Copy specific link"
+      deleteAriaLabel="Delete specific link"
+      removeChildrenGap
+    >
       <Accordion
         collapsible
         openItems={isAccordionOpen ? ["specific-recipients"] : []}
@@ -214,6 +179,6 @@ export const ItemLinkSpecificPermissionRow = ({
           </AccordionPanel>
         </AccordionItem>
       </Accordion>
-    </div>
+    </ItemLinkPermissionRowShell>
   );
 };

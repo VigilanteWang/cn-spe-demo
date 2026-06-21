@@ -99,6 +99,12 @@ describe("ItemLinkSpecificPermissionRow", () => {
     expect(
       screen.getByRole("button", { name: "Specific people and groups" }),
     ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: "Copy specific link" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete specific link" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "People" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Groups" })).toBeInTheDocument();
     expect(screen.getAllByText("Adele Vance")).toHaveLength(2);

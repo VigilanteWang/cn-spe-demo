@@ -9,8 +9,8 @@ import {
   type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
 import { ItemLinkCreateControls } from "./ItemLinkCreateControls";
-import { ItemLinkPermissionRow } from "./ItemLinkPermissionRow";
 import { ItemLinkSpecificPermissionRow } from "./ItemLinkSpecificPermissionRow";
+import { ItemLinkPermissionRowShell } from "./itemLinkPermissionRowShared";
 import { usePermissionsStyles } from "./permissionsStyles";
 
 /**
@@ -149,12 +149,19 @@ export const ItemLinkPermissionPanel = ({
         <div className={styles.linkList}>
           {/* 先渲染非 specific link，保持普通分享链接的列表更紧凑。 */}
           {nonSpecificEntries.map((entry) => (
-            <ItemLinkPermissionRow
+            <ItemLinkPermissionRowShell
               key={entry.id}
               entry={entry}
               interactionDisabled={interactionDisabled}
               onCopyLink={onCopyLink}
               onDeleteLink={onDeleteLink}
+              subtitle={
+                entry.scope === "organization" ? (
+                  <Text size={200}>
+                    people who have access: {entry.grantedToCount}
+                  </Text>
+                ) : null
+              }
             />
           ))}
 

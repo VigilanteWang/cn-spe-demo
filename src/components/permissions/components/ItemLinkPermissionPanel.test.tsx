@@ -49,7 +49,7 @@ describe("ItemLinkPermissionPanel", () => {
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Open Link permission type" }),
+      screen.getByRole("combobox", { name: "Link permission type" }),
     );
     expect(
       await screen.findByRole("option", { name: "Review" }),
@@ -105,7 +105,7 @@ describe("ItemLinkPermissionPanel", () => {
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Open Link permission type" }),
+      screen.getByRole("combobox", { name: "Link permission type" }),
     );
     expect(screen.getByRole("button", { name: "Add link" })).toBeDisabled();
     expect(
