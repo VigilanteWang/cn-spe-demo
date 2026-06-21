@@ -14,22 +14,21 @@ import type {
 } from "../models/itemLinkPermissionModels";
 import { getInitials } from "./permissionPrincipalCandidateMapper";
 
+const ITEM_LINK_PERMISSION_SCOPE_LABELS: Record<
+  ItemLinkPermissionScope,
+  string
+> = {
+  anonymous: "Anyone with the link",
+  organization: "People in Organization",
+  specific: "Specific people",
+};
+
 /**
  * 把 link scope 转成 UI 文案。
  */
 export const getItemLinkPermissionScopeLabel = (
   scope: ItemLinkPermissionScope,
-): string => {
-  if (scope === "anonymous") {
-    return "Anyone";
-  }
-
-  if (scope === "organization") {
-    return "People in Organization";
-  }
-
-  return "Specific";
-};
+): string => ITEM_LINK_PERMISSION_SCOPE_LABELS[scope];
 
 /**
  * 生成 recipient 的稳定去重键。

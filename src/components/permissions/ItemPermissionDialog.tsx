@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Text } from "@fluentui/react-components";
 import { AppError, formatAppErrorMessageForUI } from "../../../common/appError";
-import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
+import { isSupportedItemLinkPermissionTarget } from "../../../common/helper/itemLinkPermissionCommonHelper";
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemUserPermissionChangeSetFromUI,

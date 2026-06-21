@@ -92,18 +92,6 @@ export type ItemLinkPermissionScope =
   (typeof ITEM_LINK_PERMISSION_SCOPES)[number];
 
 /**
- * 判断输入值是否属于当前支持的 link scope。
- *
- * @param value 待判断的原始输入。
- * @returns 命中 scope 白名单时返回 true。
- */
-export const isItemLinkPermissionScope = (
-  value: unknown,
-): value is ItemLinkPermissionScope =>
-  typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
-
-/**
  * link share 可支持的类型。
  */
 export const ITEM_LINK_PERMISSION_TYPES = [
@@ -115,18 +103,6 @@ export const ITEM_LINK_PERMISSION_TYPES = [
 
 export type ItemLinkPermissionType =
   (typeof ITEM_LINK_PERMISSION_TYPES)[number];
-
-/**
- * 判断输入值是否属于当前支持的 link type。
- *
- * @param value 待判断的原始输入。
- * @returns 命中 type 白名单时返回 true。
- */
-export const isItemLinkPermissionType = (
-  value: unknown,
-): value is ItemLinkPermissionType =>
-  typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);
 
 /**
  * link type 到前端只读权限标签的唯一映射表。
@@ -143,18 +119,6 @@ export const ITEM_LINK_PERMISSION_ROLE_LABELS = {
  */
 export type ItemLinkPermissionRoleLabelForUI =
   (typeof ITEM_LINK_PERMISSION_ROLE_LABELS)[ItemLinkPermissionType];
-
-/**
- * 把 link type 转成前后端共用的只读权限标签。
- *
- * 这里放在共享合同层，避免前后端各自维护一份相同映射。
- *
- * @param type 当前 link permission 的类型。
- * @returns UI 展示使用的只读权限标签。
- */
-export const getItemLinkPermissionRoleLabel = (
-  type: ItemLinkPermissionType,
-): ItemLinkPermissionRoleLabelForUI => ITEM_LINK_PERMISSION_ROLE_LABELS[type];
 
 /**
  * link 当前可执行的后续操作能力。

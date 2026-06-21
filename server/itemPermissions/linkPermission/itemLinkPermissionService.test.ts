@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
-import { isSupportedItemLinkPermissionTarget } from "../../../common/itemLinkPermissionTargets";
+import type { Client } from "@microsoft/microsoft-graph-client";
+import { isSupportedItemLinkPermissionTarget } from "../../../common/helper/itemLinkPermissionCommonHelper";
 import {
   applyItemLinkPermissionChangeSet,
   fetchMapItemLinkPermissionsFromGraphToResponse,
@@ -82,7 +82,7 @@ describe("fetchMapItemLinkPermissionsFromGraphToResponse", () => {
     );
 
     const response = await fetchMapItemLinkPermissionsFromGraphToResponse(
-      graphClient,
+      graphClient as Client,
       "drive-1",
       "item-1",
     );
@@ -147,7 +147,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
     );
 
     const response = await applyItemLinkPermissionChangeSet(
-      graphClient,
+      graphClient as Client,
       "drive-1",
       "item-1",
       {
@@ -233,8 +233,25 @@ describe("applyItemLinkPermissionChangeSet", () => {
   });
 });
 
-type PermissionGraphClient = Client;
-type PermissionGraphRequest = GraphRequest;
+/**
+ * 测试里的 Graph client 只需要覆盖当前服务真正调用到的最小方法集合。
+ */
+type PermissionGraphClient = {
+  api: (path: string) => PermissionGraphRequest;
+};
+
+/**
+ * 这里使用测试专用的最小 request 接口，并让链式方法返回自己，
+ * 避免把 SDK `GraphRequest` 上的大量内部字段一并拖进类型检查。
+ */
+interface PermissionGraphRequest {
+  version: (value: string) => PermissionGraphRequest;
+  header: (..._args: unknown[]) => PermissionGraphRequest;
+  get: () => Promise<unknown>;
+  post: (body: unknown) => Promise<unknown>;
+  patch: (body?: unknown) => Promise<unknown>;
+  delete: () => Promise<unknown>;
+}
 
 const createMockGraphClient = (
   responsesByPath: Record<string, unknown>,

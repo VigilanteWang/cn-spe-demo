@@ -2,7 +2,7 @@ import {
   getItemLinkPermissionRoleLabel,
   isItemLinkPermissionScope,
   isItemLinkPermissionType,
-} from "../../../common/contracts/itemPermissionCommonContracts";
+} from "../../../common/helper/itemLinkPermissionCommonHelper";
 import type {
   IItemLinkPermissionEntryForUI,
   IItemUserPermissionRecipientForUI,

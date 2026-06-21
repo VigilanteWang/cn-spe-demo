@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getItemLinkPermissionRoleLabel } from "../../../../common/contracts/itemPermissionCommonContracts";
+import { getItemLinkPermissionRoleLabel } from "../../../../common/helper/itemLinkPermissionCommonHelper";
 import {
   ITEM_LINK_PERMISSION_SCOPES,
   ITEM_LINK_PERMISSION_TYPES,

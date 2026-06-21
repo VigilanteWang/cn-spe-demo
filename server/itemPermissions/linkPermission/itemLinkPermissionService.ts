@@ -7,7 +7,7 @@ import type {
 import {
   isSupportedItemLinkPermissionTarget,
   type IItemLinkPermissionTargetInfo,
-} from "../../../common/itemLinkPermissionTargets";
+} from "../../../common/helper/itemLinkPermissionCommonHelper";
 import { sendGraphRequest } from "../../../common/graphError";
 import {
   readGraphToRecord,

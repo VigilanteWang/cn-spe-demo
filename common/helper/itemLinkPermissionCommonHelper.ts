@@ -1,3 +1,12 @@
+import {
+  ITEM_LINK_PERMISSION_ROLE_LABELS,
+  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_TYPES,
+  type ItemLinkPermissionRoleLabelForUI,
+  type ItemLinkPermissionScope,
+  type ItemLinkPermissionType,
+} from "../contracts/itemPermissionCommonContracts";
+
 /**
  * 判断文件是否支持 item link share 的所需信息。
  * 原则上，只有 office 文件支持 item link share。
@@ -92,3 +101,39 @@ export const isSupportedItemLinkPermissionTarget = (
   // 只有解析出扩展名时才检查扩展名 allowlist，否则视为不支持。
   return extension ? SUPPORTED_OFFICE_EXTENSIONS.has(extension) : false;
 };
+
+/**
+ * 判断输入值是否属于当前支持的 link scope。
+ *
+ * @param value 待判断的原始输入。
+ * @returns 命中 scope 白名单时返回 true。
+ */
+export const isItemLinkPermissionScope = (
+  value: unknown,
+): value is ItemLinkPermissionScope =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
+
+/**
+ * 判断输入值是否属于当前支持的 link type。
+ *
+ * @param value 待判断的原始输入。
+ * @returns 命中 type 白名单时返回 true。
+ */
+export const isItemLinkPermissionType = (
+  value: unknown,
+): value is ItemLinkPermissionType =>
+  typeof value === "string" &&
+  (ITEM_LINK_PERMISSION_TYPES as readonly string[]).includes(value);
+
+/**
+ * 把 link type 转成前后端共用的只读权限标签。
+ *
+ * 这里放在共享 helper 层，避免前后端各自维护一份相同映射。
+ *
+ * @param type 当前 link permission 的类型。
+ * @returns UI 展示使用的只读权限标签。
+ */
+export const getItemLinkPermissionRoleLabel = (
+  type: ItemLinkPermissionType,
+): ItemLinkPermissionRoleLabelForUI => ITEM_LINK_PERMISSION_ROLE_LABELS[type];

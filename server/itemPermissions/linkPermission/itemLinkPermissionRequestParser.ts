@@ -1,7 +1,7 @@
 import {
   isItemLinkPermissionScope,
   isItemLinkPermissionType,
-} from "../../../common/contracts/itemPermissionCommonContracts";
+} from "../../../common/helper/itemLinkPermissionCommonHelper";
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemLinkPermissionCreateChange,
