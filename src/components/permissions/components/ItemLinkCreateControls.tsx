@@ -1,4 +1,9 @@
-import { Button, Combobox, Option } from "@fluentui/react-components";
+import {
+  Button,
+  Dropdown,
+  Option,
+  type DropdownProps,
+} from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
 import { getItemLinkPermissionRoleLabel } from "../../../../common/helper/itemLinkPermissionCommonHelper";
 import {
@@ -44,13 +49,20 @@ export const ItemLinkCreateControls = ({
   onAddLink,
 }: IItemLinkCreateControlsProps) => {
   const styles = usePermissionsStyles();
+  const dropdownRoot: DropdownProps["root"] = {
+    className: styles.linkCreateDropdown,
+    style: {
+      width: "100%",
+      minWidth: 0,
+    },
+  };
 
   return (
     <div className={styles.linkCreateRow}>
-      {/* scope 选择框：输入框里展示的是可读标签，真正提交给外层的是受控的 scope 字面量值。 */}
-      <Combobox
+      {/* scope 选择框：这是固定候选集单选，使用 Dropdown 比可输入的 Combobox 更贴合 Fluent UI 官方推荐场景。 */}
+      <Dropdown
         aria-label="Link scope"
-        className={styles.linkCreateCombobox}
+        root={dropdownRoot}
         selectedOptions={[createScope]}
         value={getItemLinkPermissionScopeLabel(createScope)}
         disabled={interactionDisabled}
@@ -73,12 +85,12 @@ export const ItemLinkCreateControls = ({
             </div>
           </Option>
         ))}
-      </Combobox>
+      </Dropdown>
 
-      {/* type 选择框和 scope 保持同一套 Combobox 交互，只是展示文案来自共享的角色标签映射。 */}
-      <Combobox
+      {/* type 选择框同样是固定候选集单选，因此也走 Dropdown，避免输入型控件的默认最小宽度干扰布局。 */}
+      <Dropdown
         aria-label="Link permission type"
-        className={styles.linkCreateCombobox}
+        root={dropdownRoot}
         selectedOptions={[createType]}
         value={getItemLinkPermissionRoleLabel(createType)}
         disabled={interactionDisabled}
@@ -97,7 +109,7 @@ export const ItemLinkCreateControls = ({
             {getItemLinkPermissionRoleLabel(type)}
           </Option>
         ))}
-      </Combobox>
+      </Dropdown>
 
       {/* Add 按钮只负责触发外层新增动作，是否允许点击完全由外层已经算好的 canAddLink 控制。 */}
       <Button

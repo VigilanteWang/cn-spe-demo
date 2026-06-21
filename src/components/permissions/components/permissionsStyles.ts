@@ -218,7 +218,7 @@ export const usePermissionsStyles = makeStyles({
     alignItems: "center",
     columnGap: "8px",
   },
-  linkCreateCombobox: {
+  linkCreateDropdown: {
     width: "100%",
     minWidth: 0,
   },
@@ -232,7 +232,7 @@ export const usePermissionsStyles = makeStyles({
     flexDirection: "column",
     rowGap: "12px",
     overflowY: "auto",
-    paddingRight: "4px",
+    paddingRight: "1px",
   },
   linkRowCard: {
     border: `1px solid ${tokens.colorNeutralStroke2}`,

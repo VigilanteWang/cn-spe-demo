@@ -32,9 +32,9 @@ describe("ItemLinkCreateControls", () => {
     expect(screen.getByRole("combobox", { name: "Link scope" })).toBeEnabled();
     expect(
       screen.getByRole("combobox", { name: "Link permission type" }),
-    ).toHaveValue("Review");
+    ).toHaveTextContent("Review");
     await userEvent.click(
-      screen.getByRole("button", { name: "Open Link permission type" }),
+      screen.getByRole("combobox", { name: "Link permission type" }),
     );
     expect(
       await screen.findByRole("option", { name: "Review" }),
@@ -70,7 +70,7 @@ describe("ItemLinkCreateControls", () => {
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Open Link permission type" }),
+      screen.getByRole("combobox", { name: "Link permission type" }),
     );
     await userEvent.click(await screen.findByRole("option", { name: "Edit" }));
     fireEvent.click(screen.getByRole("button", { name: "Add link" }));

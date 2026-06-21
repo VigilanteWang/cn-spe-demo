@@ -466,7 +466,7 @@ describe("ItemPermissionDialog", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Links" }));
     expect(
-      screen.getByRole("button", { name: /Copy Anyone link/i }),
+      screen.getByRole("button", { name: /Copy Anyone with the link link/i }),
     ).toBeInTheDocument();
   });
 });

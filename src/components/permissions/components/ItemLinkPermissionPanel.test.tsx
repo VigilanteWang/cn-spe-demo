@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ItemLinkPermissionPanel } from "./ItemLinkPermissionPanel";
 import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
@@ -23,7 +24,7 @@ const createEntry = (
 });
 
 describe("ItemLinkPermissionPanel", () => {
-  it("should render review in the type selector and disable occupied scope:type combinations", () => {
+  it("should render review in the type selector and disable occupied scope:type combinations", async () => {
     render(
       <ItemLinkPermissionPanel
         entries={[
@@ -47,11 +48,16 @@ describe("ItemLinkPermissionPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: "Review" })).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open Link permission type" }),
+    );
+    expect(
+      await screen.findByRole("option", { name: "Review" }),
+    ).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "Add link" })).toBeDisabled();
   });
 
-  it("should disable add when all four types for a scope are already occupied", () => {
+  it("should disable add when all four types for a scope are already occupied", async () => {
     render(
       <ItemLinkPermissionPanel
         entries={[
@@ -98,10 +104,13 @@ describe("ItemLinkPermissionPanel", () => {
       />,
     );
 
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open Link permission type" }),
+    );
     expect(screen.getByRole("button", { name: "Add link" })).toBeDisabled();
     expect(
-      screen.getByRole("option", { name: "Block download" }),
-    ).toBeDisabled();
+      await screen.findByRole("option", { name: "Block download" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("should auto expand a newly added specific link row", async () => {
