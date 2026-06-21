@@ -61,11 +61,13 @@ export const parseItemLinkPermissionChangeSet = (
  */
 const mapCreateChange = (value: unknown): IItemLinkPermissionCreateChange => {
   const record = readGraphToRecord(value);
+  const scope = readLinkPermissionScope(record.scope);
+
   return {
-    scope: readLinkPermissionScope(record.scope),
+    scope,
     type: readLinkPermissionType(record.type),
-    // createLinks 的 recipients 允许省略，因为有些 link 只创建链接本身，不立即授权具体对象。
-    recipients: readOptionalRecipients(record.recipients, "createLinks"),
+    // 只有 specific link 会真正消费 recipients；其余 scope 即使传了空数组，也直接忽略。
+    recipients: readCreateRecipients(scope, record.recipients),
   };
 };
 
@@ -150,6 +152,24 @@ const readOptionalRecipients = (
   }
 
   return readRequiredRecipients(value, fieldName);
+};
+
+/**
+ * 读取 createLinks 场景下的 recipients。
+ *
+ * @param scope 当前待创建 link 的 scope。
+ * @param value 原始 recipients 输入。
+ * @returns specific link 需要非空 recipients；其它 scope 统一忽略该字段。
+ */
+const readCreateRecipients = (
+  scope: ItemLinkPermissionScope,
+  value: unknown,
+): IItemUserPermissionRecipientForUI[] | undefined => {
+  if (scope !== "specific") {
+    return undefined;
+  }
+
+  return readOptionalRecipients(value, "createLinks");
 };
 
 /**

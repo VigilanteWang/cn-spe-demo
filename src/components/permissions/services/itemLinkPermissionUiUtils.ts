@@ -98,11 +98,17 @@ export const createItemLinkPermissionChangeSet = (
   );
 
   return {
-    create: draft.createdLinks.map((entry) => ({
-      scope: entry.scope,
-      type: entry.type,
-      recipients: entry.recipients.map(mapItemLinkRecipientCandidateToRequest),
-    })),
+    create: draft.createdLinks.map((entry) => {
+      const recipients = entry.recipients.map(
+        mapItemLinkRecipientCandidateToRequest,
+      );
+
+      return {
+        scope: entry.scope,
+        type: entry.type,
+        ...(entry.scope === "specific" ? { recipients } : {}),
+      };
+    }),
     deleteLinks: draft.deletedPermissionIds.map((permissionId) => ({
       permissionId,
     })),

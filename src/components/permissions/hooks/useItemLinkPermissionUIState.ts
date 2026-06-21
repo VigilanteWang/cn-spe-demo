@@ -158,15 +158,31 @@ export const useItemLinkPermissionUIState = ({
   };
 };
 
+/**
+ * 为 links 创建区解析下一个可用的 scope/type 组合。
+ *
+ * 选择顺序遵循“尽量少改动当前选择”的原则：
+ * 1. 当前组合还能用时，直接保留当前 scope 和 type。
+ * 2. 当前组合已占用时，优先只在当前 scope 下切换到下一个可用 type。
+ * 3. 当前 scope 已经没有可用 type 时，再按常量顺序扫描其他 scope。
+ * 4. 如果所有组合都已占满，则返回 null，让上层知道已经没有可新增的 link。
+ *
+ * @param entries 当前面板里已经存在的 link 条目，包含后端基线和前端草稿。
+ * @param currentScope 当前创建区选中的 scope。
+ * @param currentType 当前创建区选中的 type。
+ * @returns 下一个可用的创建组合；如果所有组合都已占用，则返回 null。
+ */
 const resolveNextAvailableCreateLinkCombo = (
   entries: IItemLinkPermissionDerivedEntry[],
   currentScope: ItemLinkPermissionScope,
   currentType: ItemLinkPermissionType,
 ): { scope: ItemLinkPermissionScope; type: ItemLinkPermissionType } | null => {
+  // 先把已存在的 scope:type 组合收敛成集合，方便后面统一做占用判断。
   const occupiedKeys = new Set(
     entries.map((entry) => createScopeTypeKey(entry.scope, entry.type)),
   );
 
+  // 当前组合还没被占用时，不调整用户选择，直接继续使用它。
   if (!occupiedKeys.has(createScopeTypeKey(currentScope, currentType))) {
     return {
       scope: currentScope,
@@ -174,6 +190,7 @@ const resolveNextAvailableCreateLinkCombo = (
     };
   }
 
+  // 当前组合已占用时，优先保留当前 scope，只在同一个 scope 下寻找下一个可用 type。
   const currentScopeAvailableType = ITEM_LINK_PERMISSION_TYPES.find(
     (type) => !occupiedKeys.has(createScopeTypeKey(currentScope, type)),
   );
@@ -185,6 +202,7 @@ const resolveNextAvailableCreateLinkCombo = (
     };
   }
 
+  // 当前 scope 已经没有空位后，再按既定顺序扫描其他 scope，取全局第一个可用组合。
   for (const scope of ITEM_LINK_PERMISSION_SCOPES) {
     const availableType = ITEM_LINK_PERMISSION_TYPES.find(
       (type) => !occupiedKeys.has(createScopeTypeKey(scope, type)),
@@ -198,6 +216,7 @@ const resolveNextAvailableCreateLinkCombo = (
     }
   }
 
+  // 所有 scope:type 组合都已占用时，返回 null 交给上层处理“不可新增”的状态。
   return null;
 };
 

@@ -132,4 +132,32 @@ describe("parseItemLinkPermissionChangeSet", () => {
       }),
     ).toThrow("must be a non-empty array");
   });
+
+  it("should ignore recipients for non-specific create links", () => {
+    const parsed = parseItemLinkPermissionChangeSet({
+      create: [
+        {
+          scope: "organization",
+          type: "edit",
+          recipients: [],
+        },
+      ],
+      deleteLinks: [],
+      grantRecipients: [],
+      revokeRecipients: [],
+    });
+
+    expect(parsed).toEqual({
+      create: [
+        {
+          scope: "organization",
+          type: "edit",
+          recipients: undefined,
+        },
+      ],
+      deleteLinks: [],
+      grantRecipients: [],
+      revokeRecipients: [],
+    });
+  });
 });

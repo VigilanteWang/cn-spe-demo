@@ -59,6 +59,14 @@ export const ItemLinkPermissionPanel = ({
   const styles = usePermissionsStyles();
 
   /**
+   * 用 scope + type 生成唯一键，统一复用在重复判断和禁用态计算里。
+   */
+  const createScopeTypeKey = (
+    scope: ItemLinkPermissionScope,
+    type: ItemLinkPermissionType,
+  ) => `${scope}:${type}`;
+
+  /**
    * 记录刚创建的 specific link，便于列表刷新后自动展开对应的 recipients 区域。
    */
   const [autoExpandedSpecificEntryId, setAutoExpandedSpecificEntryId] =
@@ -97,16 +105,6 @@ export const ItemLinkPermissionPanel = ({
   const nonSpecificEntries = entries.filter(
     (entry) => entry.scope !== "specific",
   );
-
-  /**
-   * 用 scope + type 生成唯一键，统一复用在重复判定和禁用态计算里。
-   */
-  const createScopeTypeKey = (
-    scope: ItemLinkPermissionScope,
-    type: ItemLinkPermissionType,
-  ) => {
-    return `${scope}:${type}`;
-  };
 
   /**
    * 新增 specific link 后，自动展开它的 recipients accordion。

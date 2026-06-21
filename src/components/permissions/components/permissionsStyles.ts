@@ -222,10 +222,6 @@ export const usePermissionsStyles = makeStyles({
     width: "100%",
     minWidth: 0,
   },
-  linkCreateSelect: {
-    width: "100%",
-    minWidth: 0,
-  },
   linkScopeOption: {
     display: "flex",
     alignItems: "center",
