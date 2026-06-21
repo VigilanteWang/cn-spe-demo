@@ -27,7 +27,7 @@ export const mapDirectorySearchResultToCandidate = (
 /**
  * 从显示名称中提取最多两个首字母，供 Avatar 使用。
  */
-const getInitials = (name: string): string => {
+export const getInitials = (name: string): string => {
   const segments = name
     .trim()
     .split(/\s+/)

@@ -6,10 +6,11 @@ import type {
   ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
 import {
+  createItemLinkPermissionCreatedLinkDraft,
   createEmptyItemLinkPermissionDraftState,
+  getItemLinkPermissionRecipientKey,
   hasItemLinkPermissionDraftChanges,
-} from "../models/itemLinkPermissionModels";
-import { getItemLinkPermissionRecipientKey } from "../services/itemLinkPermissionUiUtils";
+} from "../services/itemLinkPermissionUiUtils";
 
 /**
  * 管理 links 面板的本地草稿差异。
@@ -50,12 +51,7 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
           ...currentDraft,
           createdLinks: [
             ...currentDraft.createdLinks,
-            {
-              id: nextId,
-              scope,
-              type,
-              recipients: [],
-            },
+            createItemLinkPermissionCreatedLinkDraft(nextId, scope, type),
           ],
         };
       });

@@ -1,15 +1,18 @@
 import type {
   IApplyItemLinkPermissionChangesRequest,
   IItemLinkPermissionEntryForUI,
+  IItemUserPermissionRecipientForUI,
   ItemLinkPermissionScope,
+  ItemLinkPermissionType,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../../common/contracts/permissionCommonContracts";
 import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
 import type {
+  IItemLinkPermissionCreatedLinkDraft,
   IItemLinkPermissionDraftState,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
-import { mapItemLinkRecipientCandidateToRequest } from "../models/itemLinkPermissionModels";
+import { getInitials } from "./permissionPrincipalCandidateMapper";
 
 /**
  * 把 link scope 转成 UI 文案。
@@ -150,26 +153,70 @@ export const createItemLinkPermissionChangeSet = (
   };
 };
 
+/**
+ * 把 recipient 候选项还原成后端 `grant/revoke` 需要的最小合同。
+ *
+ * 优先级沿用现有 item permission 的 recipient 规则：
+ * 优先 objectId，其次 email，最后 alias/UPN。
+ *
+ * @param candidate 前端当前持有的 recipient 候选项。
+ * @returns 可直接提交给后端合同层的最小 recipient。
+ */
+export const mapItemLinkRecipientCandidateToRequest = (
+  candidate: IItemLinkPermissionRecipientCandidate,
+): IItemUserPermissionRecipientForUI => ({
+  recipientObjectId: candidate.objectId,
+  recipientEmail: candidate.mail,
+  recipientAlias: candidate.userPrincipalName,
+});
+
+/**
+ * 计算 links 面板是否存在本地未保存修改。
+ *
+ * @param draft 当前 links 草稿状态。
+ * @returns 只要任一变更集合非空，就视为存在未保存修改。
+ */
+export const hasItemLinkPermissionDraftChanges = (
+  draft: IItemLinkPermissionDraftState,
+): boolean =>
+  draft.createdLinks.length > 0 ||
+  draft.deletedPermissionIds.length > 0 ||
+  Object.keys(draft.grantsByPermissionId).length > 0 ||
+  Object.keys(draft.revokesByPermissionId).length > 0;
+
+/**
+ * 生成 links 列表默认的空草稿状态。
+ */
+export const createEmptyItemLinkPermissionDraftState =
+  (): IItemLinkPermissionDraftState => ({
+    createdLinks: [],
+    deletedPermissionIds: [],
+    grantsByPermissionId: {},
+    revokesByPermissionId: {},
+  });
+
+/**
+ * 生成 links 面板默认的空后端快照。
+ */
+export const createEmptyItemLinkPermissionEntries =
+  (): IItemLinkPermissionEntryForUI[] => [];
+
+/**
+ * 生成一条新的 link 草稿项。
+ *
+ * 这个工厂目前主要给 hooks/UI 使用，因此放在 links 的 UI utils 更合适。
+ */
+export const createItemLinkPermissionCreatedLinkDraft = (
+  id: string,
+  scope: ItemLinkPermissionScope,
+  type: ItemLinkPermissionType,
+): IItemLinkPermissionCreatedLinkDraft => ({
+  id,
+  scope,
+  type,
+  recipients: [],
+});
+
 const mapItemLinkRecipientToRequest = (
   candidate: IItemLinkPermissionRecipientCandidate,
 ) => mapItemLinkRecipientCandidateToRequest(candidate);
-
-/**
- * 为 Avatar 生成最多两个首字母。
- */
-const getInitials = (name: string): string => {
-  const segments = name
-    .trim()
-    .split(/\s+/)
-    .filter((segment) => segment.length > 0);
-
-  if (segments.length === 0) {
-    return "?";
-  }
-
-  if (segments.length === 1) {
-    return segments[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${segments[0][0]}${segments[1][0]}`.toUpperCase();
-};

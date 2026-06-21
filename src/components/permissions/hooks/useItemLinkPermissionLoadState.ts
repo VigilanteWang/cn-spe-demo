@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { IItemLinkPermissionEntryForUI } from "../models/itemLinkPermissionModels";
-import { createEmptyItemLinkPermissionEntries } from "../models/itemLinkPermissionModels";
+import { createEmptyItemLinkPermissionEntries } from "../services/itemLinkPermissionUiUtils";
 
 /**
  * 管理 links 面板最近一次后端确认快照与懒加载状态。
