@@ -295,6 +295,9 @@ export const usePermissionsStyles = makeStyles({
     flexDirection: "column",
     rowGap: "10px",
   },
+  linkAccordionHeaderButton: {
+    padding: "0",
+  },
   linkRecipientList: {
     display: "flex",
     flexDirection: "column",

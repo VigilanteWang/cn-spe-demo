@@ -9,6 +9,7 @@ import type {
 } from "../models/itemLinkPermissionModels";
 
 const hookState = vi.hoisted(() => ({
+  searchTab: "people" as "people" | "groups",
   setSearchTab: vi.fn(),
   handleQueryChange: vi.fn(),
   handleCandidateSelect: vi.fn(),
@@ -16,7 +17,7 @@ const hookState = vi.hoisted(() => ({
 
 vi.mock("../hooks/useItemLinkPermissionRecipientSearch", () => ({
   useItemLinkPermissionRecipientSearch: () => ({
-    searchTab: "people",
+    searchTab: hookState.searchTab,
     setSearchTab: hookState.setSearchTab,
     query: "Ade",
     results: [
@@ -79,6 +80,7 @@ const createEntry = (
 
 describe("ItemLinkSpecificPermissionRow", () => {
   beforeEach(() => {
+    hookState.searchTab = "people";
     hookState.setSearchTab.mockClear();
     hookState.handleQueryChange.mockClear();
     hookState.handleCandidateSelect.mockClear();
@@ -109,6 +111,80 @@ describe("ItemLinkSpecificPermissionRow", () => {
     expect(screen.getByRole("tab", { name: "People" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Groups" })).toBeInTheDocument();
     expect(screen.getAllByText("Adele Vance")).toHaveLength(2);
+  });
+
+  it("should switch recipient list with the selected tab", () => {
+    const mixedEntry = createEntry({
+      recipients: [
+        {
+          key: "user-adele-vance",
+          source: "persisted",
+          candidate: createRecipientCandidate(),
+        },
+        {
+          key: "group-sales",
+          source: "persisted",
+          candidate: createRecipientCandidate({
+            id: "group-sales",
+            objectId: "group-sales",
+            name: "Sales Team",
+            type: "groups",
+            secondaryText: "sales@contoso.com",
+            initials: "ST",
+            mail: "sales@contoso.com",
+            userPrincipalName: undefined,
+          }),
+        },
+      ],
+    });
+
+    const { rerender } = render(
+      <ItemLinkSpecificPermissionRow
+        entry={mixedEntry}
+        interactionDisabled={false}
+        autoExpand
+        onCopyLink={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onAddRecipient={vi.fn()}
+        onRemoveRecipient={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText("Adele Vance")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", {
+        name: "Remove Adele Vance from specific link",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove Sales Team from specific link",
+      }),
+    ).not.toBeInTheDocument();
+
+    hookState.searchTab = "groups";
+    rerender(
+      <ItemLinkSpecificPermissionRow
+        entry={mixedEntry}
+        interactionDisabled={false}
+        autoExpand
+        onCopyLink={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onAddRecipient={vi.fn()}
+        onRemoveRecipient={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove Adele Vance from specific link",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Remove Sales Team from specific link",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("should remove recipient and show validation error", () => {

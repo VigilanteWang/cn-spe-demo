@@ -79,6 +79,10 @@ export const ItemLinkSpecificPermissionRow = ({
     entry,
     onAddRecipient,
   });
+  // 下方已选 recipients 跟随当前 tab 一起切换，避免 people / groups 混在同一块列表里。
+  const visibleRecipients = entry.recipients.filter(
+    (recipient) => recipient.candidate.type === searchTab,
+  );
 
   return (
     <ItemLinkPermissionRowShell
@@ -102,7 +106,13 @@ export const ItemLinkSpecificPermissionRow = ({
         }}
       >
         <AccordionItem value="specific-recipients">
-          <AccordionHeader>Specific people and groups</AccordionHeader>
+          <AccordionHeader
+            // Fluent UI 把 header 主点击区渲染成 button，默认自带水平 padding；
+            // 这里单独清掉它，避免 specific link 这一行和卡片内容产生额外内边距。
+            button={{ className: styles.linkAccordionHeaderButton }}
+          >
+            Specific people and groups
+          </AccordionHeader>
           <AccordionPanel>
             <div className={styles.userLinkPanelContent}>
               <TabList
@@ -156,8 +166,8 @@ export const ItemLinkSpecificPermissionRow = ({
               ) : null}
 
               <div className={styles.linkRecipientList}>
-                {/* 当前 specific link 已经绑定的对象列表，支持逐个移除。 */}
-                {entry.recipients.map((recipient) => (
+                {/* 当前 specific link 已绑定的对象列表跟随顶部 tab 切换，只显示当前分类。 */}
+                {visibleRecipients.map((recipient) => (
                   <div
                     key={recipient.key}
                     className={styles.linkRecipientListRow}
