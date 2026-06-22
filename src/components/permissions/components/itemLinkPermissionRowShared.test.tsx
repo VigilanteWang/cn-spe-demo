@@ -70,4 +70,21 @@ describe("ItemLinkPermissionRowShell", () => {
       }),
     ).toBeDisabled();
   });
+
+  it("should show copy tooltip on hover", async () => {
+    render(
+      <ItemLinkPermissionRowShell
+        entry={createEntry()}
+        interactionDisabled={false}
+        onCopyLink={vi.fn()}
+        onDeleteLink={vi.fn()}
+      />,
+    );
+
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: "Copy People in Organization link" }),
+    );
+
+    expect(screen.getByLabelText("Copy Link")).toBeInTheDocument();
+  });
 });

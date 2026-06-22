@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { mergeClasses, tokens } from "@fluentui/react-components";
-import { Button, Text } from "@fluentui/react-components";
+import { Button, Text, Tooltip } from "@fluentui/react-components";
 import {
   BriefcaseRegular,
   CopyRegular,
@@ -26,6 +26,7 @@ const ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR: Record<
   // 指定对象链接使用中性灰，避免它在视觉层级上抢过更开放的链接范围。
   specific: tokens.colorNeutralForeground3,
 };
+const ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE = { fontSize: "18px" } as const;
 
 /**
  * 渲染 link scope 对应的图标，确保创建区和列表行保持同一套视觉语义。
@@ -39,14 +40,29 @@ export const renderItemLinkPermissionScopeIcon = (
   const primaryFill = ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR[scope];
 
   if (scope === "anonymous") {
-    return <GlobeRegular primaryFill={primaryFill} />;
+    return (
+      <GlobeRegular
+        primaryFill={primaryFill}
+        style={ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE}
+      />
+    );
   }
 
   if (scope === "organization") {
-    return <BriefcaseRegular primaryFill={primaryFill} />;
+    return (
+      <BriefcaseRegular
+        primaryFill={primaryFill}
+        style={ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE}
+      />
+    );
   }
 
-  return <PersonRegular primaryFill={primaryFill} />;
+  return (
+    <PersonRegular
+      primaryFill={primaryFill}
+      style={ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE}
+    />
+  );
 };
 
 /**
@@ -83,6 +99,7 @@ export const ItemLinkPermissionRowShell = ({
 }: IItemLinkPermissionRowShellProps) => {
   const styles = usePermissionsStyles();
   const scopeLabel = getItemLinkPermissionScopeLabel(entry.scope);
+  const copyTooltipText = "Copy Link";
 
   return (
     <div
@@ -109,17 +126,26 @@ export const ItemLinkPermissionRowShell = ({
         </div>
 
         <div className={styles.linkRowActions}>
-          <Button
-            appearance="subtle"
-            aria-label={copyAriaLabel ?? `Copy ${scopeLabel} link`}
-            disabled={interactionDisabled || !entry.webUrl}
-            icon={<CopyRegular />}
-            onClick={() => {
-              if (entry.webUrl) {
-                onCopyLink(entry.webUrl);
-              }
-            }}
-          />
+          <Tooltip
+            relationship="label"
+            positioning="above"
+            content={copyTooltipText}
+          >
+            {/* 复制按钮存在 disabled 场景，包一层 span 能保证 Tooltip 仍然可触发。 */}
+            <span>
+              <Button
+                appearance="subtle"
+                aria-label={copyAriaLabel ?? `Copy ${scopeLabel} link`}
+                disabled={interactionDisabled || !entry.webUrl}
+                icon={<CopyRegular />}
+                onClick={() => {
+                  if (entry.webUrl) {
+                    onCopyLink(entry.webUrl);
+                  }
+                }}
+              />
+            </span>
+          </Tooltip>
           <Button
             appearance="subtle"
             aria-label={deleteAriaLabel ?? `Delete ${scopeLabel} link`}
