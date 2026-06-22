@@ -5,7 +5,7 @@ import type {
   IContainerUserPermissionEntriesByTab,
   IContainerUserPermissionEntry,
 } from "./models/containerUserPermissionModels";
-import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
+import type { IPermissionPrincipalSearchCandidate } from "./models/permissionSharedModels";
 import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
 import { useUserPermissionDialogUIState } from "./hooks/useUserPermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
@@ -36,7 +36,7 @@ const CONTAINER_PERMISSION_ROLES: ContainerUserPermissionRole[] = [
  * @returns 一条可直接加入容器权限草稿列表的新记录。
  */
 const createContainerPermissionEntryFromCandidate = (
-  candidate: IPermissionPrincipalCandidate,
+  candidate: IPermissionPrincipalSearchCandidate,
 ): IContainerUserPermissionEntry => ({
   ...createBaseUserPermissionEntryFromCandidate(candidate),
   role: "Reader",

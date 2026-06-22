@@ -9,7 +9,7 @@ import {
 import type { ComboboxProps } from "@fluentui/react-components";
 import type { PermissionPrincipalSearchStatus } from "../hooks/usePermissionPrincipalSearch";
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
 import { getPermissionTabTitle } from "../utils/permissionDialogSharedUtils";
@@ -23,14 +23,14 @@ interface IPrincipalSearchComboBoxProps {
   interactionDisabled: boolean;
   searchInputId: string;
   query: string;
-  searchResults: IPermissionPrincipalCandidate[];
+  searchResults: IPermissionPrincipalSearchCandidate[];
   searchStatus: PermissionPrincipalSearchStatus;
   isDropdownOpen: boolean;
   onSearchQueryChange: (value: string) => void;
   onSearchCandidateSelect: (candidateId: string | undefined) => void;
   isCandidateAdded: (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ) => boolean;
 }
 

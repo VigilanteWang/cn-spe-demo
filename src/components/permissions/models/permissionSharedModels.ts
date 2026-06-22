@@ -13,7 +13,7 @@ export type { IPermissionEntryBaseForUI, PermissionTabValue };
  * - Dialog 只关心如何渲染与选择，不需要知道原始结果来自哪一种 Graph 查询。
  * - item invite 当前只需要先把 objectId / mail 这类更稳定的信息保留下来。
  */
-export interface IPermissionPrincipalCandidate {
+export interface IPermissionPrincipalSearchCandidate {
   /** 候选 principal 的稳定标识。 */
   id: string;
   /** 用户或组的 object id。 */

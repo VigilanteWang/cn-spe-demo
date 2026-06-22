@@ -1,11 +1,11 @@
 import type { IPermissionEntryBaseForUI } from "../../../../common/contracts/permissionCommonContracts";
-import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
+import type { IPermissionPrincipalSearchCandidate } from "../models/permissionSharedModels";
 
 /**
  * 把目录搜索候选项转换成 user-type 权限草稿共用的基础字段。
  */
 export const createBaseUserPermissionEntryFromCandidate = (
-  candidate: IPermissionPrincipalCandidate,
+  candidate: IPermissionPrincipalSearchCandidate,
 ): IPermissionEntryBaseForUI => ({
   id: `${candidate.type}:${candidate.id}`,
   principalId: candidate.id,

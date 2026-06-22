@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { IPermissionEntryBaseForUI } from "../../../../common/contracts/permissionCommonContracts";
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionEntriesByTab,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
@@ -16,7 +16,7 @@ import { useUserPermissionTabs } from "./useUserPermissionTabs";
  */
 export type CreatePermissionEntryFromCandidateFn<
   TEntry extends IPermissionEntryBaseForUI & { role: string },
-> = (candidate: IPermissionPrincipalCandidate) => TEntry;
+> = (candidate: IPermissionPrincipalSearchCandidate) => TEntry;
 
 /**
  * 组合权限弹窗共用的 tab 、搜索词和草稿状态。
@@ -66,7 +66,7 @@ export const useUserPermissionDialogUIState = <
    */
   const addCandidate = (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ) => {
     addEntry(tab, createEntryFromCandidate(candidate));
   };
@@ -93,7 +93,7 @@ export const useUserPermissionDialogUIState = <
    */
   const isCandidateAdded = (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ): boolean => {
     return draftEntriesByTab[tab].some((entry) => {
       if (tab === "groups") {

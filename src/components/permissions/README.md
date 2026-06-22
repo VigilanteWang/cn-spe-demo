@@ -108,7 +108,7 @@ src/components/permissions/
   - `ContainerPermissionRole`
   - `IContainerPermissionEntry`
 - 前端本地候选模型：
-  - `IPermissionPrincipalCandidate`
+  - `IPermissionPrincipalSearchCandidate`
 - 前端按 tab 分组的列表模型�? - `PermissionEntriesByTab`
 
 这意味着现在的类型分层是�?
@@ -234,7 +234,7 @@ common/contracts/containerPermissionCommonContracts.ts
   副文�?- `role`
   `Reader / Writer / Manager / Owner`
 
-### 4.2 前端本地候选模型：`IPermissionPrincipalCandidate`
+### 4.2 前端本地候选模型：`IPermissionPrincipalSearchCandidate`
 
 这个模型只存在于前端搜索链路里�?
 它表示：
@@ -244,7 +244,7 @@ common/contracts/containerPermissionCommonContracts.ts
 
 ```text
 IDirectoryPrincipalSearchResult
-  -> IPermissionPrincipalCandidate
+  -> IPermissionPrincipalSearchCandidate
   -> IContainerPermissionEntry
 ```
 
@@ -347,7 +347,7 @@ mapDirectorySearchResultToCandidate(result, selectedTab);
 转换成：
 
 ```ts
-IPermissionPrincipalCandidate;
+IPermissionPrincipalSearchCandidate;
 ```
 
 这样 UI 不需要知道原始搜索结果来自哪�?Graph 查询�?

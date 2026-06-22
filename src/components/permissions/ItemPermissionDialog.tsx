@@ -10,7 +10,7 @@ import type {
   IItemUserPermissionEntry,
   ItemUserPermissionRole,
 } from "./models/itemUserPermissionModels";
-import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
+import type { IPermissionPrincipalSearchCandidate } from "./models/permissionSharedModels";
 import type { ItemPermissionDialogTabValue } from "./models/itemLinkPermissionModels";
 import { useUserPermissionDialogUIState } from "./hooks/useUserPermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
@@ -51,7 +51,7 @@ const ITEM_PERMISSION_ROLE_BASED_SHARING_LEARN_MORE_URL =
  * @returns 一条可直接加入草稿列表的 Item 权限记录。
  */
 const createItemPermissionEntryFromCandidate = (
-  candidate: IPermissionPrincipalCandidate,
+  candidate: IPermissionPrincipalSearchCandidate,
 ): IItemUserPermissionEntry => ({
   ...createBaseUserPermissionEntryFromCandidate(candidate),
   role: "Reader",

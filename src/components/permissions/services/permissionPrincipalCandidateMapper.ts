@@ -1,5 +1,5 @@
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
 import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/directoryPrincipalSearch";
@@ -13,7 +13,7 @@ import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/dire
 export const mapDirectorySearchResultToCandidate = (
   result: IDirectoryPrincipalSearchResult,
   tab: PermissionTabValue,
-): IPermissionPrincipalCandidate => ({
+): IPermissionPrincipalSearchCandidate => ({
   id: result.id,
   objectId: result.id,
   name: result.displayName,

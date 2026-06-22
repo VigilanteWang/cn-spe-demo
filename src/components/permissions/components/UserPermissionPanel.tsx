@@ -7,7 +7,7 @@ import {
 } from "./UserPermissionAccessListTable";
 import type { PermissionPrincipalSearchStatus } from "../hooks/usePermissionPrincipalSearch";
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
 
@@ -18,14 +18,14 @@ export interface IUserPermissionPanelProps<
   interactionDisabled: boolean;
   searchInputId: string;
   query: string;
-  searchResults: IPermissionPrincipalCandidate[];
+  searchResults: IPermissionPrincipalSearchCandidate[];
   searchStatus: PermissionPrincipalSearchStatus;
   isDropdownOpen: boolean;
   onSearchQueryChange: (value: string) => void;
   onSearchCandidateSelect: (candidateId: string | undefined) => void;
   isCandidateAdded: (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ) => boolean;
   beforeAccessListContent?: ReactNode;
   accessListProps: Omit<

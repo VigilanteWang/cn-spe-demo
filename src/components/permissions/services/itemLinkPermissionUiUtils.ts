@@ -6,7 +6,7 @@ import type {
   ItemLinkPermissionType,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../../common/contracts/permissionCommonContracts";
-import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
+import type { IPermissionPrincipalSearchCandidate } from "../models/permissionSharedModels";
 import type {
   IItemLinkPermissionCreatedLinkDraft,
   IItemLinkPermissionDraftState,
@@ -27,6 +27,9 @@ const ITEM_LINK_PERMISSION_SCOPE_LABELS: Record<
 
 /**
  * 把 link scope 转成 UI 文案。
+ *
+ * @param scope 当前 link 的 scope 枚举值。
+ * @returns 供界面直接展示的 scope 标签。
  */
 export const getItemLinkPermissionScopeLabel = (
   scope: ItemLinkPermissionScope,
@@ -37,6 +40,9 @@ export const getItemLinkPermissionScopeLabel = (
  *
  * 优先级与后端 link permission adapter 保持一致，
  * 这样前端本地草稿和后端读取出来的主体更容易对齐。
+ *
+ * @param input 当前 recipient 可用的几种标识字段。
+ * @returns 按优先级收口后的稳定 key。
  */
 export const getItemLinkPermissionRecipientKey = (input: {
   objectId?: string;
@@ -51,10 +57,14 @@ export const getItemLinkPermissionRecipientKey = (input: {
 
 /**
  * 把后端返回的 granted identity 映射成前端 recipient 候选项。
+ *
+ * @param identity 后端已经标准化过的 Graph identity。
+ * @returns links 面板内部可复用的 recipient 候选项。
  */
 export const mapGraphIdentityToItemLinkRecipientCandidate = (
   identity: IGraphPermissionIdentity,
 ): IItemLinkPermissionRecipientCandidate => ({
+  // 这里先把后端 identity 收口成稳定 key，方便前端后续去重和增删判断。
   id: getItemLinkPermissionRecipientKey({
     objectId: identity.graphId,
     userPrincipalName: identity.userPrincipalName,
@@ -72,9 +82,12 @@ export const mapGraphIdentityToItemLinkRecipientCandidate = (
 
 /**
  * 把 people/groups 搜索候选项转换成 links 面板可复用的 recipient 候选项。
+ *
+ * @param candidate people/groups 选择器当前返回的主体候选项。
+ * @returns links 面板统一使用的 recipient 结构。
  */
 export const mapPermissionCandidateToItemLinkRecipientCandidate = (
-  candidate: IPermissionPrincipalCandidate,
+  candidate: IPermissionPrincipalSearchCandidate,
 ): IItemLinkPermissionRecipientCandidate => ({
   id: candidate.id,
   objectId: candidate.objectId,
@@ -97,11 +110,15 @@ export const createItemLinkPermissionChangeSet = (
   originalEntries: IItemLinkPermissionEntryForUI[],
   draft: IItemLinkPermissionDraftState,
 ): IApplyItemLinkPermissionChangesRequest => {
+  // 先把后端基线列表转成按 permissionId 索引的 Map，
+  // 这样后面组装 grant/revoke 时可以稳定补回 shareId、type 等后端必填字段。
   const entriesByPermissionId = new Map(
     originalEntries.map((entry) => [entry.permissionId, entry]),
   );
 
   return {
+    // 把“本地新建的 links 草稿”映射成 create change。
+    // 只有 specific link 需要携带 recipients，其它 scope 交给后端按 scope 语义处理。
     create: draft.createdLinks.map((entry) => {
       const recipients = entry.recipients.map(
         mapItemLinkRecipientCandidateToRequest,
@@ -118,10 +135,14 @@ export const createItemLinkPermissionChangeSet = (
     deleteLinks: draft.deletedPermissionIds.map((permissionId) => ({
       permissionId,
     })),
+    // grantsByPermissionId 是一个“按 permissionId 分组”的对象字典，
+    // 这里先转成 entries 数组，再逐条补齐 shareId/type 并映射 recipients。
     grantRecipients: Object.entries(draft.grantsByPermissionId).map(
       ([permissionId, recipients]) => {
         const originalEntry = entriesByPermissionId.get(permissionId);
 
+        // specific link 的增人请求必须带 shareId；
+        // 如果基线里缺这个字段，说明当前草稿已经无法安全提交。
         if (!originalEntry?.shareId) {
           throw new Error(
             `Cannot grant recipients for link ${permissionId}: missing shareId.`,
@@ -132,10 +153,11 @@ export const createItemLinkPermissionChangeSet = (
           permissionId,
           shareId: originalEntry.shareId,
           type: originalEntry.type,
-          recipients: recipients.map(mapItemLinkRecipientToRequest),
+          recipients: recipients.map(mapItemLinkRecipientCandidateToRequest),
         };
       },
     ),
+    // revoke 的组装方式和 grant 一致，只是后端合同不要求再携带 link type。
     revokeRecipients: Object.entries(draft.revokesByPermissionId).map(
       ([permissionId, recipients]) => {
         const originalEntry = entriesByPermissionId.get(permissionId);
@@ -149,7 +171,7 @@ export const createItemLinkPermissionChangeSet = (
         return {
           permissionId,
           shareId: originalEntry.shareId,
-          recipients: recipients.map(mapItemLinkRecipientToRequest),
+          recipients: recipients.map(mapItemLinkRecipientCandidateToRequest),
         };
       },
     ),
@@ -189,6 +211,8 @@ export const hasItemLinkPermissionDraftChanges = (
 
 /**
  * 生成 links 列表默认的空草稿状态。
+ *
+ * @returns 所有变更集合都为空的初始草稿。
  */
 export const createEmptyItemLinkPermissionDraftState =
   (): IItemLinkPermissionDraftState => ({
@@ -200,6 +224,8 @@ export const createEmptyItemLinkPermissionDraftState =
 
 /**
  * 生成 links 面板默认的空后端快照。
+ *
+ * @returns 供加载前或重置时使用的空 entries。
  */
 export const createEmptyItemLinkPermissionEntries =
   (): IItemLinkPermissionEntryForUI[] => [];
@@ -208,6 +234,11 @@ export const createEmptyItemLinkPermissionEntries =
  * 生成一条新的 link 草稿项。
  *
  * 这个工厂目前主要给 hooks/UI 使用，因此放在 links 的 UI utils 更合适。
+ *
+ * @param id 前端本地生成的草稿 id。
+ * @param scope 新 link 的 scope。
+ * @param type 新 link 的 type。
+ * @returns 一条带空 recipients 列表的初始 link 草稿。
  */
 export const createItemLinkPermissionCreatedLinkDraft = (
   id: string,
@@ -219,7 +250,3 @@ export const createItemLinkPermissionCreatedLinkDraft = (
   type,
   recipients: [],
 });
-
-const mapItemLinkRecipientToRequest = (
-  candidate: IItemLinkPermissionRecipientCandidate,
-) => mapItemLinkRecipientCandidateToRequest(candidate);

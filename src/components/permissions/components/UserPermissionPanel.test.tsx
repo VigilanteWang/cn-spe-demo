@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { UserPermissionPanel } from "./UserPermissionPanel";
-import type { IPermissionPrincipalCandidate } from "../models/permissionSharedModels";
+import type { IPermissionPrincipalSearchCandidate } from "../models/permissionSharedModels";
 import type { UserPermissionAccessListEntryWithRole } from "./UserPermissionAccessListTable";
 
 type ITestPermissionEntry = UserPermissionAccessListEntryWithRole & {
@@ -10,8 +10,8 @@ type ITestPermissionEntry = UserPermissionAccessListEntryWithRole & {
 };
 
 const createCandidate = (
-  overrides: Partial<IPermissionPrincipalCandidate> = {},
-): IPermissionPrincipalCandidate => ({
+  overrides: Partial<IPermissionPrincipalSearchCandidate> = {},
+): IPermissionPrincipalSearchCandidate => ({
   id: "user-adele-vance",
   objectId: "user-adele-vance",
   name: "Adele Vance",
