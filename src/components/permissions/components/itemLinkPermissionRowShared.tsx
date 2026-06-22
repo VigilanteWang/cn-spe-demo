@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { mergeClasses } from "@fluentui/react-components";
+import { mergeClasses, tokens } from "@fluentui/react-components";
 import { Button, Text } from "@fluentui/react-components";
 import {
+  BriefcaseRegular,
   CopyRegular,
   DeleteRegular,
   GlobeRegular,
-  PeopleRegular,
   PersonRegular,
 } from "@fluentui/react-icons";
 import type {
@@ -14,6 +14,18 @@ import type {
 } from "../models/itemLinkPermissionModels";
 import { getItemLinkPermissionScopeLabel } from "../services/itemLinkPermissionUiUtils";
 import { usePermissionsStyles } from "./permissionsStyles";
+
+const ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR: Record<
+  ItemLinkPermissionScope,
+  string
+> = {
+  // 匿名链接使用偏绿的状态色，贴近 Microsoft Share 界面里“Anyone”选项的视觉语义。
+  anonymous: tokens.colorPaletteGreenForeground3,
+  // 组织内链接使用偏蓝的状态色，保持与“People in organization”一类企业范围选项接近。
+  organization: tokens.colorPaletteBlueForeground2,
+  // 指定对象链接使用中性灰，避免它在视觉层级上抢过更开放的链接范围。
+  specific: tokens.colorNeutralForeground3,
+};
 
 /**
  * 渲染 link scope 对应的图标，确保创建区和列表行保持同一套视觉语义。
@@ -24,15 +36,17 @@ import { usePermissionsStyles } from "./permissionsStyles";
 export const renderItemLinkPermissionScopeIcon = (
   scope: ItemLinkPermissionScope,
 ) => {
+  const primaryFill = ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR[scope];
+
   if (scope === "anonymous") {
-    return <GlobeRegular />;
+    return <GlobeRegular primaryFill={primaryFill} />;
   }
 
   if (scope === "organization") {
-    return <PeopleRegular />;
+    return <BriefcaseRegular primaryFill={primaryFill} />;
   }
 
-  return <PersonRegular />;
+  return <PersonRegular primaryFill={primaryFill} />;
 };
 
 /**
