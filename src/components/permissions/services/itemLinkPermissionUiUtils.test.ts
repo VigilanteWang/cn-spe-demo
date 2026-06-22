@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import { createItemLinkPermissionChangeSet } from "./itemLinkPermissionUiUtils";
 
 describe("createItemLinkPermissionChangeSet", () => {
@@ -35,7 +36,7 @@ describe("createItemLinkPermissionChangeSet", () => {
       createdLinks: [
         {
           id: "draft-specific-1",
-          scope: "specific",
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
           type: "review",
           recipients: [
             {
@@ -59,7 +60,7 @@ describe("createItemLinkPermissionChangeSet", () => {
     expect(changeSet).toEqual({
       create: [
         {
-          scope: "specific",
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
           type: "review",
           recipients: [
             {

@@ -1,6 +1,6 @@
 import {
   ITEM_LINK_PERMISSION_ROLE_LABELS,
-  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
   type ItemLinkPermissionRoleLabelForUI,
   type ItemLinkPermissionScope,
@@ -112,7 +112,7 @@ export const isItemLinkPermissionScope = (
   value: unknown,
 ): value is ItemLinkPermissionScope =>
   typeof value === "string" &&
-  (ITEM_LINK_PERMISSION_SCOPES as readonly string[]).includes(value);
+  (ITEM_LINK_PERMISSION_SCOPE_VALUES as readonly string[]).includes(value);
 
 /**
  * 判断输入值是否属于当前支持的 link type。

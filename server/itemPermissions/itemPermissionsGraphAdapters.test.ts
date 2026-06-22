@@ -106,7 +106,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
           id: "perm-link",
           roles: ["read"],
           link: {
-            scope: "specific",
+            scope: "user",
           },
         },
         {

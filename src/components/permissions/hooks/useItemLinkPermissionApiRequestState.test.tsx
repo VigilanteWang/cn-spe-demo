@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import {
   applyItemLinkPermissionChanges,
   listItemLinkPermissions,
@@ -28,7 +29,7 @@ const createPersistedEntry = (
   permissionId: "perm-1",
   shareId: "share-1",
   webUrl: "https://contoso.example/link-1",
-  scope: "specific",
+  scope: ITEM_LINK_PERMISSION_SCOPES.specific,
   type: "view",
   roleLabel: "View",
   preventsDownload: false,

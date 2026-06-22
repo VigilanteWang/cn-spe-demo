@@ -2,6 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import { ItemLinkPermissionPanel } from "./ItemLinkPermissionPanel";
 import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
 
@@ -122,14 +123,14 @@ describe("ItemLinkPermissionPanel", () => {
             source: "draft",
             permissionId: undefined,
             shareId: undefined,
-            scope: "specific",
+            scope: ITEM_LINK_PERMISSION_SCOPES.specific,
             type: "view",
             roleLabel: "View",
           }),
         ]}
         isLoading={false}
         interactionDisabled={false}
-        createScope="specific"
+        createScope={ITEM_LINK_PERMISSION_SCOPES.specific}
         createType="edit"
         onCreateScopeChange={vi.fn()}
         onCreateTypeChange={vi.fn()}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Client } from "@microsoft/microsoft-graph-client";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../common/contracts/itemPermissionCommonContracts";
 import { isSupportedItemLinkPermissionTarget } from "../../../common/helper/itemLinkPermissionCommonHelper";
 import {
   applyItemLinkPermissionChangeSet,
@@ -124,7 +125,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
           id: "perm-create-1",
           shareId: "u!share-created-1",
           link: {
-            scope: "specific",
+            scope: ITEM_LINK_PERMISSION_SCOPES.specific,
             type: "review",
             webUrl: "https://contoso.sharepoint.com/link-created",
           },
@@ -135,7 +136,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
               id: "perm-create-1",
               shareId: "u!share-created-1",
               link: {
-                scope: "specific",
+                scope: ITEM_LINK_PERMISSION_SCOPES.specific,
                 type: "review",
                 webUrl: "https://contoso.sharepoint.com/link-created",
               },
@@ -153,7 +154,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
       {
         create: [
           {
-            scope: "specific",
+            scope: ITEM_LINK_PERMISSION_SCOPES.specific,
             type: "review",
             recipients: [{ recipientObjectId: "user-created-1" }],
           },
@@ -194,7 +195,7 @@ describe("applyItemLinkPermissionChangeSet", () => {
         method: "post",
         version: "v1.0",
         body: {
-          scope: "specific",
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
           type: "review",
         },
       },

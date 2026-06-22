@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { IItemLinkPermissionEntryForUI } from "../../../../common/contracts/itemPermissionCommonContracts";
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  type IItemLinkPermissionEntryForUI,
+} from "../../../../common/contracts/itemPermissionCommonContracts";
 import { useItemLinkPermissionUIState } from "./useItemLinkPermissionUIState";
 
 const createPersistedEntry = (
@@ -11,7 +14,7 @@ const createPersistedEntry = (
   permissionId: "perm-1",
   shareId: "share-1",
   webUrl: "https://contoso.example/link-1",
-  scope: "specific",
+  scope: ITEM_LINK_PERMISSION_SCOPES.specific,
   type: "view",
   roleLabel: "View",
   preventsDownload: false,
@@ -35,7 +38,7 @@ describe("useItemLinkPermissionUIState", () => {
     );
 
     act(() => {
-      result.current.setCreateLinkScope("specific");
+      result.current.setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPES.specific);
     });
 
     act(() => {
@@ -45,7 +48,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0]).toMatchObject({
       source: "draft",
-      scope: "specific",
+      scope: ITEM_LINK_PERMISSION_SCOPES.specific,
       hasValidationError: true,
     });
   });
@@ -59,7 +62,7 @@ describe("useItemLinkPermissionUIState", () => {
     );
 
     act(() => {
-      result.current.setCreateLinkScope("specific");
+      result.current.setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPES.specific);
       result.current.setCreateLinkType("view");
     });
 
@@ -78,7 +81,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.entries).toHaveLength(2);
     expect(
       result.current.entries.map((entry) => `${entry.scope}:${entry.type}`),
-    ).toEqual(["specific:view", "specific:review"]);
+    ).toEqual(["users:view", "users:review"]);
   });
 
   it("should switch to the next available type when the current scope:type is occupied", () => {

@@ -14,13 +14,15 @@ import type {
 } from "../models/itemLinkPermissionModels";
 import { getInitials } from "./permissionPrincipalCandidateMapper";
 
+import { ITEM_LINK_PERMISSION_SCOPES as ITEM_LINK_PERMISSION_SCOPE_KEYS } from "../../../../common/contracts/itemPermissionCommonContracts";
+
 const ITEM_LINK_PERMISSION_SCOPE_LABELS: Record<
   ItemLinkPermissionScope,
   string
 > = {
-  anonymous: "Anyone with the link",
-  organization: "People in Organization",
-  specific: "Specific people",
+  [ITEM_LINK_PERMISSION_SCOPE_KEYS.anonymous]: "Anyone with the link",
+  [ITEM_LINK_PERMISSION_SCOPE_KEYS.organization]: "People in Organization",
+  [ITEM_LINK_PERMISSION_SCOPE_KEYS.specific]: "Specific people",
 };
 
 /**
@@ -108,7 +110,9 @@ export const createItemLinkPermissionChangeSet = (
       return {
         scope: entry.scope,
         type: entry.type,
-        ...(entry.scope === "specific" ? { recipients } : {}),
+        ...(entry.scope === ITEM_LINK_PERMISSION_SCOPE_KEYS.specific
+          ? { recipients }
+          : {}),
       };
     }),
     deleteLinks: draft.deletedPermissionIds.map((permissionId) => ({

@@ -80,16 +80,31 @@ export interface IItemUserPermissionChangeSetFromUI {
 }
 
 /**
- * link share 可支持的 scope。
+ * link share 的 scope 真值映射。
+ *
+ * 说明：
+ * - 产品语义上我们仍然把“指定对象链接”叫作 `specific`
+ * - 但 Graph / wire contract 真正使用的枚举值已经切到 `user`
+ * - 这样其它层可以继续通过 `ITEM_LINK_PERMISSION_SCOPES.specific`
+ *   保留可读命名，而不会把 UI 文案和底层值绑死
  */
-export const ITEM_LINK_PERMISSION_SCOPES = [
-  "anonymous",
-  "organization",
-  "specific",
+export const ITEM_LINK_PERMISSION_SCOPES = {
+  anonymous: "anonymous",
+  organization: "organization",
+  specific: "users",
+} as const;
+
+/**
+ * link share scope 的稳定枚举顺序。
+ */
+export const ITEM_LINK_PERMISSION_SCOPE_VALUES = [
+  ITEM_LINK_PERMISSION_SCOPES.anonymous,
+  ITEM_LINK_PERMISSION_SCOPES.organization,
+  ITEM_LINK_PERMISSION_SCOPES.specific,
 ] as const;
 
 export type ItemLinkPermissionScope =
-  (typeof ITEM_LINK_PERMISSION_SCOPES)[number];
+  (typeof ITEM_LINK_PERMISSION_SCOPE_VALUES)[number];
 
 /**
  * link share 可支持的类型。

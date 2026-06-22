@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../common/contracts/itemPermissionCommonContracts";
 import {
   mapGraphItemLinkPermission,
   mapItemLinkPermissionTypeToGrantRole,
@@ -71,12 +72,12 @@ describe("mapGraphItemLinkPermission", () => {
     });
   });
 
-  it("should map specific link identities and grant capabilities", () => {
+  it("should map user-scope specific link identities and grant capabilities", () => {
     const entry = mapGraphItemLinkPermission({
       id: "perm-link-3",
       shareId: "u!share-id-3",
       link: {
-        scope: "specific",
+        scope: ITEM_LINK_PERMISSION_SCOPES.specific,
         type: "edit",
         webUrl: "https://contoso.sharepoint.com/link-3",
       },
@@ -99,7 +100,7 @@ describe("mapGraphItemLinkPermission", () => {
     });
 
     expect(entry).toMatchObject({
-      scope: "specific",
+      scope: ITEM_LINK_PERMISSION_SCOPES.specific,
       type: "edit",
       roleLabel: "Edit",
       grantedToCount: 2,
@@ -130,7 +131,7 @@ describe("mapGraphItemLinkPermission", () => {
       id: "perm-link-4",
       shareId: "u!share-id-4",
       link: {
-        scope: "specific",
+        scope: ITEM_LINK_PERMISSION_SCOPES.specific,
         type: "view",
         webUrl: "https://contoso.sharepoint.com/link-4",
       },

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { getItemLinkPermissionRoleLabel } from "../../../../common/helper/itemLinkPermissionCommonHelper";
 import {
   ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
   type IItemLinkPermissionEntryForUI,
 } from "../models/itemLinkPermissionModels";
@@ -79,7 +80,7 @@ export const useItemLinkPermissionDerivedEntries = (
           (recipient) => !revokedRecipientKeys.has(recipient.key),
         );
         const recipients =
-          entry.scope === "specific"
+          entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
             ? [...visiblePersistedRecipients, ...grantedRecipients]
             : [];
 
@@ -94,7 +95,7 @@ export const useItemLinkPermissionDerivedEntries = (
           roleLabel: entry.roleLabel,
           preventsDownload: entry.preventsDownload,
           grantedToCount:
-            entry.scope === "specific"
+            entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
               ? recipients.length
               : entry.grantedToCount,
           recipients,
@@ -111,9 +112,11 @@ export const useItemLinkPermissionDerivedEntries = (
         roleLabel: getItemLinkPermissionRoleLabel(entry.type),
         preventsDownload: entry.type === "blocksDownload",
         grantedToCount:
-          entry.scope === "specific" ? entry.recipients.length : 0,
+          entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
+            ? entry.recipients.length
+            : 0,
         recipients:
-          entry.scope === "specific"
+          entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
             ? entry.recipients.map<IItemLinkPermissionDisplayRecipient>(
                 (candidate) => ({
                   key: getItemLinkPermissionRecipientKey({
@@ -128,7 +131,8 @@ export const useItemLinkPermissionDerivedEntries = (
               )
             : [],
         hasValidationError:
-          entry.scope === "specific" && entry.recipients.length === 0,
+          entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific &&
+          entry.recipients.length === 0,
       }));
 
     const sortedEntries = [...persistedEntries, ...createdEntries].sort(
@@ -165,7 +169,7 @@ export const useItemLinkPermissionDerivedEntries = (
 };
 
 const getScopeSortRank = (scope: IItemLinkPermissionEntryForUI["scope"]) =>
-  ITEM_LINK_PERMISSION_SCOPES.indexOf(scope);
+  ITEM_LINK_PERMISSION_SCOPE_VALUES.indexOf(scope);
 
 const getTypeSortRank = (type: IItemLinkPermissionEntryForUI["type"]) =>
   ITEM_LINK_PERMISSION_TYPES.indexOf(type);

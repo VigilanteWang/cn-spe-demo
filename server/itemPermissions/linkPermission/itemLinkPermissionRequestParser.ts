@@ -12,6 +12,7 @@ import type {
   ItemLinkPermissionScope,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
+import { ITEM_LINK_PERMISSION_SCOPES as ITEM_LINK_PERMISSION_SCOPE_KEYS } from "../../../common/contracts/itemPermissionCommonContracts";
 import {
   readGraphToRecord,
   readOptionalString,
@@ -165,7 +166,7 @@ const readCreateRecipients = (
   scope: ItemLinkPermissionScope,
   value: unknown,
 ): IItemUserPermissionRecipientForUI[] | undefined => {
-  if (scope !== "specific") {
+  if (scope !== ITEM_LINK_PERMISSION_SCOPE_KEYS.specific) {
     return undefined;
   }
 

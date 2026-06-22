@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../common/contracts/itemPermissionCommonContracts";
 import { parseItemLinkPermissionChangeSet } from "./itemLinkPermissionRequestParser";
 
 describe("parseItemLinkPermissionChangeSet", () => {
@@ -6,7 +7,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
     const parsed = parseItemLinkPermissionChangeSet({
       create: [
         {
-          scope: "specific",
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
           type: "review",
           recipients: [
             {
@@ -44,7 +45,7 @@ describe("parseItemLinkPermissionChangeSet", () => {
     expect(parsed).toEqual({
       create: [
         {
-          scope: "specific",
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
           type: "review",
           recipients: [
             {

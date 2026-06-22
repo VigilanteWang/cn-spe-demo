@@ -7,7 +7,7 @@ import {
 import { AddRegular } from "@fluentui/react-icons";
 import { getItemLinkPermissionRoleLabel } from "../../../../common/helper/itemLinkPermissionCommonHelper";
 import {
-  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
   type ItemLinkPermissionScope,
   type ItemLinkPermissionType,
@@ -71,7 +71,7 @@ export const ItemLinkCreateControls = ({
         }
       >
         {/* 这里用共享常量数组生成固定选项，避免前端再维护一份分散的 scope 列表。 */}
-        {ITEM_LINK_PERMISSION_SCOPES.map((scope) => (
+        {ITEM_LINK_PERMISSION_SCOPE_VALUES.map((scope) => (
           <Option
             key={scope}
             disabled={scopeOptionDisabledState[scope]}

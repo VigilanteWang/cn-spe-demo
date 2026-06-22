@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
   type IItemLinkPermissionDerivedEntry,
   type IItemLinkPermissionEntryForUI,
@@ -26,7 +26,7 @@ export const useItemLinkPermissionUIState = ({
   onResetLoadState,
 }: IUseItemLinkPermissionUIStateOptions) => {
   const [createLinkScope, setCreateLinkScope] =
-    useState<ItemLinkPermissionScope>(ITEM_LINK_PERMISSION_SCOPES[0]);
+    useState<ItemLinkPermissionScope>(ITEM_LINK_PERMISSION_SCOPE_VALUES[0]);
   const [createLinkType, setCreateLinkType] = useState<ItemLinkPermissionType>(
     ITEM_LINK_PERMISSION_TYPES[0],
   );
@@ -49,7 +49,7 @@ export const useItemLinkPermissionUIState = ({
 
   const resetDraftState = useCallback(() => {
     resetDraft();
-    setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPES[0]);
+    setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPE_VALUES[0]);
     setCreateLinkType(ITEM_LINK_PERMISSION_TYPES[0]);
   }, [resetDraft]);
 
@@ -203,7 +203,7 @@ const resolveNextAvailableCreateLinkCombo = (
   }
 
   // 当前 scope 已经没有空位后，再按既定顺序扫描其他 scope，取全局第一个可用组合。
-  for (const scope of ITEM_LINK_PERMISSION_SCOPES) {
+  for (const scope of ITEM_LINK_PERMISSION_SCOPE_VALUES) {
     const availableType = ITEM_LINK_PERMISSION_TYPES.find(
       (type) => !occupiedKeys.has(createScopeTypeKey(scope, type)),
     );

@@ -8,6 +8,7 @@ import {
   GlobeRegular,
   PersonRegular,
 } from "@fluentui/react-icons";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type {
   IItemLinkPermissionDerivedEntry,
   ItemLinkPermissionScope,
@@ -20,13 +21,14 @@ const ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR: Record<
   string
 > = {
   // 匿名链接使用偏绿的状态色，贴近 Microsoft Share 界面里“Anyone”选项的视觉语义。
-  anonymous: tokens.colorPaletteGreenForeground3,
+  [ITEM_LINK_PERMISSION_SCOPES.anonymous]: tokens.colorPaletteGreenForeground3,
   // 组织内链接使用偏蓝的状态色，保持与“People in organization”一类企业范围选项接近。
-  organization: tokens.colorPaletteBlueForeground2,
+  [ITEM_LINK_PERMISSION_SCOPES.organization]:
+    tokens.colorPaletteBlueForeground2,
   // 指定对象链接使用中性灰，避免它在视觉层级上抢过更开放的链接范围。
-  specific: tokens.colorNeutralForeground3,
+  [ITEM_LINK_PERMISSION_SCOPES.specific]: tokens.colorNeutralForeground3,
 };
-const ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE = { fontSize: "18px" } as const;
+const ITEM_LINK_PERMISSION_SCOPE_ICON_STYLE = { fontSize: "19px" } as const;
 
 /**
  * 渲染 link scope 对应的图标，确保创建区和列表行保持同一套视觉语义。
@@ -39,7 +41,7 @@ export const renderItemLinkPermissionScopeIcon = (
 ) => {
   const primaryFill = ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR[scope];
 
-  if (scope === "anonymous") {
+  if (scope === ITEM_LINK_PERMISSION_SCOPES.anonymous) {
     return (
       <GlobeRegular
         primaryFill={primaryFill}
@@ -48,7 +50,7 @@ export const renderItemLinkPermissionScopeIcon = (
     );
   }
 
-  if (scope === "organization") {
+  if (scope === ITEM_LINK_PERMISSION_SCOPES.organization) {
     return (
       <BriefcaseRegular
         primaryFill={primaryFill}

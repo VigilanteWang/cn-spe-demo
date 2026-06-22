@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Text } from "@fluentui/react-components";
 import {
   ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
   type IItemLinkPermissionDerivedEntry,
   type IItemLinkPermissionRecipientCandidate,
@@ -79,7 +80,7 @@ export const ItemLinkPermissionPanel = ({
 
   // 某个 scope 下如果所有 type 都已占用，就禁用该 scope 选项。
   const scopeOptionDisabledState = Object.fromEntries(
-    ITEM_LINK_PERMISSION_SCOPES.map((scope) => [
+    ITEM_LINK_PERMISSION_SCOPE_VALUES.map((scope) => [
       scope,
       ITEM_LINK_PERMISSION_TYPES.every((type) =>
         occupiedScopeTypeKeys.has(createScopeTypeKey(scope, type)),
@@ -99,11 +100,13 @@ export const ItemLinkPermissionPanel = ({
     !interactionDisabled && !typeOptionDisabledState[createType];
 
   // specific link 需要展示 recipients 维护能力，所以单独走专用行组件。
-  const specificEntries = entries.filter((entry) => entry.scope === "specific");
+  const specificEntries = entries.filter(
+    (entry) => entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific,
+  );
 
   // 其余 link 不涉及 recipients 编辑，走普通展示行即可。
   const nonSpecificEntries = entries.filter(
-    (entry) => entry.scope !== "specific",
+    (entry) => entry.scope !== ITEM_LINK_PERMISSION_SCOPES.specific,
   );
 
   /**
@@ -112,7 +115,7 @@ export const ItemLinkPermissionPanel = ({
   const handleAddLinkClick = () => {
     const createdEntryId = onAddLink();
 
-    if (createScope === "specific") {
+    if (createScope === ITEM_LINK_PERMISSION_SCOPES.specific) {
       setAutoExpandedSpecificEntryId(createdEntryId);
     }
   };
@@ -156,7 +159,7 @@ export const ItemLinkPermissionPanel = ({
               onCopyLink={onCopyLink}
               onDeleteLink={onDeleteLink}
               subtitle={
-                entry.scope === "organization" ? (
+                entry.scope === ITEM_LINK_PERMISSION_SCOPES.organization ? (
                   <Text size={200}>
                     people who have access: {entry.grantedToCount}
                   </Text>

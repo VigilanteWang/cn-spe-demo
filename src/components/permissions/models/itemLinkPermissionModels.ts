@@ -7,6 +7,7 @@ import type { PermissionTabValue } from "./permissionSharedModels";
 
 export {
   ITEM_LINK_PERMISSION_SCOPES,
+  ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
 } from "../../../../common/contracts/itemPermissionCommonContracts";
 

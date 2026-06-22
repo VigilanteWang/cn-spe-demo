@@ -1,8 +1,9 @@
 import type { Client } from "@microsoft/microsoft-graph-client";
-import type {
-  IApplyItemLinkPermissionChangesRequest,
-  IItemLinkPermissionsResponseFromApi,
-  ItemLinkPermissionType,
+import {
+  ITEM_LINK_PERMISSION_SCOPES,
+  type IApplyItemLinkPermissionChangesRequest,
+  type IItemLinkPermissionsResponseFromApi,
+  type ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
 import {
   isSupportedItemLinkPermissionTarget,
@@ -127,7 +128,7 @@ export const applyItemLinkPermissionChangeSet = async (
 
       // 只有 specific scope 才需要继续补一段 grant，把具体主体授予到刚创建的 link 上。
       if (
-        createChange.scope === "specific" &&
+        createChange.scope === ITEM_LINK_PERMISSION_SCOPES.specific &&
         createChange.recipients?.length
       ) {
         const createResponseRecord = readGraphToRecord(createResponse);

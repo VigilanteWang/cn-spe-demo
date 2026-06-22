@@ -8,6 +8,7 @@ import type {
   IItemUserPermissionRecipientForUI,
   ItemLinkPermissionType,
 } from "../../../common/contracts/itemPermissionCommonContracts";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../common/contracts/itemPermissionCommonContracts";
 import type { IGraphPermissionIdentity } from "../../../common/contracts/permissionCommonContracts";
 import { resolveGrantedToIdentitiesV2 } from "../../permissionsCore/permissionIdentityAdapters";
 import {
@@ -67,8 +68,10 @@ export const mapGraphItemLinkPermission = (
     grantedToCount: grantedToIdentities.length,
     capabilities: {
       // 只有 `specific` link 且拿到 `shareId` 时，后续 grant / revoke 才有合法目标。
-      canGrantRecipients: scope === "specific" && hasShareId,
-      canRevokeRecipients: scope === "specific" && hasShareId,
+      canGrantRecipients:
+        scope === ITEM_LINK_PERMISSION_SCOPES.specific && hasShareId,
+      canRevokeRecipients:
+        scope === ITEM_LINK_PERMISSION_SCOPES.specific && hasShareId,
       canDeleteLink: true,
     },
   };
