@@ -10,7 +10,7 @@ import {
 } from "@fluentui/react-icons";
 import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import type {
-  IItemLinkPermissionDerivedEntry,
+  IItemLinkPermissionComputedEntry,
   ItemLinkPermissionScope,
 } from "../models/itemLinkPermissionModels";
 import { getItemLinkPermissionScopeLabel } from "../services/itemLinkPermissionUiUtils";
@@ -71,10 +71,10 @@ export const renderItemLinkPermissionScopeIcon = (
  * Item link 行共享外壳的输入属性。
  */
 export interface IItemLinkPermissionRowShellProps {
-  entry: IItemLinkPermissionDerivedEntry;
+  entry: IItemLinkPermissionComputedEntry;
   interactionDisabled: boolean;
   onCopyLink: (webUrl: string) => void;
-  onDeleteLink: (entry: IItemLinkPermissionDerivedEntry) => void;
+  onDeleteLink: (entry: IItemLinkPermissionComputedEntry) => void;
   copyAriaLabel?: string;
   deleteAriaLabel?: string;
   subtitle?: ReactNode;

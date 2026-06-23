@@ -14,7 +14,7 @@ import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type { PermissionTabValue } from "../../../../common/contracts/permissionCommonContracts";
 import { useItemLinkPermissionRecipientSearch } from "../hooks/useItemLinkPermissionRecipientSearch";
 import type {
-  IItemLinkPermissionDerivedEntry,
+  IItemLinkPermissionComputedEntry,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
 import { getItemLinkPermissionRecipientKey } from "../services/itemLinkPermissionUiUtils";
@@ -26,17 +26,17 @@ import { usePermissionsStyles } from "./permissionsStyles";
  * specific item link 行组件的输入属性。
  */
 export interface IItemLinkSpecificPermissionRowProps {
-  entry: IItemLinkPermissionDerivedEntry;
+  entry: IItemLinkPermissionComputedEntry;
   interactionDisabled: boolean;
   autoExpand: boolean;
   onCopyLink: (webUrl: string) => void;
-  onDeleteLink: (entry: IItemLinkPermissionDerivedEntry) => void;
+  onDeleteLink: (entry: IItemLinkPermissionComputedEntry) => void;
   onAddRecipient: (
-    entry: IItemLinkPermissionDerivedEntry,
+    entry: IItemLinkPermissionComputedEntry,
     candidate: IItemLinkPermissionRecipientCandidate,
   ) => void;
   onRemoveRecipient: (
-    entry: IItemLinkPermissionDerivedEntry,
+    entry: IItemLinkPermissionComputedEntry,
     recipientKey: string,
   ) => void;
 }

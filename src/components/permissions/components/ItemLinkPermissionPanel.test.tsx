@@ -4,11 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import { ItemLinkPermissionPanel } from "./ItemLinkPermissionPanel";
-import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
+import type { IItemLinkPermissionComputedEntry } from "../models/itemLinkPermissionModels";
 
 const createEntry = (
-  overrides: Partial<IItemLinkPermissionDerivedEntry>,
-): IItemLinkPermissionDerivedEntry => ({
+  overrides: Partial<IItemLinkPermissionComputedEntry>,
+): IItemLinkPermissionComputedEntry => ({
   id: "entry-1",
   source: "persisted",
   permissionId: "perm-1",

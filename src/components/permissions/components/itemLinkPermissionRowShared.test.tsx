@@ -3,11 +3,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Text } from "@fluentui/react-components";
 import { describe, expect, it, vi } from "vitest";
 import { ItemLinkPermissionRowShell } from "./itemLinkPermissionRowShared";
-import type { IItemLinkPermissionDerivedEntry } from "../models/itemLinkPermissionModels";
+import type { IItemLinkPermissionComputedEntry } from "../models/itemLinkPermissionModels";
 
 const createEntry = (
-  overrides: Partial<IItemLinkPermissionDerivedEntry> = {},
-): IItemLinkPermissionDerivedEntry => ({
+  overrides: Partial<IItemLinkPermissionComputedEntry> = {},
+): IItemLinkPermissionComputedEntry => ({
   id: "entry-1",
   source: "persisted",
   permissionId: "perm-1",

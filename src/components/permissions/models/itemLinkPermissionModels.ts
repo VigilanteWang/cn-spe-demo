@@ -70,9 +70,12 @@ export interface IItemLinkPermissionDisplayRecipient {
 }
 
 /**
- * links 列表派生后的单行展示模型。
+ * links 列表计算后的单行展示模型。
+ *
+ * 它不是后端原始合同，也不是本地 draft 自身，
+ * 而是“原始基线 + 本地差异”合并后供界面直接渲染的结果。
  */
-export interface IItemLinkPermissionDerivedEntry {
+export interface IItemLinkPermissionComputedEntry {
   id: string;
   source: "persisted" | "draft";
   permissionId?: string;

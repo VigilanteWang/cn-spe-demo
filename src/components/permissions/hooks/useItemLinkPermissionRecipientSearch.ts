@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PermissionTabValue } from "../models/permissionSharedModels";
 import type {
-  IItemLinkPermissionDerivedEntry,
+  IItemLinkPermissionComputedEntry,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
 import { usePermissionPrincipalSearch } from "./usePermissionPrincipalSearch";
@@ -11,9 +11,9 @@ import {
 } from "../services/itemLinkPermissionUiUtils";
 
 interface IUseItemLinkPermissionRecipientSearchOptions {
-  entry: IItemLinkPermissionDerivedEntry;
+  entry: IItemLinkPermissionComputedEntry;
   onAddRecipient: (
-    entry: IItemLinkPermissionDerivedEntry,
+    entry: IItemLinkPermissionComputedEntry,
     candidate: IItemLinkPermissionRecipientCandidate,
   ) => void;
 }

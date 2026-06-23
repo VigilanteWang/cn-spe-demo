@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
-  type IItemLinkPermissionDerivedEntry,
+  type IItemLinkPermissionComputedEntry,
   type IItemLinkPermissionEntryForUI,
   type IItemLinkPermissionRecipientCandidate,
   type ItemLinkPermissionScope,
   type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
-import { useItemLinkPermissionDerivedEntries } from "./useItemLinkPermissionDerivedEntries";
+import { useItemLinkPermissionComputedEntries } from "./useItemLinkPermissionComputedEntries";
 import { useItemLinkPermissionDraft } from "./useItemLinkPermissionDraft";
 
 interface IUseItemLinkPermissionUIStateOptions {
@@ -19,6 +19,16 @@ interface IUseItemLinkPermissionUIStateOptions {
 
 /**
  * 管理 item link 权限面板的本地编辑状态和行级交互。
+ *
+ * 这一层不直接拥有后端基线，而是把：
+ * 1. 创建区的 scope/type 选择
+ * 2. 本地 draft 差异
+ * 3. 供渲染使用的 computed entries
+ * 4. 行级交互事件
+ * 统一编排成 links 面板可直接消费的一组状态。
+ *
+ * @param options links 面板当前依赖的基线与重置配置。
+ * @returns links tab 需要的渲染数据、创建区状态和交互回调。
  */
 export const useItemLinkPermissionUIState = ({
   resetKey,
@@ -42,28 +52,35 @@ export const useItemLinkPermissionUIState = ({
     addRevokeRecipient,
     resetDraft,
   } = useItemLinkPermissionDraft(resetKey);
-  const derivedPermissions = useItemLinkPermissionDerivedEntries(
+
+  const computedPermissions = useItemLinkPermissionComputedEntries(
     originalEntries,
     draft,
   );
 
   const resetDraftState = useCallback(() => {
+    // “放弃本地编辑”时，同时把新增区的默认选择恢复到首个可选项。
     resetDraft();
     setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPE_VALUES[0]);
     setCreateLinkType(ITEM_LINK_PERMISSION_TYPES[0]);
   }, [resetDraft]);
 
   const resetSectionState = useCallback(() => {
+    // 这一层负责 links 区整体重置：既清草稿，也允许上层顺手清掉加载基线。
     resetDraftState();
     onResetLoadState?.();
   }, [onResetLoadState, resetDraftState]);
 
   const onAddLink = useCallback(() => {
+    // 新建 link 时，使用创建区当前选中的 scope/type 生成 draft entry。
     return addCreatedLink(createLinkScope, createLinkType);
   }, [addCreatedLink, createLinkScope, createLinkType]);
 
   const onDeleteLink = useCallback(
-    (entry: IItemLinkPermissionDerivedEntry) => {
+    (entry: IItemLinkPermissionComputedEntry) => {
+      // draft 行和 persisted 行的删除语义不同：
+      // - draft 行：直接从 createdLinks 中拿掉
+      // - persisted 行：记录 delete 差异，等待 Apply
       if (entry.source === "draft") {
         removeCreatedLink(entry.id);
         return;
@@ -78,9 +95,11 @@ export const useItemLinkPermissionUIState = ({
 
   const onAddRecipient = useCallback(
     (
-      entry: IItemLinkPermissionDerivedEntry,
+      entry: IItemLinkPermissionComputedEntry,
       candidate: IItemLinkPermissionRecipientCandidate,
     ) => {
+      // 新建 link 的 recipient 直接写进 created draft；
+      // 已存在 link 的 recipient 则记成 grant 差异。
       if (entry.source === "draft") {
         addRecipientToCreatedLink(entry.id, candidate);
         return;
@@ -94,7 +113,7 @@ export const useItemLinkPermissionUIState = ({
   );
 
   const onRemoveRecipient = useCallback(
-    (entry: IItemLinkPermissionDerivedEntry, recipientKey: string) => {
+    (entry: IItemLinkPermissionComputedEntry, recipientKey: string) => {
       if (entry.source === "draft") {
         removeRecipientFromCreatedLink(entry.id, recipientKey);
         return;
@@ -112,14 +131,16 @@ export const useItemLinkPermissionUIState = ({
         return;
       }
 
+      // persisted 行里的“删人”不是立即改原始列表，而是记一条 revoke 差异。
       addRevokeRecipient(entry.permissionId, recipient.candidate);
     },
     [addRevokeRecipient, removeRecipientFromCreatedLink],
   );
 
   useEffect(() => {
+    // 每次已有 entries 变化后，都重新检查“创建区当前选中的组合是否仍可用”。
     const nextAvailableCombo = resolveNextAvailableCreateLinkCombo(
-      derivedPermissions.entries,
+      computedPermissions.entries,
       createLinkScope,
       createLinkType,
     );
@@ -135,17 +156,17 @@ export const useItemLinkPermissionUIState = ({
     if (nextAvailableCombo.type !== createLinkType) {
       setCreateLinkType(nextAvailableCombo.type);
     }
-  }, [createLinkScope, createLinkType, derivedPermissions.entries]);
+  }, [createLinkScope, createLinkType, computedPermissions.entries]);
 
   return {
-    entries: derivedPermissions.entries,
+    entries: computedPermissions.entries,
     createLinkScope,
     createLinkType,
     setCreateLinkScope,
     setCreateLinkType,
     draft,
     hasUnsavedChanges,
-    hasBlockingValidationError: derivedPermissions.hasBlockingValidationError,
+    hasBlockingValidationError: computedPermissions.hasBlockingValidationError,
     resetDraftState,
     resetSectionState,
     onAddLink,
@@ -173,7 +194,7 @@ export const useItemLinkPermissionUIState = ({
  * @returns 下一个可用的创建组合；如果所有组合都已占用，则返回 null。
  */
 const resolveNextAvailableCreateLinkCombo = (
-  entries: IItemLinkPermissionDerivedEntry[],
+  entries: IItemLinkPermissionComputedEntry[],
   currentScope: ItemLinkPermissionScope,
   currentType: ItemLinkPermissionType,
 ): { scope: ItemLinkPermissionScope; type: ItemLinkPermissionType } | null => {

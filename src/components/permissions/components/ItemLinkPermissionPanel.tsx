@@ -4,7 +4,7 @@ import {
   ITEM_LINK_PERMISSION_SCOPES,
   ITEM_LINK_PERMISSION_SCOPE_VALUES,
   ITEM_LINK_PERMISSION_TYPES,
-  type IItemLinkPermissionDerivedEntry,
+  type IItemLinkPermissionComputedEntry,
   type IItemLinkPermissionRecipientCandidate,
   type ItemLinkPermissionScope,
   type ItemLinkPermissionType,
@@ -18,7 +18,7 @@ import { usePermissionsStyles } from "./permissionsStyles";
  * Item link 权限面板的输入属性。
  */
 interface IItemLinkPermissionPanelProps {
-  entries: IItemLinkPermissionDerivedEntry[];
+  entries: IItemLinkPermissionComputedEntry[];
   isLoading: boolean;
   interactionDisabled: boolean;
   createScope: ItemLinkPermissionScope;
@@ -26,14 +26,14 @@ interface IItemLinkPermissionPanelProps {
   onCreateScopeChange: (scope: ItemLinkPermissionScope) => void;
   onCreateTypeChange: (type: ItemLinkPermissionType) => void;
   onAddLink: () => string;
-  onDeleteLink: (entry: IItemLinkPermissionDerivedEntry) => void;
+  onDeleteLink: (entry: IItemLinkPermissionComputedEntry) => void;
   onCopyLink: (webUrl: string) => void;
   onAddRecipient: (
-    entry: IItemLinkPermissionDerivedEntry,
+    entry: IItemLinkPermissionComputedEntry,
     candidate: IItemLinkPermissionRecipientCandidate,
   ) => void;
   onRemoveRecipient: (
-    entry: IItemLinkPermissionDerivedEntry,
+    entry: IItemLinkPermissionComputedEntry,
     recipientKey: string,
   ) => void;
 }

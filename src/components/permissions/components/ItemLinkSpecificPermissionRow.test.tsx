@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ITEM_LINK_PERMISSION_SCOPES } from "../../../../common/contracts/itemPermissionCommonContracts";
 import { ItemLinkSpecificPermissionRow } from "./ItemLinkSpecificPermissionRow";
 import type {
-  IItemLinkPermissionDerivedEntry,
+  IItemLinkPermissionComputedEntry,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
 
@@ -55,8 +55,8 @@ const createRecipientCandidate = (
 });
 
 const createEntry = (
-  overrides: Partial<IItemLinkPermissionDerivedEntry> = {},
-): IItemLinkPermissionDerivedEntry => ({
+  overrides: Partial<IItemLinkPermissionComputedEntry> = {},
+): IItemLinkPermissionComputedEntry => ({
   id: "entry-specific-1",
   source: "persisted",
   permissionId: "perm-specific-1",
