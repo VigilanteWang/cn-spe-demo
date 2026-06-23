@@ -109,12 +109,7 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
       candidate: IItemLinkPermissionRecipientCandidate,
     ) => {
       // 用统一 recipient key 做去重，避免同一个对象因为展示字段不同被重复加入。
-      const candidateKey = getItemLinkPermissionRecipientKey({
-        objectId: candidate.objectId,
-        userPrincipalName: candidate.userPrincipalName,
-        mail: candidate.mail,
-        name: candidate.name,
-      });
+      const candidateKey = getItemLinkPermissionRecipientKey(candidate);
 
       setDraft((currentDraft) => ({
         ...currentDraft,
@@ -126,12 +121,7 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
           // 新建 specific link 的 recipients 直接挂在这条 created draft 上。
           const alreadyExists = entry.recipients.some(
             (recipient) =>
-              getItemLinkPermissionRecipientKey({
-                objectId: recipient.objectId,
-                userPrincipalName: recipient.userPrincipalName,
-                mail: recipient.mail,
-                name: recipient.name,
-              }) === candidateKey,
+              getItemLinkPermissionRecipientKey(recipient) === candidateKey,
           );
 
           if (alreadyExists) {
@@ -159,12 +149,8 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
                 ...entry,
                 recipients: entry.recipients.filter(
                   (recipient) =>
-                    getItemLinkPermissionRecipientKey({
-                      objectId: recipient.objectId,
-                      userPrincipalName: recipient.userPrincipalName,
-                      mail: recipient.mail,
-                      name: recipient.name,
-                    }) !== recipientKey,
+                    getItemLinkPermissionRecipientKey(recipient) !==
+                    recipientKey,
                 ),
               }
             : entry,
@@ -186,20 +172,10 @@ export const useItemLinkPermissionDraft = (resetKey: string) => {
           ...currentDraft.revokesByPermissionId,
         };
         const existingRevokes = nextRevokesByPermissionId[permissionId] ?? [];
-        const candidateKey = getItemLinkPermissionRecipientKey({
-          objectId: candidate.objectId,
-          userPrincipalName: candidate.userPrincipalName,
-          mail: candidate.mail,
-          name: candidate.name,
-        });
+        const candidateKey = getItemLinkPermissionRecipientKey(candidate);
         const filteredRevokes = existingRevokes.filter(
           (recipient) =>
-            getItemLinkPermissionRecipientKey({
-              objectId: recipient.objectId,
-              userPrincipalName: recipient.userPrincipalName,
-              mail: recipient.mail,
-              name: recipient.name,
-            }) !== candidateKey,
+            getItemLinkPermissionRecipientKey(recipient) !== candidateKey,
         );
 
         if (filteredRevokes.length !== existingRevokes.length) {
@@ -292,21 +268,11 @@ const addCandidateToRecipientMap = (
   candidate: IItemLinkPermissionRecipientCandidate,
 ) => {
   // grant / revoke 两类 recipient map 共用同一套去重追加逻辑。
-  const candidateKey = getItemLinkPermissionRecipientKey({
-    objectId: candidate.objectId,
-    userPrincipalName: candidate.userPrincipalName,
-    mail: candidate.mail,
-    name: candidate.name,
-  });
+  const candidateKey = getItemLinkPermissionRecipientKey(candidate);
   const currentRecipients = recipientMap[permissionId] ?? [];
   const alreadyExists = currentRecipients.some(
     (recipient) =>
-      getItemLinkPermissionRecipientKey({
-        objectId: recipient.objectId,
-        userPrincipalName: recipient.userPrincipalName,
-        mail: recipient.mail,
-        name: recipient.name,
-      }) === candidateKey,
+      getItemLinkPermissionRecipientKey(recipient) === candidateKey,
   );
 
   if (alreadyExists) {
@@ -331,20 +297,10 @@ const removeCandidateFromRecipientMap = (
     return recipientMap;
   }
 
-  const candidateKey = getItemLinkPermissionRecipientKey({
-    objectId: candidate.objectId,
-    userPrincipalName: candidate.userPrincipalName,
-    mail: candidate.mail,
-    name: candidate.name,
-  });
+  const candidateKey = getItemLinkPermissionRecipientKey(candidate);
   const nextRecipients = currentRecipients.filter(
     (recipient) =>
-      getItemLinkPermissionRecipientKey({
-        objectId: recipient.objectId,
-        userPrincipalName: recipient.userPrincipalName,
-        mail: recipient.mail,
-        name: recipient.name,
-      }) !== candidateKey,
+      getItemLinkPermissionRecipientKey(recipient) !== candidateKey,
   );
 
   if (nextRecipients.length === currentRecipients.length) {

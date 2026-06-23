@@ -37,7 +37,7 @@ interface IUseItemLinkPermissionApiRequestStateOptions {
  * 管理 item link 权限的请求生命周期。
  *
  * 这个 Hook 主要负责三件事：
- * 1. 在 links 页签真正可见时懒加载后端已有的 link 权限。
+ * 1. 在 links tab 真正可见时懒加载后端已有的 link 权限。
  * 2. 基于“后端基线 + 前端草稿”准备提交给后端的 change set。
  * 3. 在提交成功后用最新返回结果替换基线，并把草稿重置回“已同步”状态。
  *

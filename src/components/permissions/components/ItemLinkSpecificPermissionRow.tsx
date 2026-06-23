@@ -145,12 +145,7 @@ export const ItemLinkSpecificPermissionRow = ({
                   entry.recipients.some(
                     (recipient) =>
                       recipient.key ===
-                      getItemLinkPermissionRecipientKey({
-                        objectId: candidate.objectId,
-                        userPrincipalName: candidate.userPrincipalName,
-                        mail: candidate.mail,
-                        name: candidate.name,
-                      }),
+                      getItemLinkPermissionRecipientKey(candidate),
                   )
                 }
               />

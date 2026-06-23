@@ -25,6 +25,11 @@ const ITEM_LINK_PERMISSION_SCOPE_LABELS: Record<
   [ITEM_LINK_PERMISSION_SCOPE_KEYS.specific]: "Specific people",
 };
 
+type ItemLinkPermissionRecipientKeyInput = Pick<
+  IItemLinkPermissionRecipientCandidate,
+  "objectId" | "userPrincipalName" | "mail" | "name"
+>;
+
 /**
  * 把 link scope 转成 UI 文案。
  *
@@ -44,12 +49,9 @@ export const getItemLinkPermissionScopeLabel = (
  * @param input 当前 recipient 可用的几种标识字段。
  * @returns 按优先级收口后的稳定 key。
  */
-export const getItemLinkPermissionRecipientKey = (input: {
-  objectId?: string;
-  userPrincipalName?: string;
-  mail?: string;
-  name: string;
-}): string =>
+export const getItemLinkPermissionRecipientKey = (
+  input: ItemLinkPermissionRecipientKeyInput,
+): string =>
   input.objectId ??
   input.userPrincipalName?.trim().toLowerCase() ??
   input.mail?.trim().toLowerCase() ??

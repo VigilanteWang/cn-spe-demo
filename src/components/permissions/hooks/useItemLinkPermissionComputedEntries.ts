@@ -36,10 +36,27 @@ export const useItemLinkPermissionComputedEntries = (
     // 被标记删除的 persisted link 不再参与当前界面渲染。
     const deletedPermissionIds = new Set(draft.deletedPermissionIds);
     // persistedEntries 表示“后端本来就存在、且本轮没有被整体删除”的行，
-    // 这些行还需要继续叠加 grant/revoke 差异，才能得到最终显示结果。
+    // 这些行还需要继续叠加 grant/revoke recipient差异，才能得到最终显示结果。
     const persistedEntries = originalEntries
       .filter((entry) => !deletedPermissionIds.has(entry.permissionId))
       .map<IItemLinkPermissionComputedEntry>((entry) => {
+        if (entry.scope !== ITEM_LINK_PERMISSION_SCOPES.specific) {
+          return {
+            id: entry.id,
+            source: "persisted",
+            permissionId: entry.permissionId,
+            shareId: entry.shareId,
+            webUrl: entry.webUrl,
+            scope: entry.scope,
+            type: entry.type,
+            roleLabel: entry.roleLabel,
+            preventsDownload: entry.preventsDownload,
+            grantedToCount: entry.grantedToCount,
+            recipients: [],
+            hasValidationError: false,
+          };
+        }
+
         // 先把后端原始 identity 映射成前端统一 recipient 结构，
         // 方便后面继续和本地 grant/revoke 差异做集合运算。
         const persistedRecipients = entry.grantedToIdentities.map(
@@ -48,12 +65,7 @@ export const useItemLinkPermissionComputedEntries = (
               mapGraphIdentityToItemLinkRecipientCandidate(identity);
 
             return {
-              key: getItemLinkPermissionRecipientKey({
-                objectId: candidate.objectId,
-                userPrincipalName: candidate.userPrincipalName,
-                mail: candidate.mail,
-                name: candidate.name,
-              }),
+              key: getItemLinkPermissionRecipientKey(candidate),
               candidate,
               source: "persisted",
             } satisfies IItemLinkPermissionDisplayRecipient;
@@ -62,13 +74,7 @@ export const useItemLinkPermissionComputedEntries = (
         // revoke 差异表示“当前界面上应该暂时隐藏这些原有 recipient”。
         const revokedRecipientKeys = new Set(
           (draft.revokesByPermissionId[entry.permissionId] ?? []).map(
-            (candidate) =>
-              getItemLinkPermissionRecipientKey({
-                objectId: candidate.objectId,
-                userPrincipalName: candidate.userPrincipalName,
-                mail: candidate.mail,
-                name: candidate.name,
-              }),
+            (candidate) => getItemLinkPermissionRecipientKey(candidate),
           ),
         );
         // grant 差异表示“当前界面上应该额外展示这些尚未提交的新 recipient”。
@@ -76,12 +82,7 @@ export const useItemLinkPermissionComputedEntries = (
           draft.grantsByPermissionId[entry.permissionId] ?? []
         )
           .map<IItemLinkPermissionDisplayRecipient>((candidate) => ({
-            key: getItemLinkPermissionRecipientKey({
-              objectId: candidate.objectId,
-              userPrincipalName: candidate.userPrincipalName,
-              mail: candidate.mail,
-              name: candidate.name,
-            }),
+            key: getItemLinkPermissionRecipientKey(candidate),
             candidate,
             source: "draft",
           }))
@@ -96,12 +97,10 @@ export const useItemLinkPermissionComputedEntries = (
         const visiblePersistedRecipients = persistedRecipients.filter(
           (recipient) => !revokedRecipientKeys.has(recipient.key),
         );
-        // specific link 才需要把 recipients 细项展示出来；
-        // 其他 scope 的 link 只显示摘要数量。
-        const recipients =
-          entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
-            ? [...visiblePersistedRecipients, ...grantedRecipients]
-            : [];
+        const recipients = [
+          ...visiblePersistedRecipients,
+          ...grantedRecipients,
+        ];
 
         return {
           id: entry.id,
@@ -113,10 +112,7 @@ export const useItemLinkPermissionComputedEntries = (
           type: entry.type,
           roleLabel: entry.roleLabel,
           preventsDownload: entry.preventsDownload,
-          grantedToCount:
-            entry.scope === ITEM_LINK_PERMISSION_SCOPES.specific
-              ? recipients.length
-              : entry.grantedToCount,
+          grantedToCount: recipients.length,
           recipients,
           hasValidationError: false,
         };
@@ -144,12 +140,7 @@ export const useItemLinkPermissionComputedEntries = (
                 (candidate) => ({
                   // 新建 specific link 的 recipient 也统一转成可渲染结构，
                   // 这样上层行组件无需区分它来自 persisted 还是 created draft。
-                  key: getItemLinkPermissionRecipientKey({
-                    objectId: candidate.objectId,
-                    userPrincipalName: candidate.userPrincipalName,
-                    mail: candidate.mail,
-                    name: candidate.name,
-                  }),
+                  key: getItemLinkPermissionRecipientKey(candidate),
                   candidate,
                   source: "draft",
                 }),

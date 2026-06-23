@@ -53,13 +53,7 @@ export const useItemLinkPermissionRecipientSearch = ({
     isCandidateAdded: (_tab, candidate) =>
       entry.recipients.some(
         (recipient) =>
-          recipient.key ===
-          getItemLinkPermissionRecipientKey({
-            objectId: candidate.objectId,
-            userPrincipalName: candidate.userPrincipalName,
-            mail: candidate.mail,
-            name: candidate.name,
-          }),
+          recipient.key === getItemLinkPermissionRecipientKey(candidate),
       ),
   });
 
