@@ -7,7 +7,7 @@ import {
   listItemLinkPermissions,
 } from "../../../services/itemPermissionApi";
 import type {
-  IItemLinkPermissionDraftState,
+  IItemLinkPermissionDiffState,
   IItemLinkPermissionEntryForUI,
 } from "../models/itemLinkPermissionModels";
 import { useItemLinkPermissionApiRequestState } from "./useItemLinkPermissionApiRequestState";
@@ -43,7 +43,7 @@ const createPersistedEntry = (
   ...overrides,
 });
 
-const createEmptyDraft = (): IItemLinkPermissionDraftState => ({
+const createEmptyDiff = (): IItemLinkPermissionDiffState => ({
   createdLinks: [],
   deletedPermissionIds: [],
   grantsByPermissionId: {},
@@ -91,8 +91,8 @@ describe("useItemLinkPermissionApiRequestState", () => {
     expect(result.current.originalEntries).toHaveLength(1);
   });
 
-  it("should reconcile refreshed entries and clear draft via callback", async () => {
-    const resetDraftState = vi.fn();
+  it("should reconcile refreshed entries and clear diff via callback", async () => {
+    const resetDiffState = vi.fn();
     const { result, rerender } = renderHook(
       ({ resetKey }: { resetKey: string }) =>
         useItemLinkPermissionApiRequestState({
@@ -116,7 +116,7 @@ describe("useItemLinkPermissionApiRequestState", () => {
 
     const changeSet = result.current.prepareChangeSet(
       {
-        ...createEmptyDraft(),
+        ...createEmptyDiff(),
         deletedPermissionIds: ["perm-1"],
       },
       true,
@@ -125,10 +125,13 @@ describe("useItemLinkPermissionApiRequestState", () => {
     expect(changeSet).not.toBeNull();
 
     act(() => {
-      result.current.reconcileAppliedEntries([createPersistedEntry()], resetDraftState);
+      result.current.reconcileAppliedEntries(
+        [createPersistedEntry()],
+        resetDiffState,
+      );
     });
 
-    expect(resetDraftState).toHaveBeenCalledTimes(1);
+    expect(resetDiffState).toHaveBeenCalledTimes(1);
     expect(result.current.originalEntries).toHaveLength(1);
 
     rerender({ resetKey: "drive-a:item-b" });

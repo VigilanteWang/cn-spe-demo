@@ -68,13 +68,13 @@ const originalEntries = [
 3. 删除整条 `organization + review` link
 4. 新建一条 `specific + read` link，但是还没选任何人
 
-于是本地草稿 `draft` 可以理解成：
+于是本地差异 `diff` 可以理解成：
 
 ```ts
-const draft = {
+const diff = {
   createdLinks: [
     {
-      id: "draft-item-link:1",
+      id: "diff-item-link:1",
       scope: "specific",
       type: "read",
       recipients: [],
@@ -112,7 +112,7 @@ const draft = {
 代码开头先把草稿里的 `deletedPermissionIds` 转成 `Set`：
 
 ```ts
-const deletedPermissionIds = new Set(draft.deletedPermissionIds);
+const deletedPermissionIds = new Set(diff.deletedPermissionIds);
 ```
 
 这样做是为了快速判断某条后端 link 有没有被“整条删除”。
@@ -206,7 +206,7 @@ persistedRecipients = [
 接着代码会去看：
 
 ```ts
-draft.revokesByPermissionId[entry.permissionId]
+diff.revokesByPermissionId[entry.permissionId]
 ```
 
 也就是“这条 specific link 本轮被移除的人有哪些”。
@@ -215,7 +215,7 @@ draft.revokesByPermissionId[entry.permissionId]
 
 ```ts
 const revokedRecipientKeys = new Set(
-  (draft.revokesByPermissionId[entry.permissionId] ?? []).map((candidate) =>
+  (diff.revokesByPermissionId[entry.permissionId] ?? []).map((candidate) =>
     getItemLinkPermissionRecipientKey(candidate),
   ),
 );
@@ -234,7 +234,7 @@ revokedRecipientKeys = new Set(["u-bob"]);
 然后代码会去看：
 
 ```ts
-draft.grantsByPermissionId[entry.permissionId]
+diff.grantsByPermissionId[entry.permissionId]
 ```
 
 也就是“这条 specific link 本轮新增了哪些人”。
@@ -243,12 +243,12 @@ draft.grantsByPermissionId[entry.permissionId]
 
 ```ts
 const grantedRecipients = (
-  draft.grantsByPermissionId[entry.permissionId] ?? []
+  diff.grantsByPermissionId[entry.permissionId] ?? []
 )
   .map((candidate) => ({
     key: getItemLinkPermissionRecipientKey(candidate),
     candidate,
-    source: "draft",
+    source: "diff",
   }))
 ```
 
@@ -256,7 +256,7 @@ const grantedRecipients = (
 
 ```ts
 grantedRecipients = [
-  { key: "u-carol", candidate: Carol, source: "draft" },
+  { key: "u-carol", candidate: Carol, source: "diff" },
 ];
 ```
 
@@ -310,7 +310,7 @@ const recipients = [
 ```ts
 recipients = [
   { key: "u-alice", candidate: Alice, source: "persisted" },
-  { key: "u-carol", candidate: Carol, source: "draft" },
+  { key: "u-carol", candidate: Carol, source: "diff" },
 ];
 ```
 
@@ -363,7 +363,7 @@ return {
 接下来代码会处理：
 
 ```ts
-draft.createdLinks
+diff.createdLinks
 ```
 
 这部分表示“用户刚在弹窗里新建出来，但还没有提交到后端”的 link。
@@ -371,9 +371,9 @@ draft.createdLinks
 代码会把它们也转换成统一的 `IItemLinkPermissionComputedEntry`：
 
 ```ts
-const createdEntries = draft.createdLinks.map((entry) => ({
+const createdEntries = diff.createdLinks.map((entry) => ({
   id: entry.id,
-  source: "draft",
+  source: "diff",
   scope: entry.scope,
   type: entry.type,
   roleLabel: getItemLinkPermissionRoleLabel(entry.type),
@@ -450,7 +450,7 @@ const sortedEntries = [...persistedEntries, ...createdEntries].sort(...)
 
 1. 先按 `scope`
 2. 同一个 `scope` 下按 `type`
-3. 如果 `scope` 和 `type` 都一样，`persisted` 排在 `draft` 前面
+3. 如果 `scope` 和 `type` 都一样，`persisted` 排在 `diff` 前面
 
 对应代码是：
 
@@ -502,7 +502,7 @@ return {
   {
     scope: "specific",
     type: "read",
-    source: "draft",
+    source: "diff",
     recipients: [],
     hasValidationError: true,
   },
@@ -539,7 +539,7 @@ true
 它负责的是：
 
 - 读取后端基线 `originalEntries`
-- 读取前端草稿 `draft`
+- 读取前端差异 `diff`
 - 算出“如果用户现在点 Apply，当前列表看起来应该是什么样子”
 
 所以这个文件的价值，不是做业务提交，而是让 UI 能在提交前就稳定、准确地展示最终结果。
@@ -551,7 +551,7 @@ true
 1. `persisted`
    表示后端本来就存在的东西
 
-2. `draft`
+2. `diff`
    表示用户本轮还没提交的本地修改
 
 3. `specific`

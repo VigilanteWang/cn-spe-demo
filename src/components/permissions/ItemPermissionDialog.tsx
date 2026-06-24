@@ -77,7 +77,7 @@ const truncateItemName = (itemName: string, maxLength = 32) => {
  *
  * 这个组件负责把两套能力编排到同一个弹窗里：
  * - people/groups：沿用 User 权限列表和 diff 提交模型
- * - links：使用单独的加载、草稿与提交状态
+ * - links：使用单独的加载、差异与提交状态
  * - Apply：在这里统一协调两边的提交顺序和错误反馈
  *
  * @param props Item 权限弹窗所需的资源标识、展示信息和关闭回调。
@@ -171,17 +171,17 @@ export const ItemPermissionDialog = ({
     selectedDialogTab,
   });
 
-  // links  tab 的本地草稿、校验和面板事件也保持独立，便于单独演进。
+  // links tab 的本地差异、校验和面板事件也保持独立，便于单独演进。
   const {
     entries: itemLinkEntries,
     createLinkScope,
     createLinkType,
     setCreateLinkScope,
     setCreateLinkType,
-    draft: itemLinkDraft,
+    diff: itemLinkDiff,
     hasUnsavedChanges: hasUnsavedItemLinkPermissionChanges,
     hasBlockingValidationError: hasBlockingLinkValidationError,
-    resetDraftState: resetItemLinkDraftState,
+    resetDiffState: resetItemLinkDiffState,
     resetSectionState: resetItemLinkSectionState,
     onAddLink,
     onDeleteLink,
@@ -300,7 +300,7 @@ export const ItemPermissionDialog = ({
   /**
    * 重置当前对话框会话级状态。
    *
-   * 这里不会重新请求数据，只负责把当前本地 tab 、错误提示和 link 面板草稿
+   * 这里不会重新请求数据，只负责把当前本地 tab、错误提示和 link 面板差异
    * 恢复到“下次打开弹窗时应有的初始样子”。
    */
   const resetDialogState = useCallback(() => {
@@ -468,7 +468,7 @@ export const ItemPermissionDialog = ({
 
       // links 变更集内部还会做自己的空变更判断和校验。
       linkPermissionChanges = prepareItemLinkChangeSet(
-        itemLinkDraft,
+        itemLinkDiff,
         hasUnsavedItemLinkPermissionChanges,
       );
     } catch (error: unknown) {
@@ -532,7 +532,7 @@ export const ItemPermissionDialog = ({
           // 如果 links 已成功，people/groups 再失败时仍要保住 links 的最新状态。
           reconcileAppliedItemLinkEntries(
             refreshedLinkEntries,
-            resetItemLinkDraftState,
+            resetItemLinkDiffState,
           );
           setPermissionRequestErrorMessage(
             `Links were saved, but people/groups changes failed: ${formatAppErrorMessageForUI(
@@ -559,7 +559,7 @@ export const ItemPermissionDialog = ({
       // 两边都成功后，再统一把 links 的最新结果回写进本地基线。
       reconcileAppliedItemLinkEntries(
         refreshedLinkEntries,
-        resetItemLinkDraftState,
+        resetItemLinkDiffState,
       );
     }
 

@@ -41,7 +41,7 @@ describe("ItemLinkPermissionPanel", () => {
         createType="review"
         onCreateScopeChange={vi.fn()}
         onCreateTypeChange={vi.fn()}
-        onAddLink={() => "draft-1"}
+        onAddLink={() => "diff-1"}
         onDeleteLink={vi.fn()}
         onCopyLink={vi.fn()}
         onAddRecipient={vi.fn()}
@@ -97,7 +97,7 @@ describe("ItemLinkPermissionPanel", () => {
         createType="view"
         onCreateScopeChange={vi.fn()}
         onCreateTypeChange={vi.fn()}
-        onAddLink={() => "draft-1"}
+        onAddLink={() => "diff-1"}
         onDeleteLink={vi.fn()}
         onCopyLink={vi.fn()}
         onAddRecipient={vi.fn()}
@@ -119,8 +119,8 @@ describe("ItemLinkPermissionPanel", () => {
       <ItemLinkPermissionPanel
         entries={[
           createEntry({
-            id: "draft-specific-1",
-            source: "draft",
+            id: "diff-specific-1",
+            source: "diff",
             permissionId: undefined,
             shareId: undefined,
             scope: ITEM_LINK_PERMISSION_SCOPES.specific,
@@ -134,7 +134,7 @@ describe("ItemLinkPermissionPanel", () => {
         createType="edit"
         onCreateScopeChange={vi.fn()}
         onCreateTypeChange={vi.fn()}
-        onAddLink={() => "draft-specific-1"}
+        onAddLink={() => "diff-specific-1"}
         onDeleteLink={vi.fn()}
         onCopyLink={vi.fn()}
         onAddRecipient={vi.fn()}

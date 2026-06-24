@@ -8,7 +8,7 @@ import {
 } from "../models/itemLinkPermissionModels";
 import type {
   IItemLinkPermissionComputedEntry,
-  IItemLinkPermissionDraftState,
+  IItemLinkPermissionDiffState,
   IItemLinkPermissionDisplayRecipient,
 } from "../models/itemLinkPermissionModels";
 import {
@@ -21,20 +21,20 @@ import {
  *
  * 这层 Hook 不保存新状态，只负责把：
  * - 后端原始基线 `originalEntries`
- * - 本地草稿差异 `draft`
+ * - 本地差异 `diff`
  * 合成为界面此刻应显示的最终行列表。
  *
  * @param originalEntries 后端当前确认过的 link 权限基线。
- * @param draft links 面板本地记录的 create/delete/grant/revoke 差异。
+ * @param diff links 面板本地记录的 create/delete/grant/revoke 差异。
  * @returns 可直接渲染的 computed entries，以及是否存在阻塞提交的校验错误。
  */
 export const useItemLinkPermissionComputedEntries = (
   originalEntries: IItemLinkPermissionEntryForUI[],
-  draft: IItemLinkPermissionDraftState,
+  diff: IItemLinkPermissionDiffState,
 ) => {
   return useMemo(() => {
     // 被标记删除的 persisted link 不再参与当前界面渲染。
-    const deletedPermissionIds = new Set(draft.deletedPermissionIds);
+    const deletedPermissionIds = new Set(diff.deletedPermissionIds);
     // persistedEntries 表示“后端本来就存在、且本轮没有被整体删除”的行，
     // 这些行还需要继续叠加 grant/revoke recipient差异，才能得到最终显示结果。
     const persistedEntries = originalEntries
@@ -73,18 +73,18 @@ export const useItemLinkPermissionComputedEntries = (
         );
         // revoke 差异表示“当前界面上应该暂时隐藏这些原有 recipient”。
         const revokedRecipientKeys = new Set(
-          (draft.revokesByPermissionId[entry.permissionId] ?? []).map(
+          (diff.revokesByPermissionId[entry.permissionId] ?? []).map(
             (candidate) => getItemLinkPermissionRecipientKey(candidate),
           ),
         );
         // grant 差异表示“当前界面上应该额外展示这些尚未提交的新 recipient”。
         const grantedRecipients = (
-          draft.grantsByPermissionId[entry.permissionId] ?? []
+          diff.grantsByPermissionId[entry.permissionId] ?? []
         )
           .map<IItemLinkPermissionDisplayRecipient>((candidate) => ({
             key: getItemLinkPermissionRecipientKey(candidate),
             candidate,
-            source: "draft",
+            source: "diff",
           }))
           .filter(
             (recipient) =>
@@ -93,7 +93,7 @@ export const useItemLinkPermissionComputedEntries = (
                   persistedRecipient.key === recipient.key,
               ),
           );
-        // 原有 recipient 在本轮草稿里若被 revoke，则从当前显示结果中去掉。
+        // 原有 recipient 在本轮差异里若被 revoke，则从当前显示结果中去掉。
         const visiblePersistedRecipients = persistedRecipients.filter(
           (recipient) => !revokedRecipientKeys.has(recipient.key),
         );
@@ -118,12 +118,12 @@ export const useItemLinkPermissionComputedEntries = (
         };
       });
 
-    // createdEntries 表示“仅存在于本地草稿、尚未提交到后端”的新建 link 行。
-    // 这部分数据完全来自 draft.createdLinks，不依赖 originalEntries。
+    // createdEntries 表示“仅存在于本地差异、尚未提交到后端”的新建 link 行。
+    // 这部分数据完全来自 diff.createdLinks，不依赖 originalEntries。
     const createdEntries =
-      draft.createdLinks.map<IItemLinkPermissionComputedEntry>((entry) => ({
+      diff.createdLinks.map<IItemLinkPermissionComputedEntry>((entry) => ({
         id: entry.id,
-        source: "draft",
+        source: "diff",
         scope: entry.scope,
         type: entry.type,
         // 新建行没有后端回传的 roleLabel，需要在前端按 type 现算展示文案。
@@ -139,10 +139,10 @@ export const useItemLinkPermissionComputedEntries = (
             ? entry.recipients.map<IItemLinkPermissionDisplayRecipient>(
                 (candidate) => ({
                   // 新建 specific link 的 recipient 也统一转成可渲染结构，
-                  // 这样上层行组件无需区分它来自 persisted 还是 created draft。
+                  // 这样上层行组件无需区分它来自 persisted 还是 created diff。
                   key: getItemLinkPermissionRecipientKey(candidate),
                   candidate,
-                  source: "draft",
+                  source: "diff",
                 }),
               )
             : [],
@@ -153,7 +153,7 @@ export const useItemLinkPermissionComputedEntries = (
       }));
 
     // 最终显示顺序由 scope、type、source 统一决定，
-    // 保证 persisted 与 draft 混排时界面仍稳定可预测。
+    // 保证 persisted 与 diff 混排时界面仍稳定可预测。
     const sortedEntries = [...persistedEntries, ...createdEntries].sort(
       (left, right) => {
         // 先按 scope 排，保证 anonymous / organization / specific 的大区块顺序稳定。
@@ -173,7 +173,7 @@ export const useItemLinkPermissionComputedEntries = (
         }
 
         // scope 和 type 都相同时，优先展示 persisted 行，
-        // 让真实存在的后端 link 排在本地草稿前面。
+        // 让真实存在的后端 link 排在本地差异前面。
         if (left.source === right.source) {
           return 0;
         }
@@ -190,7 +190,7 @@ export const useItemLinkPermissionComputedEntries = (
         (entry) => entry.hasValidationError,
       ),
     };
-  }, [draft, originalEntries]);
+  }, [diff, originalEntries]);
 };
 
 /**

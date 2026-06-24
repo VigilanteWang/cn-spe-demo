@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import type {
-  IItemLinkPermissionDraftState,
+  IItemLinkPermissionDiffState,
   IItemLinkPermissionEntryForUI,
 } from "../models/itemLinkPermissionModels";
 import type { IApplyItemLinkPermissionChangesRequest } from "../../../../common/contracts/itemPermissionCommonContracts";
@@ -38,8 +38,8 @@ interface IUseItemLinkPermissionApiRequestStateOptions {
  *
  * 这个 Hook 主要负责三件事：
  * 1. 在 links tab 真正可见时懒加载后端已有的 link 权限。
- * 2. 基于“后端基线 + 前端草稿”准备提交给后端的 change set。
- * 3. 在提交成功后用最新返回结果替换基线，并把草稿重置回“已同步”状态。
+ * 2. 基于“后端基线 + 前端差异”准备提交给后端的 change set。
+ * 3. 在提交成功后用最新返回结果替换基线，并把本地差异重置回“已同步”状态。
  *
  * @param options 当前对话框、目标文件项和页签相关的上下文信息。
  * @returns 提供 links 面板读取、提交和提交后对账所需的状态与方法。
@@ -80,7 +80,7 @@ export const useItemLinkPermissionApiRequestState = ({
     setLoadErrorMessage(null);
 
     // 拉取“后端当前确认过的 link 权限基线”，
-    // 后续草稿 diff 和提交都基于这份基线展开。
+    // 后续本地差异的计算和提交都基于这份基线展开。
     void listItemLinkPermissions(driveId, itemId)
       .then((entries) => {
         if (!cancelled) {
@@ -119,15 +119,15 @@ export const useItemLinkPermissionApiRequestState = ({
   ]);
 
   const prepareChangeSet = useCallback(
-    (draft: IItemLinkPermissionDraftState, hasUnsavedChanges: boolean) => {
+    (diff: IItemLinkPermissionDiffState, hasUnsavedChanges: boolean) => {
       // 没有本地改动时直接返回 null，
       // 让调用方明确知道“这次无需发起 apply 请求”。
       if (!hasUnsavedChanges) {
         return null;
       }
 
-      // 这里真正把“后端基线 + 前端草稿”收敛成后端 apply 接口能理解的合同。
-      return createItemLinkPermissionChangeSet(originalEntries, draft);
+      // 这里真正把“后端基线 + 前端差异”收敛成后端 apply 接口能理解的合同。
+      return createItemLinkPermissionChangeSet(originalEntries, diff);
     },
     [originalEntries],
   );
@@ -144,14 +144,14 @@ export const useItemLinkPermissionApiRequestState = ({
   const reconcileAppliedEntries = useCallback(
     (
       entries: IItemLinkPermissionEntryForUI[],
-      resetDraftState?: () => void,
+      resetDiffState?: () => void,
     ) => {
       // 提交成功后，后端返回的 entries 就是新的“已落库基线”。
       // 用它整体替换原基线，后续 diff 才会基于最新事实继续计算。
       replaceEntries(entries);
-      // 草稿里的新增、删除、grant、revoke 都已经被后端确认，
-      // 这里把本地草稿清空，让 UI 回到“没有待保存改动”的状态。
-      resetDraftState?.();
+      // 差异里的新增、删除、grant、revoke 都已经被后端确认，
+      // 这里把本地差异清空，让 UI 回到“没有待保存改动”的状态。
+      resetDiffState?.();
       // 请求成功后顺手清掉旧的加载错误，避免界面残留过期提示。
       setLoadErrorMessage(null);
     },

@@ -8,8 +8,8 @@ import type {
 import type { IGraphPermissionIdentity } from "../../../../common/contracts/permissionCommonContracts";
 import type { IPermissionPrincipalSearchCandidate } from "../models/permissionSharedModels";
 import type {
-  IItemLinkPermissionCreatedLinkDraft,
-  IItemLinkPermissionDraftState,
+  IItemLinkPermissionCreatedLinkDiff,
+  IItemLinkPermissionDiffState,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
 import { getInitials } from "./permissionPrincipalCandidateMapper";
@@ -44,7 +44,7 @@ export const getItemLinkPermissionScopeLabel = (
  * 生成 recipient 的稳定去重键。
  *
  * 优先级与后端 link permission adapter 保持一致，
- * 这样前端本地草稿和后端读取出来的主体更容易对齐。
+ * 这样前端本地差异和后端读取出来的主体更容易对齐。
  *
  * @param input 当前 recipient 可用的几种标识字段。
  * @returns 按优先级收口后的稳定 key。
@@ -105,12 +105,12 @@ export const mapPermissionCandidateToItemLinkRecipientCandidate = (
  * 构造 links 面板提交给后端的 change set。
  *
  * @param originalEntries 当前后端确认过的基线 link 列表。
- * @param draft 前端维护的 links 草稿。
+ * @param diff 前端维护的 links 差异。
  * @returns 可直接发给 `/links/apply` 的请求体。
  */
 export const createItemLinkPermissionChangeSet = (
   originalEntries: IItemLinkPermissionEntryForUI[],
-  draft: IItemLinkPermissionDraftState,
+  diff: IItemLinkPermissionDiffState,
 ): IApplyItemLinkPermissionChangesRequest => {
   // 先把后端基线列表转成按 permissionId 索引的 Map，
   // 这样后面组装 grant/revoke 时可以稳定补回 shareId、type 等后端必填字段。
@@ -119,9 +119,9 @@ export const createItemLinkPermissionChangeSet = (
   );
 
   return {
-    // 把“本地新建的 links 草稿”映射成 create change。
+    // 把“本地新建的 links 差异”映射成 create change。
     // 只有 specific link 需要携带 recipients，其它 scope 交给后端按 scope 语义处理。
-    create: draft.createdLinks.map((entry) => {
+    create: diff.createdLinks.map((entry) => {
       const recipients = entry.recipients.map(
         mapItemLinkRecipientCandidateToRequest,
       );
@@ -134,17 +134,17 @@ export const createItemLinkPermissionChangeSet = (
           : {}),
       };
     }),
-    deleteLinks: draft.deletedPermissionIds.map((permissionId) => ({
+    deleteLinks: diff.deletedPermissionIds.map((permissionId) => ({
       permissionId,
     })),
     // grantsByPermissionId 是一个“按 permissionId 分组”的对象字典，
     // 这里先转成 entries 数组，再逐条补齐 shareId/type 并映射 recipients。
-    grantRecipients: Object.entries(draft.grantsByPermissionId).map(
+    grantRecipients: Object.entries(diff.grantsByPermissionId).map(
       ([permissionId, recipients]) => {
         const originalEntry = entriesByPermissionId.get(permissionId);
 
         // specific link 的增人请求必须带 shareId；
-        // 如果基线里缺这个字段，说明当前草稿已经无法安全提交。
+        // 如果基线里缺这个字段，说明当前差异已经无法安全提交。
         if (!originalEntry?.shareId) {
           throw new Error(
             `Cannot grant recipients for link ${permissionId}: missing shareId.`,
@@ -160,7 +160,7 @@ export const createItemLinkPermissionChangeSet = (
       },
     ),
     // revoke 的组装方式和 grant 一致，只是后端合同不要求再携带 link type。
-    revokeRecipients: Object.entries(draft.revokesByPermissionId).map(
+    revokeRecipients: Object.entries(diff.revokesByPermissionId).map(
       ([permissionId, recipients]) => {
         const originalEntry = entriesByPermissionId.get(permissionId);
 
@@ -200,24 +200,24 @@ export const mapItemLinkRecipientCandidateToRequest = (
 /**
  * 计算 links 面板是否存在本地未保存修改。
  *
- * @param draft 当前 links 草稿状态。
+ * @param diff 当前 links 差异状态。
  * @returns 只要任一变更集合非空，就视为存在未保存修改。
  */
-export const hasItemLinkPermissionDraftChanges = (
-  draft: IItemLinkPermissionDraftState,
+export const hasItemLinkPermissionDiffChanges = (
+  diff: IItemLinkPermissionDiffState,
 ): boolean =>
-  draft.createdLinks.length > 0 ||
-  draft.deletedPermissionIds.length > 0 ||
-  Object.keys(draft.grantsByPermissionId).length > 0 ||
-  Object.keys(draft.revokesByPermissionId).length > 0;
+  diff.createdLinks.length > 0 ||
+  diff.deletedPermissionIds.length > 0 ||
+  Object.keys(diff.grantsByPermissionId).length > 0 ||
+  Object.keys(diff.revokesByPermissionId).length > 0;
 
 /**
- * 生成 links 列表默认的空草稿状态。
+ * 生成 links 列表默认的空差异状态。
  *
- * @returns 所有变更集合都为空的初始草稿。
+ * @returns 所有变更集合都为空的初始差异。
  */
-export const createEmptyItemLinkPermissionDraftState =
-  (): IItemLinkPermissionDraftState => ({
+export const createEmptyItemLinkPermissionDiffState =
+  (): IItemLinkPermissionDiffState => ({
     createdLinks: [],
     deletedPermissionIds: [],
     grantsByPermissionId: {},
@@ -233,20 +233,20 @@ export const createEmptyItemLinkPermissionEntries =
   (): IItemLinkPermissionEntryForUI[] => [];
 
 /**
- * 生成一条新的 link 草稿项。
+ * 生成一条新的 link 差异项。
  *
  * 这个工厂目前主要给 hooks/UI 使用，因此放在 links 的 UI utils 更合适。
  *
- * @param id 前端本地生成的草稿 id。
+ * @param id 前端本地生成的差异 id。
  * @param scope 新 link 的 scope。
  * @param type 新 link 的 type。
- * @returns 一条带空 recipients 列表的初始 link 草稿。
+ * @returns 一条带空 recipients 列表的初始 link 差异项。
  */
-export const createItemLinkPermissionCreatedLinkDraft = (
+export const createItemLinkPermissionCreatedLinkDiff = (
   id: string,
   scope: ItemLinkPermissionScope,
   type: ItemLinkPermissionType,
-): IItemLinkPermissionCreatedLinkDraft => ({
+): IItemLinkPermissionCreatedLinkDiff => ({
   id,
   scope,
   type,

@@ -29,7 +29,7 @@ const createPersistedEntry = (
 });
 
 describe("useItemLinkPermissionUIState", () => {
-  it("should auto-create a specific link draft entry that the panel can expand", () => {
+  it("should auto-create a specific link diff entry that the panel can expand", () => {
     const { result } = renderHook(() =>
       useItemLinkPermissionUIState({
         resetKey: "drive-a:item-a",
@@ -47,7 +47,7 @@ describe("useItemLinkPermissionUIState", () => {
 
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0]).toMatchObject({
-      source: "draft",
+      source: "diff",
       scope: ITEM_LINK_PERMISSION_SCOPES.specific,
       hasValidationError: true,
     });
@@ -139,7 +139,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.createLinkType).toBe("view");
   });
 
-  it("should clear local draft state after resetDraftState", () => {
+  it("should clear local diff state after resetDiffState", () => {
     const { result } = renderHook(() =>
       useItemLinkPermissionUIState({
         resetKey: "drive-a:item-a",
@@ -154,7 +154,7 @@ describe("useItemLinkPermissionUIState", () => {
     expect(result.current.hasUnsavedChanges).toBe(true);
 
     act(() => {
-      result.current.resetDraftState();
+      result.current.resetDiffState();
     });
 
     expect(result.current.hasUnsavedChanges).toBe(false);

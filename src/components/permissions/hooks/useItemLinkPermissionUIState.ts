@@ -9,7 +9,7 @@ import {
   type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
 import { useItemLinkPermissionComputedEntries } from "./useItemLinkPermissionComputedEntries";
-import { useItemLinkPermissionDraft } from "./useItemLinkPermissionDraft";
+import { useItemLinkPermissionDiff } from "./useItemLinkPermissionDiff";
 
 interface IUseItemLinkPermissionUIStateOptions {
   resetKey: string;
@@ -22,7 +22,7 @@ interface IUseItemLinkPermissionUIStateOptions {
  *
  * 这一层不直接拥有后端基线，而是把：
  * 1. 创建区的 scope/type 选择
- * 2. 本地 draft 差异
+ * 2. 本地 diff 差异
  * 3. 供渲染使用的 computed entries
  * 4. 行级交互事件
  * 统一编排成 links 面板可直接消费的一组状态。
@@ -41,7 +41,7 @@ export const useItemLinkPermissionUIState = ({
     ITEM_LINK_PERMISSION_TYPES[0],
   );
   const {
-    draft,
+    diff,
     hasUnsavedChanges,
     addCreatedLink,
     removeCreatedLink,
@@ -50,38 +50,38 @@ export const useItemLinkPermissionUIState = ({
     removeRecipientFromCreatedLink,
     addGrantRecipient,
     addRevokeRecipient,
-    resetDraft,
-  } = useItemLinkPermissionDraft(resetKey);
+    resetDiff,
+  } = useItemLinkPermissionDiff(resetKey);
 
   const computedPermissions = useItemLinkPermissionComputedEntries(
     originalEntries,
-    draft,
+    diff,
   );
 
-  const resetDraftState = useCallback(() => {
+  const resetDiffState = useCallback(() => {
     // “放弃本地编辑”时，同时把新增区的默认选择恢复到首个可选项。
-    resetDraft();
+    resetDiff();
     setCreateLinkScope(ITEM_LINK_PERMISSION_SCOPE_VALUES[0]);
     setCreateLinkType(ITEM_LINK_PERMISSION_TYPES[0]);
-  }, [resetDraft]);
+  }, [resetDiff]);
 
   const resetSectionState = useCallback(() => {
-    // 这一层负责 links 区整体重置：既清草稿，也允许上层顺手清掉加载基线。
-    resetDraftState();
+    // 这一层负责 links 区整体重置：既清差异，也允许上层顺手清掉加载基线。
+    resetDiffState();
     onResetLoadState?.();
-  }, [onResetLoadState, resetDraftState]);
+  }, [onResetLoadState, resetDiffState]);
 
   const onAddLink = useCallback(() => {
-    // 新建 link 时，使用创建区当前选中的 scope/type 生成 draft entry。
+    // 新建 link 时，使用创建区当前选中的 scope/type 生成 diff entry。
     return addCreatedLink(createLinkScope, createLinkType);
   }, [addCreatedLink, createLinkScope, createLinkType]);
 
   const onDeleteLink = useCallback(
     (entry: IItemLinkPermissionComputedEntry) => {
-      // draft 行和 persisted 行的删除语义不同：
-      // - draft 行：直接从 createdLinks 中拿掉
+      // diff 行和 persisted 行的删除语义不同：
+      // - diff 行：直接从 createdLinks 中拿掉
       // - persisted 行：记录 delete 差异，等待 Apply
-      if (entry.source === "draft") {
+      if (entry.source === "diff") {
         removeCreatedLink(entry.id);
         return;
       }
@@ -98,9 +98,9 @@ export const useItemLinkPermissionUIState = ({
       entry: IItemLinkPermissionComputedEntry,
       candidate: IItemLinkPermissionRecipientCandidate,
     ) => {
-      // 新建 link 的 recipient 直接写进 created draft；
+      // 新建 link 的 recipient 直接写进 created diff；
       // 已存在 link 的 recipient 则记成 grant 差异。
-      if (entry.source === "draft") {
+      if (entry.source === "diff") {
         addRecipientToCreatedLink(entry.id, candidate);
         return;
       }
@@ -114,7 +114,7 @@ export const useItemLinkPermissionUIState = ({
 
   const onRemoveRecipient = useCallback(
     (entry: IItemLinkPermissionComputedEntry, recipientKey: string) => {
-      if (entry.source === "draft") {
+      if (entry.source === "diff") {
         removeRecipientFromCreatedLink(entry.id, recipientKey);
         return;
       }
@@ -164,10 +164,10 @@ export const useItemLinkPermissionUIState = ({
     createLinkType,
     setCreateLinkScope,
     setCreateLinkType,
-    draft,
+    diff,
     hasUnsavedChanges,
     hasBlockingValidationError: computedPermissions.hasBlockingValidationError,
-    resetDraftState,
+    resetDiffState,
     resetSectionState,
     onAddLink,
     onDeleteLink,

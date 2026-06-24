@@ -24,7 +24,7 @@ export type {
 export type ItemPermissionDialogTabValue = PermissionTabValue | "links";
 
 /**
- * links 草稿里新增或撤销 recipient 时复用的前端主体模型。
+ * links 差异里新增或撤销 recipient 时复用的前端主体模型。
  */
 export interface IItemLinkPermissionRecipientCandidate {
   id: string;
@@ -38,9 +38,9 @@ export interface IItemLinkPermissionRecipientCandidate {
 }
 
 /**
- * 一条尚未持久化到后端的新建 link 草稿。
+ * 一条尚未持久化到后端的新建 link 差异项。
  */
-export interface IItemLinkPermissionCreatedLinkDraft {
+export interface IItemLinkPermissionCreatedLinkDiff {
   id: string;
   scope: ItemLinkPermissionScope;
   type: ItemLinkPermissionType;
@@ -48,10 +48,10 @@ export interface IItemLinkPermissionCreatedLinkDraft {
 }
 
 /**
- * links 面板内部维护的全部本地草稿状态。
+ * links 面板内部维护的全部本地差异状态。
  */
-export interface IItemLinkPermissionDraftState {
-  createdLinks: IItemLinkPermissionCreatedLinkDraft[];
+export interface IItemLinkPermissionDiffState {
+  createdLinks: IItemLinkPermissionCreatedLinkDiff[];
   deletedPermissionIds: string[];
   grantsByPermissionId: Record<string, IItemLinkPermissionRecipientCandidate[]>;
   revokesByPermissionId: Record<
@@ -66,18 +66,18 @@ export interface IItemLinkPermissionDraftState {
 export interface IItemLinkPermissionDisplayRecipient {
   key: string;
   candidate: IItemLinkPermissionRecipientCandidate;
-  source: "persisted" | "draft";
+  source: "persisted" | "diff";
 }
 
 /**
  * links 列表计算后的单行展示模型。
  *
- * 它不是后端原始合同，也不是本地 draft 自身，
+ * 它不是后端原始合同，也不是本地 diff 自身，
  * 而是“原始基线 + 本地差异”合并后供界面直接渲染的结果。
  */
 export interface IItemLinkPermissionComputedEntry {
   id: string;
-  source: "persisted" | "draft";
+  source: "persisted" | "diff";
   permissionId?: string;
   shareId?: string;
   webUrl?: string;
