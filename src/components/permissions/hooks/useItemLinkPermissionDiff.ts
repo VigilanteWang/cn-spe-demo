@@ -116,7 +116,7 @@ export const useItemLinkPermissionDiff = (resetKey: string) => {
         ...currentDiff.revokesByPermissionId,
       };
 
-      // 一条 link 一旦整体删除，它上面的 grant/revoke 差异就失去意义，需要一起清掉。
+      // 一条 link 一旦整体删除，它下面的 grant/revoke 差异就失去意义，需要一起清掉。
       delete nextGrantsByPermissionId[permissionId];
       delete nextRevokesByPermissionId[permissionId];
 
@@ -399,7 +399,6 @@ const removeCandidateFromRecipientMap = (
   permissionId: string,
   candidate: IItemLinkPermissionRecipientCandidate,
 ) => {
-  // 当用户撤回一条尚未提交的 grant 时，直接把它从 map 里删掉即可。
   const currentRecipients = recipientMap[permissionId];
 
   if (!currentRecipients) {

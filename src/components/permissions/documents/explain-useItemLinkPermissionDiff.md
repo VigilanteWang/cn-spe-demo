@@ -70,14 +70,10 @@ const diff = {
   ],
   deletedPermissionIds: [],
   grantsByPermissionId: {
-    "perm-specific-write": [
-      { objectId: "u-david", displayName: "David" },
-    ],
+    "perm-specific-write": [{ objectId: "u-david", displayName: "David" }],
   },
   revokesByPermissionId: {
-    "perm-specific-write": [
-      { objectId: "u-bob", displayName: "Bob" },
-    ],
+    "perm-specific-write": [{ objectId: "u-bob", displayName: "Bob" }],
   },
 };
 ```
@@ -92,7 +88,7 @@ const diff = {
 
 后面 `useItemLinkPermissionComputedEntries` 再拿这份 `diff` 去和后端基线合并，界面才会显示成“新 link 先出现，Bob 先消失，David 先出现”的效果。
 
-## 第 1 步：初始化时，这个 hook 会先准备一份空 diff
+## 1. 初始化时，这个 hook 会先准备一份空 diff
 
 代码开头：
 
@@ -109,7 +105,7 @@ const [diff, setDiff] = useState<IItemLinkPermissionDiffState>(
 
 你可以把它理解成一张刚打开的草稿纸，上面还什么都没记。
 
-## 第 2 步：切换到别的文件项时，要把上一轮草稿全部清空
+## 2. 切换到别的文件项时，要把上一轮草稿全部清空
 
 这个 hook 依赖一个 `resetKey`：
 
@@ -132,7 +128,7 @@ useEffect(() => {
 
 这样能避免“我在 A 文件上新建的 link 草稿，不小心跑到 B 文件上继续显示”。
 
-## 第 3 步：用户点击“新建 link”时，`addCreatedLink` 会记一条 created diff
+## 3. 用户点击“新建 link”时，`addCreatedLink` 会记一条 created diff
 
 来看一个最简单的例子。
 
@@ -185,12 +181,35 @@ const existingEntry = currentDiff.createdLinks.find(
 
 如果找到，就直接复用已有 id，返回原 `diff`。
 
+不过要先说明一个前提：
+
+- 按现在的前端交互，用户正常从 links 创建区操作时，基本上不可能再手动新建出一条重复草稿
+
+原因不在这个 hook 本身，而是在更外层的 links 面板已经提前挡住了：
+
+- `ItemLinkPermissionPanel.tsx` 会先根据当前 `entries` 计算哪些 `scope:type` 组合已经被占用
+- 如果当前 `scope` 下某个 `type` 已经存在，对应的下拉选项就会被禁用
+- 如果某个 `scope` 下所有 `type` 都已经占满，对应的 `scope` 选项也会被禁用
+- `useItemLinkPermissionUIState.ts` 还会在列表变化后自动切到“下一个可用组合”，避免创建区停在已占用组合上
+
+也就是说，正常情况下，创建区送进 `addCreatedLink` 的应该都是“还没被占用的组合”。
+
+那这里为什么还要再做一次判断？
+
+可以把它理解成 `diff` 层的最后一道保险，主要是为了两件事：
+
+1. 保证 `addCreatedLink` 自己是幂等的
+   就算以后调用路径调整了，或者有别的地方直接调用这个函数并传进重复的 `scope:type`，这里也不会把 `createdLinks` 写坏。
+
+2. 让调用方稳定拿到“这条草稿”的 id
+   现在外层会使用返回 id 继续做行级 UI 处理，比如新建 `specific` link 后自动展开对应行。命中重复时直接复用旧 id，调用方就不需要再区分“这次是真新增”还是“只是又点到同一个组合”。
+
 也就是说：
 
 - 不会多出第二条一样的 `specific + read` 草稿
 - 调用方还能拿到原来那条草稿的 id，继续对它做操作
 
-## 第 4 步：如果用户撤回这条新建 link，`removeCreatedLink` 会直接删掉这条 created diff
+## 4. 如果用户撤回这条新建 link，`removeCreatedLink` 会直接删掉这条 created diff
 
 继续上面的例子。
 
@@ -227,7 +246,7 @@ const existingEntry = currentDiff.createdLinks.find(
 
 因为这条 link 还没有提交到后端，所以它没有 persisted 基线可对照。对这种草稿行来说，“删除”就等于“把草稿从本地抹掉”。
 
-## 第 5 步：给本地新建 link 加人时，`addRecipientToCreatedLink` 只改 `createdLinks`
+## 5. 给本地新建 link 加人时，`addRecipientToCreatedLink` 只改 `createdLinks`
 
 还是看刚才那条本地新建的 `specific + read` link。
 
@@ -245,7 +264,7 @@ const existingEntry = currentDiff.createdLinks.find(
 如果用户给它加上 `Carol`，也就是调用：
 
 ```ts
-addRecipientToCreatedLink("diff-item-link:1", Carol)
+addRecipientToCreatedLink("diff-item-link:1", Carol);
 ```
 
 那这条 created entry 会变成：
@@ -276,14 +295,13 @@ addRecipientToCreatedLink("diff-item-link:1", Carol)
 
 ```ts
 const alreadyExists = entry.recipients.some(
-  (recipient) =>
-    getItemLinkPermissionRecipientKey(recipient) === candidateKey,
+  (recipient) => getItemLinkPermissionRecipientKey(recipient) === candidateKey,
 );
 ```
 
 如果 `Carol` 已经在这条草稿 link 里了，就直接返回原 entry，不重复追加第二次。
 
-## 第 6 步：从本地新建 link 里删人时，`removeRecipientFromCreatedLink` 也是直接改 `createdLinks`
+## 6. 从本地新建 link 里删人时，`removeRecipientFromCreatedLink` 也是直接改 `createdLinks`
 
 如果当前这条本地草稿是：
 
@@ -313,9 +331,16 @@ const alreadyExists = entry.recipients.some(
 - 所以也不需要 `grant / revoke` 对冲
 - 直接把草稿 entry 里的 `recipients` 数组过滤一遍就够了
 
-## 第 7 步：删除一条后端已有 link 时，`deletePersistedLink` 只记 `permissionId`
+## 7. 删除一条后端已有 link 时，`deletePersistedLink` 只记 `permissionId`
 
 现在切换到 persisted link 的情况。
+
+> Note: 可以先把这个项目里的 link change 模型理解成两层：
+> 一层是“link 本身”的增删，比如新建一条 link、删除一条 link；
+> 另一层是“specific link 下面的 recipients”增删，也就是给这条 link 加人或删人。
+> 在 `diff` 里，这两层没有拆成两份彼此独立的状态，而是放在同一份账本里：
+> `deletedPermissionIds` 记录 link 层变化，`grantsByPermissionId` / `revokesByPermissionId` 记录 recipient 层变化，
+> 中间靠 `permissionId` 把“这是谁下面的 recipient 变化”串起来。
 
 假设后端原本有一条：
 
@@ -362,7 +387,7 @@ revokesByPermissionId: {
 
 最终你只需要保留“这条 link 要整条删除”这一个事实。
 
-## 第 8 步：给后端已有 link 加人时，`addGrantRecipient` 分两种情况
+## 8. 给后端已有 link 加人时，`addGrantRecipient` 分两种情况
 
 这是这个文件里最容易绕的一段。
 
@@ -386,7 +411,7 @@ revokesByPermissionId: {
 如果调用：
 
 ```ts
-addGrantRecipient("perm-specific-write", David)
+addGrantRecipient("perm-specific-write", David);
 ```
 
 结果会变成：
@@ -428,7 +453,7 @@ addGrantRecipient("perm-specific-write", David)
 这时如果调用：
 
 ```ts
-addGrantRecipient("perm-specific-write", Bob)
+addGrantRecipient("perm-specific-write", Bob);
 ```
 
 正确结果不是：
@@ -466,7 +491,7 @@ addGrantRecipient("perm-specific-write", Bob)
 - `Bob` 本来就在 persisted 基线里
 - 用户先删后加，最终等于“什么都没变”
 
-## 第 9 步：给后端已有 link 删人时，`addRevokeRecipient` 也分两种情况
+## 9. 给后端已有 link 删人时，`addRevokeRecipient` 也分两种情况
 
 这段和上一段正好是镜像关系。
 
@@ -497,7 +522,7 @@ addGrantRecipient("perm-specific-write", Bob)
 如果这时用户又把 `David` 删掉，调用：
 
 ```ts
-addRevokeRecipient("perm-specific-write", David)
+addRevokeRecipient("perm-specific-write", David);
 ```
 
 结果不会变成“给 David 记一条 revoke”。
@@ -532,7 +557,7 @@ addRevokeRecipient("perm-specific-write", David)
 如果用户移除 `Bob`，调用：
 
 ```ts
-addRevokeRecipient("perm-specific-write", Bob)
+addRevokeRecipient("perm-specific-write", Bob);
 ```
 
 这时 `removeCandidateFromRecipientMap` 会发现：
@@ -556,7 +581,7 @@ addRevokeRecipient("perm-specific-write", Bob)
 - `Bob` 原本就在后端基线里
 - 本轮用户明确要把他移除
 
-## 第 10 步：`addCandidateToRecipientMap` 和 `removeCandidateFromRecipientMap` 在干什么
+## 10. `addCandidateToRecipientMap` 和 `removeCandidateFromRecipientMap` 在干什么
 
 这两个工具函数可以把它们理解成：
 
@@ -622,19 +647,20 @@ const grantsByPermissionId = {
 而是会直接变成：
 
 ```ts
-{}
+{
+}
 ```
 
 也就是把整个 key 都删掉。
 
 这样 `diff` 会更干净，因为空数组本身已经不表达任何有效差异了。
 
-## 第 11 步：`hasUnsavedChanges` 是怎么来的
+## 11. `hasUnsavedChanges` 是怎么来的
 
 这个 hook 最后会返回：
 
 ```ts
-hasUnsavedChanges: hasItemLinkPermissionDiffChanges(diff)
+hasUnsavedChanges: hasItemLinkPermissionDiffChanges(diff);
 ```
 
 它的意思是：
@@ -652,7 +678,7 @@ hasUnsavedChanges: hasItemLinkPermissionDiffChanges(diff)
 - 是否启用 `Apply`
 - 是否在关闭弹窗前提示用户
 
-## 第 12 步：`resetDiff` 做的事情最简单，但非常重要
+## 12. `resetDiff` 做的事情最简单，但非常重要
 
 `resetDiff()` 会直接把整个 `diff` 重置为空：
 
