@@ -22,7 +22,7 @@ import { mapPermissionEntriesToTabs } from "./permissionApiShared";
  * @returns 供权限对话框直接消费的分组选项结果。
  * @throws 当后端返回非成功状态时抛出 `AppError`。
  */
-export const listItemPermissions = async (
+export const listItemUserPermissions = async (
   driveId: string,
   itemId: string,
 ): Promise<IItemUserPermissionEntriesLoadResult> => {
@@ -61,7 +61,7 @@ export const listItemPermissions = async (
  * @returns 服务端应用变更后返回的最新权限分组结果。
  * @throws 当 apply 请求失败时抛出 `AppError`。
  */
-export const applyItemPermissionChanges = async (
+export const applyItemUserPermissionChanges = async (
   driveId: string,
   itemId: string,
   changes: IItemUserPermissionChangeSetFromUI,

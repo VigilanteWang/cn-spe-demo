@@ -5,20 +5,28 @@ import type {
   IItemLinkPermissionEntryForUI,
 } from "../models/itemLinkPermissionModels";
 import type { IApplyItemLinkPermissionChangesRequest } from "../../../../common/contracts/itemPermissionCommonContracts";
-import { useItemLinkPermissionLoadState } from "./useItemLinkPermissionLoadState";
 import {
   applyItemLinkPermissionChanges,
   listItemLinkPermissions,
 } from "../../../services/itemPermissionApi";
-import { createItemLinkPermissionChangeSet } from "../services/itemLinkPermissionUiUtils";
+import {
+  createEmptyItemLinkPermissionEntries,
+  createItemLinkPermissionChangeSet,
+} from "../services/itemLinkPermissionUiUtils";
 import type { ItemPermissionDialogTabValue } from "../models/itemLinkPermissionModels";
 
 interface IUseItemLinkPermissionApiRequestStateOptions {
+  /** 对话框是否处于打开状态。 */
   open: boolean;
+  /** 当前 item 所属 drive 的标识。 */
   driveId?: string;
+  /** 当前 item 的标识。 */
   itemId?: string;
+  /** 用来区分当前编辑目标的重置键。 */
   resetKey: string;
+  /** 当前目标是否支持 item link permission。 */
   isSupportedLinkTarget: boolean;
+  /** 当前弹窗选中的主 tab。 */
   selectedDialogTab: ItemPermissionDialogTabValue;
 }
 
@@ -52,14 +60,50 @@ export const useItemLinkPermissionApiRequestState = ({
   isSupportedLinkTarget,
   selectedDialogTab,
 }: IUseItemLinkPermissionApiRequestStateOptions) => {
+  // 这份列表保存“最近一次被后端确认”的 links 基线，
+  // 后续 diff 计算、Apply 前组装 change set 都必须以它为准。
+  const [originalEntries, setOriginalEntries] = useState<
+    IItemLinkPermissionEntryForUI[]
+  >(createEmptyItemLinkPermissionEntries());
+  // 记录本轮对话框会话里是否已经真正加载过一次 links，
+  // 用来保证 links tab 只在第一次进入时懒加载，而不是每次切回都重新加载。
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // 控制 links 面板自身的加载中状态，只覆盖“读取已有 link 权限”这条请求。
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
+  // 保存 links 面板最近一次加载相关的用户可读错误文案。
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
-  const {
-    originalEntries,
-    hasLoadedOnce,
-    replaceEntries,
-    reset: resetLoadState,
-  } = useItemLinkPermissionLoadState(resetKey);
+
+  useEffect(() => {
+    // 切换到新的 item 后，原先缓存的 links 基线和“已加载过”标记都必须作废，
+    // 否则新目标会错误复用旧目标的懒加载结果。
+    setOriginalEntries(createEmptyItemLinkPermissionEntries());
+    setHasLoadedOnce(false);
+  }, [resetKey]);
+
+  /**
+   * 用后端最新快照覆盖当前 links 基线，并标记已完成一次真实加载。
+   */
+  const replaceEntries = useCallback(
+    (entries: IItemLinkPermissionEntryForUI[]) => {
+      // 这里用 map 做一次浅拷贝，避免后续 diff 计算时直接修改到原始对象。
+      setOriginalEntries(entries.map((entry) => ({ ...entry })));
+      setHasLoadedOnce(true);
+    },
+    [],
+  );
+
+  /**
+   * 把 links 懒加载状态完整重置回“未加载”。
+   *
+   * 关闭弹窗后重开同一个 item 时，需要重新从后端拿一份新快照，
+   * 因此不能直接沿用上一次打开期间缓存下来的结果。
+   */
+  const resetLoadState = useCallback(() => {
+    // 这个重置入口通常在对话框关闭或显式放弃 links 状态时调用，
+    // 目的是让下一次打开时重新走完整的首次懒加载流程。
+    setOriginalEntries(createEmptyItemLinkPermissionEntries());
+    setHasLoadedOnce(false);
+  }, []);
 
   useEffect(() => {
     // 只有 links 页签真正打开、目标项完整可用、且当前文件支持 link 权限时，
@@ -75,6 +119,8 @@ export const useItemLinkPermissionApiRequestState = ({
       return;
     }
 
+    // 这一轮 effect 对应一次“当前 item 的 links 首次加载尝试”。
+    // 通过 cancelled 标记，避免旧请求在目标切换后把过期结果写回新状态。
     let cancelled = false;
     setIsLoadingPermissions(true);
     setLoadErrorMessage(null);
@@ -118,6 +164,13 @@ export const useItemLinkPermissionApiRequestState = ({
     selectedDialogTab,
   ]);
 
+  /**
+   * 基于当前后端基线和本地 diff，生成后端 apply 接口需要的变更合同。
+   *
+   * @param diff links 面板当前累积的本地差异。
+   * @param hasUnsavedChanges 当前是否真的存在待保存改动。
+   * @returns 如果没有改动则返回 `null`；否则返回可直接提交的 change set。
+   */
   const prepareChangeSet = useCallback(
     (diff: IItemLinkPermissionDiffState, hasUnsavedChanges: boolean) => {
       // 没有本地改动时直接返回 null，
@@ -132,6 +185,12 @@ export const useItemLinkPermissionApiRequestState = ({
     [originalEntries],
   );
 
+  /**
+   * 把已经准备好的 links change set 提交给后端 apply 接口。
+   *
+   * @param changes 基于当前后端基线和本地 diff 生成的变更合同。
+   * @returns 后端应用完成后返回的最新 link 权限快照。
+   */
   const applyPreparedChanges = useCallback(
     async (changes: IApplyItemLinkPermissionChangesRequest) => {
       // driveId 和 itemId 的存在性已经被调用路径保证，
@@ -141,11 +200,14 @@ export const useItemLinkPermissionApiRequestState = ({
     [driveId, itemId],
   );
 
+  /**
+   * 用 Apply 成功后的后端返回值重建 links 基线，并按需清掉本地 diff。
+   *
+   * @param entries 后端 apply 成功后返回的最新 link 权限快照。
+   * @param resetDiffState 调用方传入的 diff 重置函数，用来把 UI 恢复为“已同步”状态。
+   */
   const reconcileAppliedEntries = useCallback(
-    (
-      entries: IItemLinkPermissionEntryForUI[],
-      resetDiffState?: () => void,
-    ) => {
+    (entries: IItemLinkPermissionEntryForUI[], resetDiffState?: () => void) => {
       // 提交成功后，后端返回的 entries 就是新的“已落库基线”。
       // 用它整体替换原基线，后续 diff 才会基于最新事实继续计算。
       replaceEntries(entries);

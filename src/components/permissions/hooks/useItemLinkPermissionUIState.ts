@@ -12,8 +12,11 @@ import { useItemLinkPermissionComputedEntries } from "./useItemLinkPermissionCom
 import { useItemLinkPermissionDiff } from "./useItemLinkPermissionDiff";
 
 interface IUseItemLinkPermissionUIStateOptions {
+  /** 当前编辑目标的重置键，用来驱动 diff hook 在切换 item 时清会话状态。 */
   resetKey: string;
+  /** 来自请求层的后端确认基线，供 UI 合并本地草稿后渲染。 */
   originalEntries: IItemLinkPermissionEntryForUI[];
+  /** 可选的上层重置入口，用来顺手清掉 links 懒加载基线。 */
   onResetLoadState?: () => void;
 }
 
@@ -35,11 +38,14 @@ export const useItemLinkPermissionUIState = ({
   originalEntries,
   onResetLoadState,
 }: IUseItemLinkPermissionUIStateOptions) => {
+  // 创建区当前选中的 scope。新增 link 时会直接使用这个值参与生成 diff entry。
   const [createLinkScope, setCreateLinkScope] =
     useState<ItemLinkPermissionScope>(ITEM_LINK_PERMISSION_SCOPE_VALUES[0]);
+  // 创建区当前选中的 type。它和 scope 一起组成“准备新增哪一种 link”的组合。
   const [createLinkType, setCreateLinkType] = useState<ItemLinkPermissionType>(
     ITEM_LINK_PERMISSION_TYPES[0],
   );
+  // 这一层只接管 links 草稿本身的增删改语义，不直接碰后端基线。
   const {
     diff,
     hasUnsavedChanges,
@@ -53,6 +59,8 @@ export const useItemLinkPermissionUIState = ({
     resetDiff,
   } = useItemLinkPermissionDiff(resetKey);
 
+  // 把“后端基线 + 本地 diff”合并成真正供列表渲染的 entries，
+  // 并顺手算出是否存在阻塞 Apply 的校验错误。
   const computedPermissions = useItemLinkPermissionComputedEntries(
     originalEntries,
     diff,
@@ -114,15 +122,19 @@ export const useItemLinkPermissionUIState = ({
 
   const onRemoveRecipient = useCallback(
     (entry: IItemLinkPermissionComputedEntry, recipientKey: string) => {
+      // 新建 link 里的 recipient 还只存在于本地草稿，因此直接从 created diff 里删除。
       if (entry.source === "diff") {
         removeRecipientFromCreatedLink(entry.id, recipientKey);
         return;
       }
 
+      // persisted 行必须有真实 permissionId，后续 revoke 才能精确指向后端对象。
       if (!entry.permissionId) {
         return;
       }
 
+      // 先从当前 UI entry 中找到要删除的 recipient，
+      // 再把它转成 revoke 语义写进 diff，而不是直接篡改 originalEntries。
       const recipient = entry.recipients.find(
         (currentRecipient) => currentRecipient.key === recipientKey,
       );
@@ -138,17 +150,22 @@ export const useItemLinkPermissionUIState = ({
   );
 
   useEffect(() => {
-    // 每次已有 entries 变化后，都重新检查“创建区当前选中的组合是否仍可用”。
+    // 这个 effect 的职责不是“只跟着 scope 变动”，
+    // 而是持续校验“当前 scope + type 组合是否仍然可新增”。
+    // 只要已存在 entries 变了，或者用户当前选择变了，都重新跑一轮纠正逻辑。
     const nextAvailableCombo = resolveNextAvailableCreateLinkCombo(
       computedPermissions.entries,
       createLinkScope,
       createLinkType,
     );
 
+    // 所有 scope:type 都被占满时，保留现状并把“不可新增”的判断交给面板层处理。
     if (!nextAvailableCombo) {
       return;
     }
 
+    // 只有当 resolver 计算出的更正值与当前选择不同，才真正触发状态更新，
+    // 这样 effect 会快速收敛，不会因为依赖包含 scope/type 而无限循环。
     if (nextAvailableCombo.scope !== createLinkScope) {
       setCreateLinkScope(nextAvailableCombo.scope);
     }
@@ -159,6 +176,7 @@ export const useItemLinkPermissionUIState = ({
   }, [createLinkScope, createLinkType, computedPermissions.entries]);
 
   return {
+    // 列表真正渲染的 entries 来自“基线 + diff”合并结果，而不是原始基线本身。
     entries: computedPermissions.entries,
     createLinkScope,
     createLinkType,
@@ -172,6 +190,7 @@ export const useItemLinkPermissionUIState = ({
     onAddLink,
     onDeleteLink,
     onCopyLink: (webUrl: string) => {
+      // links 面板不额外包一层提示，复制行为保持为尽力写入剪贴板。
       void navigator.clipboard?.writeText(webUrl);
     },
     onAddRecipient,
@@ -217,6 +236,8 @@ const resolveNextAvailableCreateLinkCombo = (
   );
 
   if (currentScopeAvailableType) {
+    // 这里显式保留 currentScope，表达的是“优先尊重用户刚选中的 scope，
+    // 只有 type 撞车时，才在同 scope 下替换成下一个可用 type”。
     return {
       scope: currentScope,
       type: currentScopeAvailableType,
@@ -241,6 +262,13 @@ const resolveNextAvailableCreateLinkCombo = (
   return null;
 };
 
+/**
+ * 用 `scope:type` 组合生成稳定键，统一用于占用判断和去重比较。
+ *
+ * @param scope link 的分享范围。
+ * @param type link 的权限类型。
+ * @returns 适合放入 `Set` 做组合占用判断的字符串键。
+ */
 const createScopeTypeKey = (
   scope: ItemLinkPermissionScope,
   type: ItemLinkPermissionType,

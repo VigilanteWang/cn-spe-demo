@@ -22,8 +22,8 @@ import { ItemLinkPermissionPanel } from "./components/ItemLinkPermissionPanel";
 import { usePermissionsStyles } from "./components/permissionsStyles";
 import type { IItemPermissionDialogProps } from "./components/permissionsTypes";
 import {
-  applyItemPermissionChanges,
-  listItemPermissions,
+  applyItemUserPermissionChanges,
+  listItemUserPermissions,
 } from "../../services/itemPermissionApi";
 import { computeItemPermissionChanges } from "./services/itemUserPermissionDiff";
 import {
@@ -258,7 +258,7 @@ export const ItemPermissionDialog = ({
     setApplyFeedbackStatus(null);
 
     // people/groups 的 User 权限在弹窗打开时立即加载，成功后同时刷新基线和草稿。
-    void listItemPermissions(driveId, itemId)
+    void listItemUserPermissions(driveId, itemId)
       .then(({ entriesByTab }) => {
         if (!cancelled) {
           replaceEntries(entriesByTab);
@@ -520,7 +520,7 @@ export const ItemPermissionDialog = ({
 
     if (shouldApplyUserPermissionChanges && userPermissionChanges) {
       try {
-        const { entriesByTab } = await applyItemPermissionChanges(
+        const { entriesByTab } = await applyItemUserPermissionChanges(
           driveId!,
           itemId!,
           userPermissionChanges,

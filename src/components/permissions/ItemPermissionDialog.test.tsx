@@ -8,9 +8,9 @@ import type { IItemUserPermissionEntry } from "./models/itemUserPermissionModels
 import type { IItemLinkPermissionEntryForUI } from "../../../common/contracts/itemPermissionCommonContracts";
 import {
   applyItemLinkPermissionChanges,
-  applyItemPermissionChanges,
+  applyItemUserPermissionChanges,
   listItemLinkPermissions,
-  listItemPermissions,
+  listItemUserPermissions,
 } from "../../services/itemPermissionApi";
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
 import { computeItemPermissionChanges } from "./services/itemUserPermissionDiff";
@@ -30,8 +30,8 @@ vi.mock(
 );
 
 vi.mock("../../services/itemPermissionApi", () => ({
-  listItemPermissions: vi.fn(),
-  applyItemPermissionChanges: vi.fn(),
+  listItemUserPermissions: vi.fn(),
+  applyItemUserPermissionChanges: vi.fn(),
   listItemLinkPermissions: vi.fn(),
   applyItemLinkPermissionChanges: vi.fn(),
 }));
@@ -48,8 +48,10 @@ vi.mock("./services/itemUserPermissionDiff", async () => {
 });
 
 const searchDirectoryPrincipalsMock = vi.mocked(searchDirectoryPrincipals);
-const listItemPermissionsMock = vi.mocked(listItemPermissions);
-const applyItemPermissionChangesMock = vi.mocked(applyItemPermissionChanges);
+const listItemUserPermissionsMock = vi.mocked(listItemUserPermissions);
+const applyItemUserPermissionChangesMock = vi.mocked(
+  applyItemUserPermissionChanges,
+);
 const listItemLinkPermissionsMock = vi.mocked(listItemLinkPermissions);
 const applyItemLinkPermissionChangesMock = vi.mocked(
   applyItemLinkPermissionChanges,
@@ -123,13 +125,13 @@ const createLinkEntry = (
 describe("ItemPermissionDialog", () => {
   beforeEach(() => {
     searchDirectoryPrincipalsMock.mockReset();
-    listItemPermissionsMock.mockReset();
-    applyItemPermissionChangesMock.mockReset();
+    listItemUserPermissionsMock.mockReset();
+    applyItemUserPermissionChangesMock.mockReset();
     listItemLinkPermissionsMock.mockReset();
     applyItemLinkPermissionChangesMock.mockReset();
     computeItemPermissionChangesMock.mockClear();
 
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [],
         groups: [],
@@ -162,7 +164,7 @@ describe("ItemPermissionDialog", () => {
   });
 
   it("should render inherited rows as readonly and keep user permission rows editable", async () => {
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [
           createPermissionEntry({
@@ -228,13 +230,13 @@ describe("ItemPermissionDialog", () => {
   });
 
   it("should reuse item permission diff and api when applying changes", async () => {
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Writer" })],
         groups: [],
       },
     });
-    applyItemPermissionChangesMock.mockResolvedValue({
+    applyItemUserPermissionChangesMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Reader" })],
         groups: [],
@@ -254,7 +256,7 @@ describe("ItemPermissionDialog", () => {
     await flushAsyncWork();
 
     expect(computeItemPermissionChangesMock).toHaveBeenCalledTimes(1);
-    expect(applyItemPermissionChangesMock).toHaveBeenCalledWith(
+    expect(applyItemUserPermissionChangesMock).toHaveBeenCalledWith(
       "drive-a",
       "item-a",
       {
@@ -278,7 +280,7 @@ describe("ItemPermissionDialog", () => {
     const onClose = vi.fn();
     const onManageContainerPermission = vi.fn();
 
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Writer" })],
         groups: [],
@@ -309,7 +311,7 @@ describe("ItemPermissionDialog", () => {
   });
 
   it("should show the Graph visibility disclaimer and learn-more links when the list is empty", async () => {
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [],
         groups: [],
@@ -377,13 +379,13 @@ describe("ItemPermissionDialog", () => {
   });
 
   it("should apply link changes before people/groups changes when both sides are dirty", async () => {
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Writer" })],
         groups: [],
       },
     });
-    applyItemPermissionChangesMock.mockResolvedValue({
+    applyItemUserPermissionChangesMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Reader" })],
         groups: [],
@@ -413,14 +415,16 @@ describe("ItemPermissionDialog", () => {
     await flushAsyncWork();
 
     expect(applyItemLinkPermissionChangesMock).toHaveBeenCalledTimes(1);
-    expect(applyItemPermissionChangesMock).toHaveBeenCalledTimes(1);
+    expect(applyItemUserPermissionChangesMock).toHaveBeenCalledTimes(1);
     expect(
       applyItemLinkPermissionChangesMock.mock.invocationCallOrder[0],
-    ).toBeLessThan(applyItemPermissionChangesMock.mock.invocationCallOrder[0]);
+    ).toBeLessThan(
+      applyItemUserPermissionChangesMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("should keep refreshed links and show partial failure message when user permission apply fails after links succeed", async () => {
-    listItemPermissionsMock.mockResolvedValue({
+    listItemUserPermissionsMock.mockResolvedValue({
       entriesByTab: {
         people: [createPermissionEntry({ role: "Writer" })],
         groups: [],
@@ -435,7 +439,7 @@ describe("ItemPermissionDialog", () => {
         scope: "anonymous",
       }),
     ]);
-    applyItemPermissionChangesMock.mockRejectedValue(
+    applyItemUserPermissionChangesMock.mockRejectedValue(
       new Error("user permission apply failed"),
     );
 
