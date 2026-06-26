@@ -50,17 +50,27 @@ const createEmptyDiff = (): IItemLinkPermissionDiffState => ({
   revokesByPermissionId: {},
 });
 
+interface ISelectedDialogTabHookProps {
+  selectedDialogTab: "people" | "groups" | "links";
+}
+
 describe("useItemLinkPermissionApiRequestState", () => {
   beforeEach(() => {
     listItemLinkPermissionsMock.mockReset();
     applyItemLinkPermissionChangesMock.mockReset();
     listItemLinkPermissionsMock.mockResolvedValue([createPersistedEntry()]);
-    applyItemLinkPermissionChangesMock.mockResolvedValue([createPersistedEntry()]);
+    applyItemLinkPermissionChangesMock.mockResolvedValue([
+      createPersistedEntry(),
+    ]);
   });
 
   it("should lazy-load links only when the links tab becomes active", async () => {
+    const initialProps: ISelectedDialogTabHookProps = {
+      selectedDialogTab: "people",
+    };
+
     const { result, rerender } = renderHook(
-      ({ selectedDialogTab }: { selectedDialogTab: "people" | "groups" | "links" }) =>
+      ({ selectedDialogTab }: ISelectedDialogTabHookProps) =>
         useItemLinkPermissionApiRequestState({
           open: true,
           driveId: "drive-a",
@@ -70,9 +80,7 @@ describe("useItemLinkPermissionApiRequestState", () => {
           selectedDialogTab,
         }),
       {
-        initialProps: {
-          selectedDialogTab: "people" as const,
-        },
+        initialProps,
       },
     );
 
