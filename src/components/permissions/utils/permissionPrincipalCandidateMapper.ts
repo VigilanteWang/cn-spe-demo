@@ -2,7 +2,7 @@ import type {
   IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
-import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/directoryPrincipalSearch";
+import { IDirectoryPrincipalSearchResult } from "../services/directoryPrincipalSearch/directoryPrincipalSearch";
 
 /**
  * 把目录搜索结果映射成权限弹窗可直接消费的候选项模型。

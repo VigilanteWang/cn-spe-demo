@@ -16,7 +16,7 @@ import {
   applyContainerPermissionChanges,
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
-import { computeContainerPermissionChanges } from "./services/containerUserPermissionDiff";
+import { computeContainerPermissionChanges } from "./utils/containerUserPermissionDiff";
 import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
 import { createBaseUserPermissionEntryFromCandidate } from "./utils/userPermissionEntryUtils";
 

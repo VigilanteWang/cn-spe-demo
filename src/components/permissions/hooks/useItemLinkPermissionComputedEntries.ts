@@ -14,7 +14,7 @@ import type {
 import {
   getItemLinkPermissionRecipientKey,
   mapGraphIdentityToItemLinkRecipientCandidate,
-} from "../services/itemLinkPermissionUiUtils";
+} from "../utils/itemLinkPermissionUiUtils";
 
 /**
  * 计算 links 面板真正需要渲染的 entries。

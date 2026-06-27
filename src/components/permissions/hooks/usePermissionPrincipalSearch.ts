@@ -5,7 +5,7 @@ import type {
   IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
-import { mapDirectorySearchResultToCandidate } from "../services/permissionPrincipalCandidateMapper";
+import { mapDirectorySearchResultToCandidate } from "../utils/permissionPrincipalCandidateMapper";
 import {
   type IDirectoryPrincipalSearchResult,
   searchDirectoryPrincipals,

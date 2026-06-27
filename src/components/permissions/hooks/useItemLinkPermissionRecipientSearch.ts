@@ -8,7 +8,7 @@ import { usePermissionPrincipalSearch } from "./usePermissionPrincipalSearch";
 import {
   getItemLinkPermissionRecipientKey,
   mapPermissionCandidateToItemLinkRecipientCandidate,
-} from "../services/itemLinkPermissionUiUtils";
+} from "../utils/itemLinkPermissionUiUtils";
 
 interface IUseItemLinkPermissionRecipientSearchOptions {
   entry: IItemLinkPermissionComputedEntry;

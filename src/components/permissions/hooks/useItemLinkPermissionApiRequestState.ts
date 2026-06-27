@@ -12,7 +12,7 @@ import {
 import {
   createEmptyItemLinkPermissionEntries,
   createItemLinkPermissionChangeSet,
-} from "../services/itemLinkPermissionUiUtils";
+} from "../utils/itemLinkPermissionUiUtils";
 import type { ItemPermissionDialogTabValue } from "../models/itemLinkPermissionModels";
 
 interface IUseItemLinkPermissionApiRequestStateOptions {

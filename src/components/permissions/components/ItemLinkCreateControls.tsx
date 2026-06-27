@@ -12,7 +12,7 @@ import {
   type ItemLinkPermissionScope,
   type ItemLinkPermissionType,
 } from "../models/itemLinkPermissionModels";
-import { getItemLinkPermissionScopeLabel } from "../services/itemLinkPermissionUiUtils";
+import { getItemLinkPermissionScopeLabel } from "../utils/itemLinkPermissionUiUtils";
 import { usePermissionsStyles } from "./permissionsStyles";
 import { renderItemLinkPermissionScopeIcon } from "./itemLinkPermissionRowShared";
 

@@ -13,7 +13,7 @@ import type {
   IItemLinkPermissionComputedEntry,
   ItemLinkPermissionScope,
 } from "../models/itemLinkPermissionModels";
-import { getItemLinkPermissionScopeLabel } from "../services/itemLinkPermissionUiUtils";
+import { getItemLinkPermissionScopeLabel } from "../utils/itemLinkPermissionUiUtils";
 import { usePermissionsStyles } from "./permissionsStyles";
 
 const ITEM_LINK_PERMISSION_SCOPE_ICON_COLOR: Record<

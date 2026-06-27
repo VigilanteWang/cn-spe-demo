@@ -25,7 +25,7 @@ import {
   applyItemUserPermissionChanges,
   listItemUserPermissions,
 } from "../../services/itemPermissionApi";
-import { computeItemPermissionChanges } from "./services/itemUserPermissionDiff";
+import { computeItemPermissionChanges } from "./utils/itemUserPermissionDiff";
 import {
   buildPermissionErrorMessages,
   createEmptyPermissionEntriesByTab,

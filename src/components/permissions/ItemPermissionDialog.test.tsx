@@ -13,7 +13,7 @@ import {
   listItemUserPermissions,
 } from "../../services/itemPermissionApi";
 import { searchDirectoryPrincipals } from "./services/directoryPrincipalSearch/directoryPrincipalSearch";
-import { computeItemPermissionChanges } from "./services/itemUserPermissionDiff";
+import { computeItemPermissionChanges } from "./utils/itemUserPermissionDiff";
 
 vi.mock(
   "./services/directoryPrincipalSearch/directoryPrincipalSearch",
@@ -36,10 +36,10 @@ vi.mock("../../services/itemPermissionApi", () => ({
   applyItemLinkPermissionChanges: vi.fn(),
 }));
 
-vi.mock("./services/itemUserPermissionDiff", async () => {
+vi.mock("./utils/itemUserPermissionDiff", async () => {
   const actual = await vi.importActual<
-    typeof import("./services/itemUserPermissionDiff")
-  >("./services/itemUserPermissionDiff");
+    typeof import("./utils/itemUserPermissionDiff")
+  >("./utils/itemUserPermissionDiff");
 
   return {
     ...actual,

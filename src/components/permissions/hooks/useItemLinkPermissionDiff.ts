@@ -10,7 +10,7 @@ import {
   createEmptyItemLinkPermissionDiffState,
   getItemLinkPermissionRecipientKey,
   hasItemLinkPermissionDiffChanges,
-} from "../services/itemLinkPermissionUiUtils";
+} from "../utils/itemLinkPermissionUiUtils";
 
 /**
  * 管理 links 面板的本地差异状态。

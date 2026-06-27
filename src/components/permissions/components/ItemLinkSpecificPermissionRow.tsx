@@ -17,7 +17,7 @@ import type {
   IItemLinkPermissionComputedEntry,
   IItemLinkPermissionRecipientCandidate,
 } from "../models/itemLinkPermissionModels";
-import { getItemLinkPermissionRecipientKey } from "../services/itemLinkPermissionUiUtils";
+import { getItemLinkPermissionRecipientKey } from "../utils/itemLinkPermissionUiUtils";
 import { PrincipalSearchComboBox } from "./PrincipalSearchComboBox";
 import { ItemLinkPermissionRowShell } from "./itemLinkPermissionRowShared";
 import { usePermissionsStyles } from "./permissionsStyles";

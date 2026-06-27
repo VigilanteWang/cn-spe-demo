@@ -443,7 +443,7 @@ replaceEntries(refreshedEntries);
 它的核心文件是：
 
 - `hooks/usePermissionPrincipalSearch.ts`
-- `services/permissionPrincipalCandidateMapper.ts`
+- `utils/permissionPrincipalCandidateMapper.ts`
 - `services/directoryPrincipalSearch/*`
 
 ### 链路 B：权限草稿和写回
@@ -461,7 +461,7 @@ replaceEntries(refreshedEntries);
 - `hooks/useUserPermissionDraft.ts`
 - `hooks/useUserPermissionDialogUIState.ts`
 - `hooks/usePermissionDialogApiRequestState.ts`
-- `services/containerUserPermissionDiff.ts`
+- `utils/containerUserPermissionDiff.ts`
 - `src/services/containerPermissionApi.ts`
 
 为什么要分开�?
@@ -573,7 +573,7 @@ ContainerPermissionApiError;
 2. `src/components/permissions/hooks/useUserPermissionDialogUIState.ts`
 3. `src/components/permissions/hooks/useUserPermissionDraft.ts`
 4. `src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
-5. `src/components/permissions/services/containerUserPermissionDiff.ts`
+5. `src/components/permissions/utils/containerUserPermissionDiff.ts`
 6. `src/services/containerPermissionApi.ts`
 7. `common/contracts/containerPermissionCommonContracts.ts`
 
@@ -631,7 +631,7 @@ computeContainerPermissionChanges(...)
 优先看：
 
 - `hooks/usePermissionPrincipalSearch.ts`
-- `services/permissionPrincipalCandidateMapper.ts`
+- `utils/permissionPrincipalCandidateMapper.ts`
 - `services/directoryPrincipalSearch/*`
 - `utils/permissionDialogSharedUtils.ts`
 
@@ -657,7 +657,7 @@ computeContainerPermissionChanges(...)
 
 优先看：
 
-- `services/containerUserPermissionDiff.ts`
+- `utils/containerUserPermissionDiff.ts`
 - `src/services/containerPermissionApi.ts`
 - `common/contracts/containerPermissionCommonContracts.ts`
 
