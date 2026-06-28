@@ -1,697 +1,641 @@
-# Container Permission 前端模块说明
+# 初识 `permissions` 模块
 
-本文档面向初级开发者，目标不是只告诉你“这个模块能做什么”，而是帮助你按当前代码现状看懂它的前端结构、状态流、搜索流、Apply 流，以及它和后端共同契约之间的关系�?
-注意：这�?README 现在�?_前端现状\*\*为主�?
-如果你想继续看共同契约、后端包装层�?`read_` pattern，请继续阅读�?
+这篇 README 面向刚接触当前权限模块的同学。
 
-- `common/contracts/containerPermissionCommonContracts.ts`
-- `docs/fix&refactor/container-permission-common-contracts-and-readers.md`
+目标不是一次讲完全部实现细节，而是先帮你建立 3 个稳定印象：
 
----
+1. Microsoft Graph / SharePoint Embedded 里，permission 是怎么建模的
+2. 当前仓库为什么会拆成 `Container User Permission`、`Item User Permission`、`Item Link Permission`
+3. 一次真实的 user-type 权限编辑，是怎么从前端搜索与草稿状态一路走到后端 Graph 写回的
 
-## 1. 这个前端模块解决什么问�?
-
-`Container Permission` 前端模块用于管理某个 `fileStorageContainer` 的访问权限�?
-用户在弹窗里可以�?4 件事�?
-
-1. 查看当前容器已经有哪�?`people` �?`groups`
-2. 搜索新的用户或组，并把它们加进本地权限草�?3. 修改已有权限条目的角�?4. 点击 `Apply`，把本地草稿相对基线的差异提交给后端
-
-当前前端设计有两个很重要的前提：
-
-1. 前端**不直接操�?Microsoft Graph**
-2. 前端维护的是**本地草稿**，不是“用户每改一下就立刻写服务端�?
-   这样做的好处是：
-
-- 弹窗内的交互更流�?- 前端不需要直接理�?Graph 权限接口细节
-- `Close / Reset / Apply` 的语义更清晰
-- 错误处理、角色映射、Graph 兼容逻辑集中在后�?
+如果你之后想继续深入 `item link permission` 的细节，请阅读 [introduce-ItemLinkPermissionModule.md](./documents/introduce-ItemLinkPermissionModule.md)。
 
 ---
 
-## 2. 当前前端文件地图
+## 1. 先看官方模型：Graph 里的 permission 如何设计的
 
-当前前端权限模块主要在：
+先记住一个核心点：
+
+> Graph 里的 `permission` 是统一资源类型，而 Microsoft 会用 facet 来表达“这条 permission 具备哪一种权限形态”。
+
+官方参考文档：
+
+- [Microsoft Graph permission resource](https://learn.microsoft.com/en-us/graph/api/resources/permission?view=graph-rest-1.0)
+- [driveItem invite](https://learn.microsoft.com/en-us/graph/api/driveitem-invite?view=graph-rest-1.0&tabs=http)
+- [driveItem createLink](https://learn.microsoft.com/en-us/graph/api/driveitem-createlink?view=graph-rest-1.0&tabs=http)
+- [fileStorageContainer create permission](https://learn.microsoft.com/en-us/graph/api/filestoragecontainer-post-permissions?view=graph-rest-1.0&tabs=http)
+- [SharePoint Embedded: accessing content in containers](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/auth#accessing-content-in-containers)
+- [SharePoint Embedded: sharing and permissions](https://learn.microsoft.com/en-us/sharepoint/dev/embedded/development/sharing-and-perm)
+
+### 1.1 按权限类型分：User permission 和 Link permission
+
+从当前项目最关心的视角看，permission 可以先分成两类。
+
+#### User permission
+
+这类权限的重点是：
+
+> 把权限直接授予某个 user 或 group。相当于 Direct Access。
+
+对当前仓库来说，最常见的是：
+
+- container permission 把权限直接授予 user / group
+- item user permission 也把权限直接授予 user / group
+
+#### Link permission
+
+这类权限的重点是：
+
+> 先创建一条 share link，再决定这条 link 的访问范围、能力，以及它下面的 recipients。
+
+对当前仓库来说，`item link permission` 处理的就是这一类能力。
+
+### 1.2 这里的 facet 是什么
+
+facet 原意是“面、切面“，微软用这个词，实际源于分面分类（Faceted Classification），它是一种将事物按照多个独立的特征、属性或维度（即“分面”）进行分类的方法。如服饰网站中，用户可以通过侧边栏的“颜色”、“尺码”、“品牌”和“价格区间”分面来筛选商品。
+
+这里 graph api 中，可以把 facet 理解成：
+
+> 一种用于描述资源某个独立特征或形态的“特征属性组”。
+
+它不只是一个普通字段，而是一组带语义的相关属性：
+
+- 这组属性本身描述某种能力或形态
+- 同一个资源可以同时带多个 facet
+
+在 `permission` resource 上，facet 的含义是：
+
+> 用来表示“这条 Permission 属于哪一种 permission kind” 的一组属性。
+
+在 `permission` 资源里，当前最重要的是两种 facet：
+
+- `link`
+  它的存在表示这条 permission 是一个 Link Permission，并带有 `type`、`scope` 等属性
+- `invitation`
+  它的存在表示这条 permission 是通过邀请特定对象创建出来的 Permission
+
+但对当前项目要额外注意一点：
+
+- SharePoint Embedded 当前不使用 `invitation` facet 来作为我们识别 user-type permission 的主要入口
+- 在实际读模型和当前代码里，我们更常通过 `grantedToV2.user` / `grantedToV2.group` 判断“这是一条直接授予给 user/group 的 permission”
+- `grantedToIdentitiesV2` 则更像是 link permission 下面 recipients 的集合字段，不应和 facet 混为一谈
+
+所以对当前仓库来说，可以先这样记：
+
+- 看到 `link` facet，通常说明这是 link-type permission
+- 看到 `grantedToV2.user` / `grantedToV2.group`，通常说明这是当前代码会按 user-type permission 处理的 permission
+
+### 1.3 Graph 是怎么“创建权限”的
+
+虽然官方最后都返回 `permission` 资源，但不同权限类型的创建入口并不一样。
+
+#### Item User Permission：`invite`
+
+item 上给某个 user 或 group 增加显式权限，通常走 `invite`：
+
+- [driveItem invite](https://learn.microsoft.com/en-us/graph/api/driveitem-invite?view=graph-rest-1.0&tabs=http)
+
+这也是当前仓库里 item user permission 的写入方式。
+
+#### Item Link Permission：`createLink`
+
+item 上创建分享链接，通常走 `createLink`：
+
+- [driveItem createLink](https://learn.microsoft.com/en-us/graph/api/driveitem-createlink?view=graph-rest-1.0&tabs=http)
+
+这也是当前仓库里 item link permission 的创建入口。
+
+#### Container Permission：`POST /storage/fileStorage/containers/{containerId}/permissions`
+
+container 的写法和 item 不同，它不是 `invite`，而是直接创建 container permission：
+
+- [fileStorageContainer create permission](https://learn.microsoft.com/en-us/graph/api/filestoragecontainer-post-permissions?view=graph-rest-1.0&tabs=http)
+
+但模型上它仍然是 user-type permission，因为它授予的仍然是具体主体，而不是 share link。
+
+### 1.4 按授予对象层级分：Container Permission 和 Item Permission
+
+除了“按类型分”，这个项目还必须“按层级分”。
+
+#### Container Permission
+
+它授予的是 container 层的访问能力。
+
+在 SharePoint Embedded 里，这一层决定的是：
+
+> 某个 user / group 能不能访问这个 `fileStorageContainer`。
+
+#### Item Permission
+
+它授予的是某个 drive item 的访问能力。
+
+> 注意：
+> 在 SharePoint Embedded 里，item permission 可以理解为一种 additive permission，也就是“附加权限”。
+>
+> 文件和文件夹始终继承父级权限（包括 container 权限），开发者不能改变这条继承结构；
+> 但可以在某个具体文件或文件夹上额外添加权限，用来在继承权限之外扩展某个 user 的访问能力。
+>
+> 例如，某个 user 在 container 层原本只有 `Reader`，但仍然可以通过 item permission 对某个具体文档额外获得 `Edit`。
+
+在当前项目里，item permission 又继续分成两种：
+
+- item user permission
+- item link permission
+
+---
+
+## 2. 当前仓库如何建模这套 permission
+
+把上面的官方模型映射到当前仓库，可以先记住一句话：
+
+> `Container` 只有 user-type permission；`Item` 同时有 user-type permission 和 link-type permission。
+
+所以项目里实际存在 3 大类权限：
+
+1. `Container User Permission`
+2. `Item User Permission`
+3. `Item Link Permission`
+
+### 2.1 命名规律
+
+当前仓库的命名是比较统一的，通常按这个模式展开：
+
+- `[Container/Item][User/Link]PermissionXXX.[ts/tsx]`
+
+例如：
+
+- [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx)
+- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx)
+- [containerUserPermissionModels.ts](./models/containerUserPermissionModels.ts)
+- [itemUserPermissionModels.ts](./models/itemUserPermissionModels.ts)
+- [itemLinkPermissionModels.ts](./models/itemLinkPermissionModels.ts)
+- [containerPermissionsHandlers.ts](../../../server/containerPermissions/containerPermissionsHandlers.ts)
+- [itemPermissionsHandlers.ts](../../../server/itemPermissions/itemPermissionsHandlers.ts)
+- [itemLinkPermissionHandlers.ts](../../../server/itemPermissions/linkPermission/itemLinkPermissionHandlers.ts)
+
+从结构上看：
+
+- user-type permission 在 container 和 item 之间共享大量前后端代码
+- link-type permission 单独建模、单独请求、单独 diff、单独 apply
+
+### 2.2 文件树和职责分组
+
+注： `item link permission` 文件树未列出，请看 [introduce-ItemLinkPermissionModule.md](./documents/introduce-ItemLinkPermissionModule.md)。
+测试文件也不在此列。
 
 ```text
-src/components/permissions/
-├─ index.ts
-├─ ContainerPermissionDialog.tsx
-├─ ContainerPermissionDialog.test.tsx
-├─ ItemPermissionDialog.tsx
-├─ ItemPermissionDialog.test.tsx
-├─ hooks/
-├─ models/
+common/
+├─ contracts/
+│  ├─ permissionCommonContracts.ts
+│  ├─ containerPermissionCommonContracts.ts
+│  └─ itemPermissionCommonContracts.ts
+
+src/
 ├─ services/
+│  ├─ containerPermissionApi.ts
+│  └─ itemPermissionApi.ts
 └─ components/
-   ├─ permissionsTypes.ts
-   ├─ permissionsStyles.ts
-   ├─ PermissionDialogFrame.tsx
-   ├─ PermissionDialogFrame.test.tsx
-   ├─ UserPermissionAccessListTable.tsx
-   └─ PrincipalSearchComboBox.tsx
+   └─ permissions/
+      ├─ README.md
+      ├─ ContainerPermissionDialog.tsx
+      ├─ ItemPermissionDialog.tsx
+      ├─ models/
+      │  ├─ permissionSharedModels.ts
+      │  ├─ containerUserPermissionModels.ts
+      │  ├─ itemUserPermissionModels.ts
+      │  └─ itemLinkPermissionModels.ts
+      ├─ hooks/
+      │  ├─ useUserPermissionDialogUIState.ts
+      │  ├─ useUserPermissionDraft.ts
+      │  └─ usePermissionPrincipalSearch.ts
+      ├─ utils/
+      │  ├─ userPermissionEntryUtils.ts
+      │  ├─ containerUserPermissionDiff.ts
+      │  └─ itemUserPermissionDiff.ts
+      ├─ components/
+      │  └─ UserPermissionPanel.tsx
+      ├─ services/
+      │  └─ directoryPrincipalSearch/
+      │     ├─ directoryPrincipalSearch.ts
+      │     ├─ directoryPrincipalSearchPlan.ts
+      │     ├─ directoryPrincipalSearchQueryBuilder.ts
+      │     ├─ directoryPrincipalSearchMapper.ts
+      │     ├─ directoryPrincipalSearchCache.ts
+      │     └─ directoryPrincipalSearchError.ts
+      └─ documents/
+         └─ introduce-ItemLinkPermissionModule.md
+
+server/
+├─ containerPermissions/
+│  ├─ index.ts
+│  ├─ containerPermissionsHandlers.ts
+│  ├─ containerPermissionsRequestParser.ts
+│  ├─ containerPermissionsCommonAdapters.ts
+│  ├─ containerPermissionRoleMapper.ts
+│  └─ containerPermissionsReaders.ts
+├─ itemPermissions/
+│  ├─ index.ts
+│  ├─ itemPermissionsHandlers.ts
+│  ├─ itemPermissionsRequestParser.ts
+│  ├─ itemPermissionsGraphAdapters.ts
+│  └─ itemPermissionRoleMapper.ts
+└─ permissionsCore/
+   ├─ permissionIdentityAdapters.ts
+   └─ permissionGraphReaders.ts
 ```
 
-另外，这个模块还直接依赖两个外部层：
+#### 共享 contract / model
 
-- 前端 API 层：`src/services/containerPermissionApi.ts`
-- 共同契约层：`common/contracts/containerPermissionCommonContracts.ts`
+- [permissionCommonContracts.ts](../../../common/contracts/permissionCommonContracts.ts)
+  定义三类 permission 都会复用的基础 identity 和 entry 字段。
+- [containerPermissionCommonContracts.ts](../../../common/contracts/containerPermissionCommonContracts.ts)
+  定义 container user permission 的 entry、role 和 `change set` 合同。
+- [itemPermissionCommonContracts.ts](../../../common/contracts/itemPermissionCommonContracts.ts)
+  同时承载 item user permission 与 item link permission 的共享 HTTP 合同。
+- [permissionSharedModels.ts](./models/permissionSharedModels.ts)
+  定义前端目录搜索候选项和 people/groups 分组模型。
+- [containerUserPermissionModels.ts](./models/containerUserPermissionModels.ts)
+  把 container user permission 的共享 contract 映射成前端可消费的分组类型。
+- [itemUserPermissionModels.ts](./models/itemUserPermissionModels.ts)
+  把 item user permission 的共享 contract 映射成前端可消费的分组类型。
 
-### `index.ts`
+#### 前端 user-type permission 入口
 
-模块出口文件�?
-它只做两件事�?
+- [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx)
+  负责编排 container user permission 的搜索、草稿、加载和 apply。
+- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx)
+  作为 item 权限总入口，同时编排 item user permission 和 item link permission。
+- [UserPermissionPanel.tsx](./components/UserPermissionPanel.tsx)
+  把 people/groups 的搜索框和 access list 表格收进同一个共用面板。
+- [useUserPermissionDialogUIState.ts](./hooks/useUserPermissionDialogUIState.ts)
+  把 tab、搜索输入、草稿列表和候选去重整合成 user-type 共用状态层。
+- [useUserPermissionDraft.ts](./hooks/useUserPermissionDraft.ts)
+  负责维护 user-type 权限的原始基线与当前草稿。
+- [usePermissionPrincipalSearch.ts](./hooks/usePermissionPrincipalSearch.ts)
+  负责目录搜索的输入、debounce、结果状态和候选选择。
+- [userPermissionEntryUtils.ts](./utils/userPermissionEntryUtils.ts)
+  把目录搜索候选项转换成 user-type 权限草稿的基础 entry。
+- [containerUserPermissionDiff.ts](./utils/containerUserPermissionDiff.ts)
+  计算 container user permission 的 `create / update / remove` 差异。
+- [itemUserPermissionDiff.ts](./utils/itemUserPermissionDiff.ts)
+  计算 item user permission 的 `create / update / remove` 差异，并校验 inherited/readonly 约束。
 
-- 暴露 `ContainerPermissionDialog`
-- 暴露 `IContainerPermissionDialogProps`
+#### `directoryPrincipalSearch` 相关文件
 
-你可以把它理解成“权限模块的大门”�?
+- [directoryPrincipalSearch.ts](./services/directoryPrincipalSearch/directoryPrincipalSearch.ts)
+  目录搜索总入口，负责串起 plan、缓存和错误映射。
+- [directoryPrincipalSearchPlan.ts](./services/directoryPrincipalSearch/directoryPrincipalSearchPlan.ts)
+  根据输入决定这次目录搜索该走哪一种 Graph 查询策略。
+- [directoryPrincipalSearchQueryBuilder.ts](./services/directoryPrincipalSearch/directoryPrincipalSearchQueryBuilder.ts)
+  负责拼出不同策略对应的 Graph 查询参数。
+- [directoryPrincipalSearchMapper.ts](./services/directoryPrincipalSearch/directoryPrincipalSearchMapper.ts)
+  把 Graph 返回的目录对象映射成搜索服务内部统一结果。
+- [directoryPrincipalSearchCache.ts](./services/directoryPrincipalSearch/directoryPrincipalSearchCache.ts)
+  提供短周期内存缓存，减少重复目录查询。
+- [directoryPrincipalSearchError.ts](./services/directoryPrincipalSearch/directoryPrincipalSearchError.ts)
+  把底层 Graph 错误收口成前端可判断的稳定搜索错误。
 
-### `ContainerPermissionDialog.tsx`
+#### 前端 API service
 
-这是前端权限模块的主组件，也是最值得先读的文件�?
-它主要负责：
+- [containerPermissionApi.ts](../../services/containerPermissionApi.ts)
+  负责请求 container user permission 列表与 apply 接口。
+- [itemPermissionApi.ts](../../services/itemPermissionApi.ts)
+  负责请求 item user permission 与 item link permission 的前端 API。
 
-- 渲染对话框壳�?- 展示 `People / Groups` 两个 tab
-- 在弹窗打开时加载当前容器权�?- 接上目录搜索 Hook
-- 接上草稿状�?Hook
-- 点击 `Apply` 时计算差异并提交给后�?- 展示权限加载错误、搜索错误、Apply 成功或失败反�?
-  一句话理解�?
-  它像一个前端的“小 controller”，负责把多�?Hook 和服务拼起来�?
+#### 后端 container permission
 
-### `permissionsTypes.ts`
+- [index.ts](../../../server/containerPermissions/index.ts)
+  作为 container permission 区域的导出边界。
+- [containerPermissionsHandlers.ts](../../../server/containerPermissions/containerPermissionsHandlers.ts)
+  负责 container permission 的读取、apply 和回读编排。
+- [containerPermissionsRequestParser.ts](../../../server/containerPermissions/containerPermissionsRequestParser.ts)
+  把外部请求体收窄成后端接受的 container `change set`。
+- [containerPermissionsCommonAdapters.ts](../../../server/containerPermissions/containerPermissionsCommonAdapters.ts)
+  负责 container permission 的 Graph 请求体和响应体映射。
+- [containerPermissionRoleMapper.ts](../../../server/containerPermissions/containerPermissionRoleMapper.ts)
+  负责 container 角色在 UI 和 Graph 之间转换。
+- [containerPermissionsReaders.ts](../../../server/containerPermissions/containerPermissionsReaders.ts)
+  提供 container 模块自己的 Graph record 读取工具。
 
-定义对话框的外部入参�?
+#### 后端 item user permission
 
-- `open`
-- `containerId`
-- `containerName`
-- `onClose`
+- [index.ts](../../../server/itemPermissions/index.ts)
+  作为 item permissions 区域的导出边界。
+- [itemPermissionsHandlers.ts](../../../server/itemPermissions/itemPermissionsHandlers.ts)
+  负责 item user permission 的读取、apply、父级权限回读和结果回填。
+- [itemPermissionsRequestParser.ts](../../../server/itemPermissions/itemPermissionsRequestParser.ts)
+  把外部请求体收窄成后端接受的 item user permission `change set`。
+- [itemPermissionsGraphAdapters.ts](../../../server/itemPermissions/itemPermissionsGraphAdapters.ts)
+  负责 item user permission 的 Graph `invite` 请求体和读结果映射。
+- [itemPermissionRoleMapper.ts](../../../server/itemPermissions/itemPermissionRoleMapper.ts)
+  负责 item user permission 角色在 UI 和 Graph 之间转换。
 
-这说明权限弹窗不是自己决定“当前容器是谁”，而是由容器页面把上下文传进来�?
+#### 后端共享 identity / Graph reader
 
-### `permissionsStyles.ts`
+- [permissionIdentityAdapters.ts](../../../server/permissionsCore/permissionIdentityAdapters.ts)
+  从 `grantedToV2` / `grantedToIdentitiesV2` 提取当前项目真正支持的 user/group identity。
+- [permissionGraphReaders.ts](../../../server/permissionsCore/permissionGraphReaders.ts)
+  提供后端共享的 Graph record、string 和 array 读取能力。
 
-只负责样式，不负责业务逻辑�?
-它能帮助你理解页面被分成了哪些区域，例如�?
+### 2.4 三大权限在前端入口里的关系
 
-- 顶部容器信息�?- 搜索�?- Access List 表格�?- 底部操作�?
+如果只看前端入口，可以这样理解：
 
-### `models/containerUserPermissionModels.ts`
+- [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx)
+  只处理 `Container User Permission`
+- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx)
+  同时处理：
+  - `Item User Permission`
+  - `Item Link Permission`
 
-这是前端模型补充层�?
-现在这个文件和以前不一样：  
-�?\*不再重复声明\*\*前后端共同契约里的权限条目接口，而是直接复用根目�?`common/contracts` 里的共享类型，再补前端本地专用模型�?
-它目前最重要的内容是�?
+这也是为什么当前 item dialog 会比 container dialog 更复杂。
 
-- 重新导出共同契约中的�? - `PermissionTabValue`
-  - `ContainerPermissionRole`
-  - `IContainerPermissionEntry`
-- 前端本地候选模型：
-  - `IPermissionPrincipalSearchCandidate`
-- 前端按 tab 分组的列表模型�? - `PermissionEntriesByTab`
+它不是单纯“多一个 tab”，而是：
 
-这意味着现在的类型分层是�?
-
-- `common/contracts`
-  前后端都认的稳定协议
-- `models/containerUserPermissionModels.ts`
-  前端为了页面交互补出来的本地模型
+- people/groups 这两页复用 user-type 共用逻辑
+- links 页单独维护自己的加载、diff、校验和 apply
 
 ---
 
-## 3. 当前前端核心状态是怎么拆的
+## 3. 两个真实例子：user-type permission 是怎么跑通的
 
-当前前端权限模块不是把所有状态都堆在 `ContainerPermissionDialog.tsx` 里，而是拆成了几个职责明确的 Hook�?
+下面不再从“文件树”视角介绍，而是改成两个真实使用过程。
 
-### 3.1 `useUserPermissionTabs.ts`
+目标是让你看到：
 
-这是最小的一层�?
-它只负责维护当前选中的是�?
+> 用户在弹窗里点的每一步，最后是怎样变成 Graph 请求的。
 
-- `people`
-- `groups`
+### 3.1 例子一：把一个用户加到 container
 
-这层很小，但作用很明确：  
-让“当前 tab ”成为一个独立状态源，而不是散落在组件里�?
+这个例子对应的是 `Container User Permission`。
 
-### 3.2 `useUserPermissionDraft.ts`
+#### Step 1：打开 container 权限弹窗
 
-这是当前前端模块最核心的状态层之一�?
-它维护两份列表：
+入口在 [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx)。
 
-- `originalEntriesByTab`
-  最近一次确认后的基�?- `draftEntriesByTab`
-  用户当前正在编辑的草�?
-  这两份数据为什么不能只保留一份？
+这个组件负责把 3 类能力拼起来：
 
-因为前端当前有明确的“草稿编辑语义”：
+- user-type 草稿状态
+- 目录搜索状态
+- API 加载与 apply 状态
 
-1. `Close` 时要能丢弃本次编�?2. `Apply` 成功后要把服务端最新结果变成新基线
-2. 容器切换时要整体重置
+它自己不直接理解 Graph 字段，而是负责 orchestration。
 
-所以这�?Hook 提供的关键能力是�?
+#### Step 2：在搜索框里搜一个用户
 
-- `addEntry`
-- `updateEntryRole`
-- `removeEntry`
-- `resetDraft`
-- `replaceEntries`
-- `hasUnsavedChanges`
+搜索交互由 [usePermissionPrincipalSearch.ts](./hooks/usePermissionPrincipalSearch.ts) 管理。
 
-你可以把它理解成�?
+这个 Hook 处理的事情包括：
 
-> “权限弹窗里的本地编辑会话状态机�?
+- people / groups 两个 tab 各自保留 query
+- 至少输入 3 个字符才真正搜索
+- debounce 1 秒后再发请求
+- 把结果映射成统一的 `IPermissionPrincipalSearchCandidate`
 
-### 3.3 `useUserPermissionDialogUIState.ts`
+它真正调用的目录搜索入口是：
 
-`ContainerPermissionDialog.tsx` �?`ItemPermissionDialog.tsx` 会各自把
-`candidate -> permission entry` 的场景适配函数传给这个共享 Hook�?
-这个 Hook 负责把“页�?+ 草稿 + 每个 tab 的输入框”组合起来�?
-它做的事情包括：
+- [directoryPrincipalSearch.ts](./services/directoryPrincipalSearch/directoryPrincipalSearch.ts)
 
-- 维护当前选中�?`tab`
-- 维护 `people / groups` 各自的输入框内容
-- 把候选项转换成权限草稿条�?- 判断某个候选项是不是已经加过了
-- 统一提供当前 tab 的可见权限列�?- 提供 `discardDraftAndClose`
+这层会继续负责编排：
 
-这个 Hook 的价值是�?
-�?`ContainerPermissionDialog.tsx` 主要负责渲染和真实请求，而不是自己手写很多零�?`useState`�?
+- search plan
+- 短周期缓存
+- Graph 错误映射
 
-### 3.4 `usePermissionPrincipalSearch.ts`
+#### Step 3：把候选用户变成一条本地草稿 entry
 
-这是当前前端搜索体验的核心�?
-注意�?_当前现状�?`Combobox` 搜索流，不是 `TagPicker` 搜索流�?_
+用户从下拉列表选中一个候选人后：
 
-它负责完整的搜索状态机�?
+1. [usePermissionPrincipalSearch.ts](./hooks/usePermissionPrincipalSearch.ts) 把候选项交给 dialog
+2. [userPermissionEntryUtils.ts](./utils/userPermissionEntryUtils.ts) 先创建 user-type 共用基础字段
+3. [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx) 里的 `createContainerPermissionEntryFromCandidate` 再补上 container 默认角色 `Reader`
 
-- `idle`
-- `waitingForMoreInput`
-- `debouncing`
-- `loading`
-- `success`
-- `empty`
-- `error`
+这样，目录搜索结果就变成了一条真正的 container 权限草稿。
 
-它还负责这些关键行为�?
+#### Step 4：草稿状态由共用 Hook 管理
 
-1. 每个 tab 各自维护 query
-2. 最少输�?`3` 个字符才允许真正搜索
-3. 输入后等�?`1000ms` 再发请求
-4. 搜索请求�?tab 隔离
-5. �?`requestSequence` 防止旧请求晚返回覆盖新结�?6. 把目录搜索结果映射成统一候选项
-6. 选中后直接加�?Access List 草稿，并清空输入�?
-   一句话理解�?
-   > 这个 Hook 管的是“搜索体验”，不是“权限写回”�?
+这条新草稿会进入：
 
----
+- [useUserPermissionDialogUIState.ts](./hooks/useUserPermissionDialogUIState.ts)
+- [useUserPermissionDraft.ts](./hooks/useUserPermissionDraft.ts)
 
-## 4. 当前前端数据模型
+可以把这两层理解成：
 
-要看懂这个模块，最重要的不是先记所有文件名，而是先记当前前端到底在操作哪些模型�?
+- `useUserPermissionDialogUIState`
+  负责把 tab、输入框、候选去重、显示列表这些 UI 语义拼起来
+- `useUserPermissionDraft`
+  负责维护“原始基线”和“当前草稿”两份列表
 
-### 4.1 共同契约：`IContainerPermissionEntry`
+这也是为什么用户可以在弹窗里先改很多次，最后再一次性 `Apply`。
 
-它来自：
+#### Step 5：点击 Apply，先算 diff
 
-```text
-common/contracts/containerPermissionCommonContracts.ts
-```
+当用户点击 `Apply` 时：
 
-前端直接用它作为 Access List 行模型�?
-最重要的字段有�?
+- [ContainerPermissionDialog.tsx](./ContainerPermissionDialog.tsx) 会调用 [containerUserPermissionDiff.ts](./utils/containerUserPermissionDiff.ts)
 
-- `id`
-  前端本地稳定主键，用于渲染和草稿更新
-- `permissionId`
-  后续 `update/delete` 提交给后端时需�?- `principalId`
-  当前人或组的稳定标识
-- `principalUserPrincipalName`
-  people 新增权限时必须保�?- `principalDisplayName`
-  表格主标�?- `principalType`
-  `people / groups`
-- `description`
-  副文�?- `role`
-  `Reader / Writer / Manager / Owner`
+这一层会把：
 
-### 4.2 前端本地候选模型：`IPermissionPrincipalSearchCandidate`
+- 原始权限快照
+- 当前草稿权限列表
 
-这个模型只存在于前端搜索链路里�?
-它表示：
+比较成一个 `create / update / remove` 变更集。
 
-> “目录搜索结果在 UI 中被渲染和选择时的统一形状�?
-> 它和最终权限条目的关系是：
+如果只是“新增一个用户”，最终通常只会在 `create` 里出现一条记录。
 
-```text
-IDirectoryPrincipalSearchResult
-  -> IPermissionPrincipalSearchCandidate
-  -> IContainerPermissionEntry
-```
+#### Step 6：前端把 change set 发给后端
 
-### 4.3 前端按 tab 分组模型：`PermissionEntriesByTab`
+container user permission 的前端 API 入口是：
 
-它是�?
+- [containerPermissionApi.ts](../../services/containerPermissionApi.ts)
 
-```ts
-type PermissionEntriesByTab = {
-  people: IContainerPermissionEntry[];
-  groups: IContainerPermissionEntry[];
-};
-```
+这里会：
 
-这个模型贯穿了：
+- 调用 `/api/containerPermissions/{containerId}/apply`
+- 把 change set 原样提交给后端
+- 等后端返回最新 entries 后，再映射回 people/groups 分组结构
 
-- 权限加载结果
-- 原始基线
-- 草稿状�?- Apply 成功后的刷新结果
+#### Step 7：后端把 UI change 映射成 Graph create permission
 
----
+后端编排入口在：
 
-## 5. 当前前端运行链路
+- [containerPermissionsHandlers.ts](../../../server/containerPermissions/containerPermissionsHandlers.ts)
 
-下面按真实运行过程走一遍�?
+它负责：
 
-## �?1 步：容器页打开权限弹窗
+- 鉴权
+- 读取 `containerId`
+- 解析请求体
+- 创建 Graph client
+- 顺序执行 `remove -> update -> create`
+- 最后回读 container permission 列表
 
-入口不在 `permissions/` 目录内部，而在�?
+真正把前端 `create` 变成 Graph body 的位置在：
 
-```text
-src/components/containers/index.tsx
-```
+- [containerPermissionsCommonAdapters.ts](../../../server/containerPermissions/containerPermissionsCommonAdapters.ts)
 
-容器页负责：
+这里会把 user / group 变更分别映射成：
 
-- 选中当前容器
-- �?`containerId` �?`containerName` 传给 `ContainerPermissionDialog`
+- `grantedToV2.user.userPrincipalName`
+- `grantedToV2.group.id`
 
-这说明边界很清楚�?
+所以 container user permission 的本质就是：
 
-- 容器页负责“当前我在管理哪个容器�?- 权限模块负责“怎么管理这个容器的权限�?
+> 前端先保留目录搜索得到的主体线索，后端再把这些线索翻译成 Graph 的 `grantedToV2` 请求体。
 
-## �?2 步：弹窗打开时加载当前权�?
+#### Step 8：后端回读最新权限，前端刷新基线
 
-`ContainerPermissionDialog.tsx` 监听�?
+写入成功后，后端不会只返回“写入成功”。
 
-- `open`
-- `containerId`
+它会重新读取 Graph 当前的 container permission 列表，再把结果返回前端。
 
-当弹窗打开且有容器 id 时，它会调用�?
+这样前端就能：
 
-```ts
-listContainerPermissions(containerId);
-```
+- 用服务端确认后的最新结果替换原始基线
+- 同时把草稿也重置成这份新基线
 
-拿到结果后调用：
+于是弹窗里的列表状态会重新稳定下来。
 
-```ts
-replaceEntries(entriesByTab);
-```
+### 3.2 例子二：把一个组加到文件夹
 
-这一步会同时更新�?
+这个例子对应的是 `Item User Permission`，而且目标是一个文件夹。
 
-- `originalEntriesByTab`
-- `draftEntriesByTab`
+这里顺便要注意一个区别：
 
-所以“第一次打开弹窗后的真实权限”会直接变成当前本地编辑会话的基线�?
+- container 只有 user-type permission
+- item 除了 user-type，还有 link-type
 
-## �?3 步：用户�?Combobox 里输入搜索词
+但这次例子只看 user-type。
 
-当前组件使用的是�?
+#### Step 1：从 item dialog 的 `groups` tab 进入
 
-```tsx
-<Combobox />
-```
+入口仍然在 [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx)。
 
-不是 `TagPicker`�?
-输入时会调用�?
+这个组件一边管理 people/groups 的 user-type 权限，一边管理 links tab。
 
-```ts
-handleQueryChange(event.target.value);
-```
+如果当前用户正在 `groups` tab：
 
-然后搜索 Hook 决定下一步：
+- 搜索与草稿部分走的是 user-type 共用逻辑
+- links 的状态不会混进这一条提交链路里
 
-- 空字符串：回�?`idle`
-- 1 �?2 个字符：进入 `waitingForMoreInput`
-- 3 个及以上字符：进�?`debouncing`
-- 1 秒后真正发目录搜索请�?
+#### Step 2：搜索一个组，并加到草稿里
 
-## �?4 步：目录搜索服务返回结果，映射成候选项
+这里复用的还是同一套 user-type 能力：
 
-`usePermissionPrincipalSearch.ts` 拿到目录搜索结果后，会调用：
+- [usePermissionPrincipalSearch.ts](./hooks/usePermissionPrincipalSearch.ts)
+- [directoryPrincipalSearch.ts](./services/directoryPrincipalSearch/directoryPrincipalSearch.ts)
+- [userPermissionEntryUtils.ts](./utils/userPermissionEntryUtils.ts)
+- [useUserPermissionDialogUIState.ts](./hooks/useUserPermissionDialogUIState.ts)
 
-```ts
-mapDirectorySearchResultToCandidate(result, selectedTab);
-```
+区别只是：
 
-转换成：
+- 当前 tab 是 `groups`
+- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx) 里的 `createItemPermissionEntryFromCandidate` 会给它补上 item user permission 默认角色 `Reader`
 
-```ts
-IPermissionPrincipalSearchCandidate;
-```
+#### Step 3：点击 Apply，先计算 item user permission change set
 
-这样 UI 不需要知道原始搜索结果来自哪�?Graph 查询�?
+当用户点击 `Apply` 时：
 
-## �?5 步：用户选中候选项，直接加进本地草�?
+- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx) 会先调用 [itemUserPermissionDiff.ts](./utils/itemUserPermissionDiff.ts)
 
-当用户从 `Combobox` 结果里选中某一项时�?
-
-1. Hook 先根�?`candidateId` 找回完整候选项
-2. 判断是否重复添加
-3. 如果没加过，就调�?`addCandidate(...)`
-4. 清空当前 query 和当�?tab 的结果列�?
-   `ContainerPermissionDialog.tsx` 里会把候选项转换成新的草稿权限条目：
-
-```ts
-{
-  id: `${candidate.type}:${candidate.id}`,
-  principalId: candidate.id,
-  principalUserPrincipalName: candidate.userPrincipalName,
-  principalDisplayName: candidate.name,
-  principalType: candidate.type,
-  description: candidate.secondaryText,
-  role: "Reader",
-}
-```
-
-注意这里的当前前端行为：
-
-- 新加条目默认角色�?`Reader`
-- 新加条目只是进入草稿，还没有写服务端
-
-## �?6 步：用户修改角色或删除条�?
-
-这两件事都只改草稿：
-
-- 改角色：`updateEntryRole(...)`
-- 删除条目：`removeEntry(...)`
-
-此时 `hasUnsavedChanges` 会变�?`true`�?
-
-## �?7 步：点击 `Apply`，前端计算差�?
-
-弹窗会调用：
-
-```ts
-computeContainerPermissionChanges(originalEntriesByTab, draftEntriesByTab);
-```
-
-它只计算三类差异�?
+这层会把差异整理成：
 
 - `create`
 - `update`
 - `remove`
 
-当前前端不会把整张权限表重新提交给后端，只提交差异�?
-这是当前实现里非常重要的一点�?
+并且额外做 item user permission 特有的校验，例如：
 
-## �?8 步：前端把差异交给后端，并用返回值刷新基�?
+- inherited 行不能更新
+- inherited 行不能删除
+- 创建或重建权限时，必须还能找到合法 recipient 线索
 
-前端调用�?
+#### Step 4：前端调 item user permission 后端接口
 
-```ts
-applyContainerPermissionChanges(containerId, changes);
-```
+前端 API 入口在：
 
-后端完成真正的写回后，会把最新权限列表重新返回给前端�?
-前端再调用：
+- [itemPermissionApi.ts](../../services/itemPermissionApi.ts)
 
-```ts
-replaceEntries(refreshedEntries);
-```
+user-type 这条链路会调用：
 
-于是�?
+- `listItemUserPermissions`
+- `applyItemUserPermissionChanges`
 
-- `originalEntriesByTab` 被刷新成最新服务端结果
-- `draftEntriesByTab` 也同步到同一份结�?- 本地脏状态被清空
+对应的后端路由是 `itemPermissions`，不是 links 子路由。
 
----
+#### Step 5：后端用 `invite` 创建组权限，用 PATCH 更新已有显式权限
 
-## 6. 当前前端为什么要分成“搜索链路”和“权限写回链路�?
+后端编排入口在：
 
-这是现在这个模块最重要的设计边界之一�?
+- [itemPermissionsHandlers.ts](../../../server/itemPermissions/itemPermissionsHandlers.ts)
 
-### 链路 A：目录搜�?
+这里会：
 
-它关注的是：
+- 读取 `driveId` / `itemId`
+- 解析前端发来的 user-type change set
+- 对 `create` 走 `invite`
+- 对 `update` 走 PATCH 更新已有显式权限角色
+- 对 `remove` 走 delete
+- 最后重新读取当前 item 的权限列表
 
-- 输入框内�?- 最小输入长�?- debounce
-- loading / empty / error
-- 结果映射
-- 防止重复添加
+真正把新增权限翻译成 `invite` body 的位置在：
 
-它的核心文件是：
+- [itemPermissionsGraphAdapters.ts](../../../server/itemPermissions/itemPermissionsGraphAdapters.ts)
 
-- `hooks/usePermissionPrincipalSearch.ts`
-- `utils/permissionPrincipalCandidateMapper.ts`
-- `services/directoryPrincipalSearch/*`
+这里会构造 Graph 的 `recipients`，并保留：
 
-### 链路 B：权限草稿和写回
+- `recipientObjectId`
+- `recipientEmail`
+- `recipientAlias`
 
-它关注的是：
+这也是为什么 item user permission 的 change set 里要保留 recipient 相关字段。
 
-- 原始基线
-- 当前草稿
-- 角色修改
-- 删除条目
-- 差异计算
-- Apply 成功后刷新基�?
-  它的核心文件是：
+因为对 item 来说，后端真正写 Graph 时用的是 `invite`，而 `invite` 必须知道 recipient。
 
-- `hooks/useUserPermissionDraft.ts`
-- `hooks/useUserPermissionDialogUIState.ts`
-- `hooks/usePermissionDialogApiRequestState.ts`
-- `utils/containerUserPermissionDiff.ts`
-- `src/services/containerPermissionApi.ts`
+#### Step 6：顺带理解“继承权限”为何会是只读
 
-为什么要分开�?
-因为“搜索某个人”和“把容器权限写回服务端”不是同一件事�?
-如果把它们硬揉在一起，后续改动会很痛苦，例如：
+文件夹和文件的 item permission 还有一个 container 没有的复杂点：
 
-- 改搜索体验时容易误伤 Apply �?- 改写�?payload 时容易误�?Combobox 行为
+> 当前项可能继承父文件夹的权限。
 
-所以当前结构的价值是�?
+这个逻辑在后端完成，关键位置是：
 
-> 搜索体验单独演进，权限写回逻辑单独演进�?
+- [itemPermissionsHandlers.ts](../../../server/itemPermissions/itemPermissionsHandlers.ts)
+- [itemPermissionsGraphAdapters.ts](../../../server/itemPermissions/itemPermissionsGraphAdapters.ts)
 
----
+后端会：
 
-## 7. 当前前端和后端的边界关系
+1. 先读取当前 item 的 permission
+2. 再尝试读取父 folder 的 permission
+3. 用父子两层的 `permissionId` 做对比
 
-虽然这篇 README 以当前前端为主，但你还是要知道它和后端的边界在哪里�?
+如果某条当前项权限的 `permissionId` 也出现在父层里，就会把它视为：
 
-### 前端直接依赖的后端入�?
+- `isInherited = true`
+- `isEditable = false`
+- `isRemovable = false`
 
-前端不直接调 Graph，它只调�?
+前端收到这份结果后，就会把继承项显示成只读、不可删。
 
-```text
-src/services/containerPermissionApi.ts
-```
-
-里面只有两条关键调用�?
-
-- `listContainerPermissions(containerId)`
-- `applyContainerPermissionChanges(containerId, changes)`
-
-### 前端直接依赖的共同契�?
-
-前端现在直接复用�?
-
-```text
-common/contracts/containerPermissionCommonContracts.ts
-```
-
-这意味着前端页面里看到的�?
-
-- `IContainerPermissionEntry`
-- `IContainerPermissionChangeSet`
-- `IContainerPermissionsResponse`
-
-都不是“前端自己乱定义的一套”，而是和后端共享的一套协议�?
-
-### 当前后端实现位置
-
-如果你想顺着这条链继续看后端实现，现在的后端入口已经不是旧的单文件了，而是�?
-
-```text
-server/containerPermissions/
-```
-
-其中最值得先看的文件是�?
-
-- `containerPermissionsHandlers.ts`
-- `containerPermissionsRequestParser.ts`
-- `containerPermissionsCommonAdapters.ts`
+所以这里不是前端自己“猜”哪条权限是继承的，而是后端先对 Graph 结果做了继承判定。
 
 ---
 
-## 8. 当前前端错误处理现状
+## 4. 阅读这个模块时，建议先抓住什么
 
-当前前端会同时处理两类错误：
+如果你是第一次读当前权限模块，建议先按下面顺序理解：
 
-### 8.1 权限加载 / Apply 错误
+1. 先分清 3 大类权限：
+   `Container User Permission`、`Item User Permission`、`Item Link Permission`
+2. 再分清两条 user-type 共用主线：
+   搜索链路、草稿链路
+3. 最后再看 container 和 item 在后端写 Graph 时的区别：
+   container 走 create permission，item 走 invite
 
-来源�?
+也可以记成一句话：
 
-- `listContainerPermissions(...)`
-- `applyContainerPermissionChanges(...)`
+> 当前仓库把“user-type 权限的共用交互”尽量抽在一起，把“container / item / link 的 Graph 差异”尽量收在各自边界里。
 
-这类错误最终会被包装成�?
+如果接下来你要继续读 link-type 权限，请直接跳到：
 
-```ts
-ContainerPermissionApiError;
-```
-
-如果后端返回了：
-
-- `retryAfterSeconds`
-
-前端会把它拼进错误文案里�?
-
-### 8.2 搜索错误
-
-来源�?
-
-- `searchDirectoryPrincipals(...)`
-- MGT provider 未登�?
-  这类错误不会阻塞整张权限表，但会在顶部状态区域显示：
-
-- `Search Error: ...`
-
-### 8.3 当前 UI 错误汇总策�?
-
-`ContainerPermissionDialog.tsx` 会把两类错误统一映射到顶部状态消息区，而不是在多个位置重复弹错误�?
-这让当前页面行为更统一，也更容易让用户理解“现在是哪条链路出了问题”�?
-
----
-
-## 9. 当前前端最值得先读的代码顺�?
-
-如果你第一次接触这个模块，建议按这个顺序读�?
-
-1. `src/components/permissions/ContainerPermissionDialog.tsx`
-2. `src/components/permissions/hooks/useUserPermissionDialogUIState.ts`
-3. `src/components/permissions/hooks/useUserPermissionDraft.ts`
-4. `src/components/permissions/hooks/usePermissionPrincipalSearch.ts`
-5. `src/components/permissions/utils/containerUserPermissionDiff.ts`
-6. `src/services/containerPermissionApi.ts`
-7. `common/contracts/containerPermissionCommonContracts.ts`
-
-如果你之后还想继续理解后端，再去看：
-
-8. `server/containerPermissions/containerPermissionsHandlers.ts`
-9. `server/containerPermissions/containerPermissionsRequestParser.ts`
-10. `server/containerPermissions/containerPermissionsCommonAdapters.ts`
-
----
-
-## 10. 读完后你应该记住�?6 个核心点
-
-### 1. 当前前端�?`Combobox` 搜索流，不是 `TagPicker`
-
-这会直接影响你后续读代码和改交互的入口判断�?
-
-### 2. 当前前端维护的是“基�?+ 草稿”两份权限状�?
-
-这不是重复存储，而是为了支持�?
-
-- Close 回滚
-- Apply 后刷新基�?- 容器切换重置
-
-### 3. 搜索链路和权限写回链路是分开�?
-
-搜索只负责：
-
-- 找人 / 找组
-- 生成候选项
-- 加进草稿
-
-真正写回权限�?Apply 流的事情�?
-
-### 4. 前端提交的是差异，不是整张表
-
-差异来自�?
-
-```ts
-computeContainerPermissionChanges(...)
-```
-
-### 5. 前端已经开始直接复用共同契�?
-
-`IContainerPermissionEntry` 不再�?permissions 模块里私有复制的一份，它来自根目录共享契约�?
-
-### 6. 后端现在已经拆到 `server/containerPermissions/`
-
-## 所以如果你看到旧文档里还写 `server/containerPermissions.ts`，要以当前代码目录为准�?
-
-## 11. 如果你要继续扩展当前前端模块，优先注意什�?
-
-### 如果你要改搜索体�?
-
-优先看：
-
-- `hooks/usePermissionPrincipalSearch.ts`
-- `utils/permissionPrincipalCandidateMapper.ts`
-- `services/directoryPrincipalSearch/*`
-- `utils/permissionDialogSharedUtils.ts`
-
-特别注意�?
-
-- 最�?`3` 个字符才搜索
-- `1000ms` debounce
-- 请求序号防止旧结果回�?- people / groups 搜索上下文是隔离�?
-
-### 如果你要改本地编辑体�?
-
-优先看：
-
-- `hooks/useUserPermissionDraft.ts`
-- `hooks/useUserPermissionDialogUIState.ts`
-
-特别注意�?
-
-- 不要破坏 `original + draft` 双快照语�?- `Close` 现在就是丢弃草稿
-- `replaceEntries(...)` 是对齐服务端结果的关键动�?
-
-### 如果你要�?Apply payload
-
-优先看：
-
-- `utils/containerUserPermissionDiff.ts`
-- `src/services/containerPermissionApi.ts`
-- `common/contracts/containerPermissionCommonContracts.ts`
-
-特别注意�?
-
-- people 新增权限需�?`userPrincipalName`
-- update / remove 依赖已有条目�?`permissionId`
-
-### 如果你要改后端对接边�?
-
-优先看：
-
-- `common/contracts/containerPermissionCommonContracts.ts`
-- `src/services/containerPermissionApi.ts`
-- `server/containerPermissions/`
-
-## 不要只改前端类型，不改共同契约�?
-
-## 12. 一句话总结
-
-当前 `Container Permission` 前端模块的本质是�?
-
-> �?`Combobox` 驱动目录搜索，用“双快照草稿模型”管理本地编辑，用“差异提交”驱�?Apply，并通过 `common/contracts` 和后端保持统一协议�?---
-
-## 13. Shared dialog responsibilities
-
-`ContainerPermissionDialog.tsx` �?`ItemPermissionDialog.tsx` 现在共用同一套权限对话框骨架，但仍然按层分工�?
-
-- `components/PermissionDialogFrame.tsx`
-  负责 dialog 外壳、顶部状态区、tab、搜索区、access list 区块编排，以及底�?Close / Apply 和保存反馈�?- `components/UserPermissionAccessListTable.tsx`
-  负责 access list �?loading / empty / row 三种状态，以及统一的主体信息列、角色下拉框列、删除按钮列�?- `hooks/usePermissionDialogApiRequestState.ts`
-  负责权限加载、Apply 前差异计算、Apply 后刷新，以及 `container / item` 默认请求文案的参数化�?
-  现在两个 dialog 自己保留的差异主要是�?
-- header 文案
-- role options
-- item 专属�?inherited tooltip、visibility disclaimer、container permission 跳转入口
-- 各自对应�?API 调用函数
+- [introduce-ItemLinkPermissionModule.md](./documents/introduce-ItemLinkPermissionModule.md)
