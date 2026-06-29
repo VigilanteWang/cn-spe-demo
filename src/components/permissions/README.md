@@ -673,10 +673,9 @@ const createItemPermissionEntryFromCandidate = (
 
 这一层的关键模型是：
 
-- `IItemUserPermissionEntriesByTab`
-  含义：前端保存的基线和草稿
-- `IItemUserPermissionChangeSetFromUI`
-  含义：前端提交给后端的最终变更集
+- `IItemUserPermissionEntriesByTab` 前端保存的基线和草稿
+
+- `IItemUserPermissionChangeSetFromUI` 前端提交给后端的最终变更集
 
 ```ts
 userPermissionChanges = computeItemPermissionChanges(
@@ -709,18 +708,12 @@ userPermissionChanges = computeItemPermissionChanges(
 }
 ```
 
-草稿中的 3 记录不会整张表原样提交给后端。
+草稿中的 3条 记录不会整张表原样提交给后端。
 
 后端真正收到的只是 **相对基线的变化**：
 
-- `IT` 和 `HR` 本来就存在，所以不进 change set
+- `IT` 和 `HR` 本来就存在，所以不需要写进 change set
 - `Finance Reviewers` 是新增行所以写进 `create`
-
-这里也能看到 item user permission 的保护规则：
-
-- inherited 行不能更新
-- inherited 行不能删除
-- 创建或重建权限时，必须还能找到合法 recipient 线索
 
 #### Step 5：后端如何把 change set 转成 Graph `invite`
 
@@ -736,25 +729,7 @@ userPermissionChanges = computeItemPermissionChanges(
 - [itemPermissionsHandlers.ts](../../../server/itemPermissions/itemPermissionsHandlers.ts)
 - [itemPermissionsGraphAdapters.ts](../../../server/itemPermissions/itemPermissionsGraphAdapters.ts)
 
-前端发给后端的请求体如下：
-
-```json
-{
-  "create": [
-    {
-      "principalType": "groups",
-      "principalId": "group-finance-reviewers",
-      "recipientObjectId": "group-finance-reviewers",
-      "recipientEmail": "finance-reviewers@contoso.com",
-      "role": "Reader"
-    }
-  ],
-  "update": [],
-  "remove": []
-}
-```
-
-后端在处理 `create` 时，关键代码是：
+后端在拿到 change set 后，处理 `create` 时，关键代码是：
 
 ```ts
 for (const createChange of changeSet.create) {
@@ -858,9 +833,13 @@ for (const createChange of changeSet.create) {
 - 它不再是本地草稿，而是新的 persisted entry
 - 本地“未保存更改”状态会被清空
 
-#### 关于 inherited permission
+---
 
-##### 7.1 后端是怎么找出“这条权限是继承来的”
+## 4. 关于 inherited permission
+
+> 关键前提：当我们调用 list permissions API 时，子项目拿到的 permission 列表里，通常会同时包含“从上层文件夹继承下来的权限”和“这个 item 自己持有的权限”，所以这里看到的是混合结果，不是只返回 item 自带权限。
+
+#### 1. 代码如何判定“这条权限是继承来的”
 
 这个判断由后端完成，不是前端推断。
 
@@ -876,15 +855,7 @@ for (const createChange of changeSet.create) {
 3. 把父层里出现过的 `permissionId` 收集成一个集合
 4. 如果当前项某条 permission 的 `permissionId` 也出现在父层集合里，就把它视为 inherited
 
-也就是说，当前项目判断继承关系时，依赖的是：
-
-```text
-当前 item permissionId 集合
-  vs
-父 folder permissionId 集合
-```
-
-而不是单纯依赖某个 `inheritedFrom` 字段。
+而不是单纯依赖某个 `inheritedFrom` 字段，这个字段至少在 SharePoint Embedded 里会出现在继承权限entry中，但为空值，有时还不会出现。
 
 关键代码可以直接看这里：
 
@@ -895,7 +866,7 @@ for (const createChange of changeSet.create) {
 - [itemPermissionsGraphAdapters.ts](../../../server/itemPermissions/itemPermissionsGraphAdapters.ts:65)
   用 `parentPermissionIds.has(candidate.permissionId)` 判断 `isInherited`
 
-##### 7.2 识别成 inherited 之后，前端会得到什么限制
+#### 2. 识别成 inherited 之后，前端会得到什么限制
 
 一旦后端认定某条权限是继承权限，就会直接把这些字段写回前端模型：
 
@@ -911,9 +882,7 @@ for (const createChange of changeSet.create) {
 2. 禁用角色编辑
 3. 禁用删除操作
 
-这也是为什么前面例子里的 `IT` 和 `HR` 会表现成只读。
-
-##### 7.3 很重要：不是所有用户都能看全 inherited permission
+#### 3. 很重要：不是所有用户都能看全 inherited permission
 
 这一点很容易忽略。
 
@@ -926,22 +895,11 @@ for (const createChange of changeSet.create) {
 1. 如果当前列表是空的，不一定代表“这个 item 真的没有权限”
 2. 也可能只是因为当前用户权限太低，Graph 没把这些 item-level / inherited permissions 都返回出来
 
-文案位置可以直接看：
-
-- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx:235)
-  注释写的是“只读权限下 Graph 可能不返回 item 级权限”
-- [ItemPermissionDialog.tsx](./ItemPermissionDialog.tsx:250)
-  UI 文案明确写了 `With only read access to this file, Microsoft Graph may not return them`
-
-所以在理解 inherited permission 时，要带着这个前提：
-
-> 实务上，如果想稳定看到完整的 inherited permission，不能假设 Reader 视角一定看全；至少要把 `edit` / 当前项目里的 `Writer` 及以上权限视为更可靠的查看前提。
-
 这也是为什么 inherited 相关问题不能只看前端表格，还要结合当前调用者本身对这个 item 的权限级别一起理解。
 
 ---
 
-## 4. 阅读建议
+## 5. 阅读建议
 
 首次阅读当前权限模块时，建议按下面的顺序理解：
 
@@ -951,10 +909,6 @@ for (const createChange of changeSet.create) {
    搜索链路、草稿链路
 3. 再看 container 和 item 在后端写 Graph 时的区别：
    container 走 create permission，item 走 invite
-
-可以概括为：
-
-> 当前仓库把“user-type 权限的共用交互”尽量抽在一起，把“container / item / link 的 Graph 差异”尽量收在各自边界里。
 
 如需继续阅读 link-type permission，请直接跳到：
 
