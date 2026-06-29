@@ -12,6 +12,7 @@
  * 它负责组织流程，但尽量不直接承载 Graph 结构转换或字段解析细节。
  */
 import { Request, Response } from "restify";
+import type { Client } from "@microsoft/microsoft-graph-client";
 import { sendGraphRequest } from "../../common/graphError";
 import {
   createGraphClient,
@@ -26,7 +27,6 @@ import {
   newGraphCreatePermissionBody,
   mapGraphPermissionToEntryOnUI,
 } from "./containerPermissionsCommonAdapters";
-import type { IGraphClient } from "./containerPermissionsInternalContracts";
 import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
 import { parseContainerPermissionChangeSet } from "./containerPermissionsRequestParser";
 import {
@@ -57,7 +57,7 @@ export const listContainerPermissionsFromGraph = async (
   }
 
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IGraphClient;
+  const graphClient = createGraphClient(graphToken);
   const entries = await fetchMapContainerPermissionFromGraphToEntries(
     graphClient,
     containerId,
@@ -98,7 +98,7 @@ export const applyContainerPermissionsToGraph = async (
   }
 
   const graphToken = await getGraphOBOToken(authorizationResult.token);
-  const graphClient = createGraphClient(graphToken) as IGraphClient;
+  const graphClient = createGraphClient(graphToken);
 
   await applyContainerPermissionChangeSet(graphClient, containerId, changeSet);
 
@@ -118,7 +118,7 @@ export const applyContainerPermissionsToGraph = async (
  * @returns 映射后的权限条目数组。
  */
 export const fetchMapContainerPermissionFromGraphToEntries = async (
-  graphClient: IGraphClient,
+  graphClient: Client,
   containerId: string,
 ) => {
   const response = await sendGraphRequest(
@@ -150,7 +150,7 @@ export const fetchMapContainerPermissionFromGraphToEntries = async (
  * @returns Promise<void>
  */
 export const applyContainerPermissionChangeSet = async (
-  graphClient: IGraphClient,
+  graphClient: Client,
   containerId: string,
   changeSet: IContainerPermissionChangeSetFromUI,
 ): Promise<void> => {

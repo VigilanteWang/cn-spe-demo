@@ -2,10 +2,10 @@ import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { useEffect, useRef, useState } from "react";
 import { AppError } from "../../../../common/appError";
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
-import { mapDirectorySearchResultToCandidate } from "../services/permissionPrincipalCandidateMapper";
+import { mapDirectorySearchResultToCandidate } from "../utils/permissionPrincipalCandidateMapper";
 import {
   type IDirectoryPrincipalSearchResult,
   searchDirectoryPrincipals,
@@ -77,13 +77,13 @@ interface IUsePermissionPrincipalSearchOptions {
   // 把选中的候选人加到权限列表里。
   addCandidate: (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ) => void;
 
   // 判断某个候选人是不是已经被加进列表了。
   isCandidateAdded: (
     tab: PermissionTabValue,
-    candidate: IPermissionPrincipalCandidate,
+    candidate: IPermissionPrincipalSearchCandidate,
   ) => boolean;
 
   // 真正执行目录搜索的函数；不传时默认使用内置实现。
@@ -105,7 +105,7 @@ interface IUsePermissionPrincipalSearchResult {
   query: string;
 
   // 当前 tab 已经搜索出来、可以展示在下拉列表里的候选项。
-  results: IPermissionPrincipalCandidate[];
+  results: IPermissionPrincipalSearchCandidate[];
 
   // 当前搜索流程走到哪一步了，比如空闲、加载中、成功、失败。
   status: PermissionPrincipalSearchStatus;
@@ -143,7 +143,7 @@ export const usePermissionPrincipalSearch = ({
 }: IUsePermissionPrincipalSearchOptions): IUsePermissionPrincipalSearchResult => {
   // 每个 tab 都维护自己的搜索结果，切换 tab 时不会互相覆盖。
   const [resultsByTab, setResultsByTab] = useState<
-    Record<PermissionTabValue, IPermissionPrincipalCandidate[]>
+    Record<PermissionTabValue, IPermissionPrincipalSearchCandidate[]>
   >({
     people: [],
     groups: [],

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
-  IPermissionGraphClient,
-  IPermissionGraphRequest,
-} from "../permissionsCore/permissionGraphContracts";
+  Client,
+  GraphRequest,
+} from "@microsoft/microsoft-graph-client";
 import {
   fetchMapItemPermissionsFromGraphToResponse,
   listItemPermissionsFromGraph,
@@ -13,7 +13,7 @@ import {
   getGraphOBOToken,
   requireContainerManageRequest,
 } from "../auth";
-import { mapGraphItemPermissionsToResponse } from "./itemPermissionsCommonAdapters";
+import { mapGraphItemPermissionsToResponse } from "./itemPermissionsGraphAdapters";
 
 vi.mock("../auth", () => ({
   createGraphClient: vi.fn(),
@@ -21,10 +21,10 @@ vi.mock("../auth", () => ({
   requireContainerManageRequest: vi.fn(),
 }));
 
-vi.mock("./itemPermissionsCommonAdapters", async () => {
+vi.mock("./itemPermissionsGraphAdapters", async () => {
   const actual = await vi.importActual<
-    typeof import("./itemPermissionsCommonAdapters")
-  >("./itemPermissionsCommonAdapters");
+    typeof import("./itemPermissionsGraphAdapters")
+  >("./itemPermissionsGraphAdapters");
 
   return {
     ...actual,
@@ -203,9 +203,7 @@ describe("listItemPermissionsFromGraph", () => {
       token: "access-token",
     } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
-    vi.mocked(createGraphClient).mockReturnValue(
-      graphClient as ReturnType<typeof createGraphClient>,
-    );
+    vi.mocked(createGraphClient).mockReturnValue(graphClient as Client);
     vi.mocked(mapGraphItemPermissionsToResponse).mockImplementationOnce(() => {
       throw new Error("local mapping failed");
     });
@@ -237,8 +235,8 @@ describe("listItemPermissionsFromGraph", () => {
       "/drives/drive-1/items/item-1/permissions": new Error("unused"),
     });
 
-    graphClient.api = (): IPermissionGraphRequest => {
-      const request: IPermissionGraphRequest = {
+    graphClient.api = (): PermissionGraphRequest => {
+      const request: PermissionGraphRequest = {
         version: () => request,
         header: () => request,
         get: async () => {
@@ -262,9 +260,7 @@ describe("listItemPermissionsFromGraph", () => {
       token: "access-token",
     } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
-    vi.mocked(createGraphClient).mockReturnValue(
-      graphClient as ReturnType<typeof createGraphClient>,
-    );
+    vi.mocked(createGraphClient).mockReturnValue(graphClient as Client);
 
     const req = {
       params: {
@@ -289,14 +285,17 @@ describe("listItemPermissionsFromGraph", () => {
   });
 });
 
+type PermissionGraphClient = Client;
+type PermissionGraphRequest = GraphRequest;
+
 const createMockGraphClient = (
   responsesByPath: Record<string, unknown>,
   requestedPaths: string[] = [],
-): IPermissionGraphClient => ({
-  api: (path: string): IPermissionGraphRequest => {
+): PermissionGraphClient => ({
+  api: (path: string): PermissionGraphRequest => {
     requestedPaths.push(path);
 
-    const request: IPermissionGraphRequest = {
+    const request: PermissionGraphRequest = {
       version: () => request,
       header: () => request,
       get: async () => {

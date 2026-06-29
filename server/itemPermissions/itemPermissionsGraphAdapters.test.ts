@@ -3,7 +3,7 @@ import {
   buildGraphInviteRecipient,
   mapGraphPermissionCandidate,
   mapGraphItemPermissionsToResponse,
-} from "./itemPermissionsCommonAdapters";
+} from "./itemPermissionsGraphAdapters";
 
 /**
  * 验证 item 权限适配层的继承判断、候选过滤和 Graph invite recipient 构造规则。
@@ -106,7 +106,7 @@ describe("mapGraphItemPermissionsToResponse", () => {
           id: "perm-link",
           roles: ["read"],
           link: {
-            scope: "users",
+            scope: "user",
           },
         },
         {

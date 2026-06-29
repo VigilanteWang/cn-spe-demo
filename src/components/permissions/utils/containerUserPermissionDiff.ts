@@ -6,9 +6,9 @@ import type {
   IContainerPermissionUpdateChange,
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 import type {
-  IContainerPermissionEntry,
-  IContainerPermissionEntriesByTab,
-} from "../models/containerPermissionModels";
+  IContainerUserPermissionEntriesByTab,
+  IContainerUserPermissionEntry,
+} from "../models/containerUserPermissionModels";
 
 export { type IContainerPermissionChangeSetFromUI as IContainerPermissionChangeSet } from "../../../../common/contracts/containerPermissionCommonContracts";
 
@@ -41,7 +41,7 @@ export const buildContainerPermissionValidationError = (
 interface IRequiredFieldErrorOptions {
   code: string;
   operation: string;
-  fieldName: keyof IContainerPermissionEntry;
+  fieldName: keyof IContainerUserPermissionEntry;
   entryId: string;
 }
 
@@ -49,8 +49,8 @@ interface IRequiredFieldErrorOptions {
  * 计算权限草稿相对初始快照的差异，以便一次性保存权限修改。
  */
 export const computeContainerPermissionChanges = (
-  originalEntriesByTab: IContainerPermissionEntriesByTab,
-  draftEntriesByTab: IContainerPermissionEntriesByTab,
+  originalEntriesByTab: IContainerUserPermissionEntriesByTab,
+  draftEntriesByTab: IContainerUserPermissionEntriesByTab,
 ): IContainerPermissionChangeSetFromUI => {
   const create: IContainerPermissionCreateChange[] = [];
   const update: IContainerPermissionUpdateChange[] = [];
@@ -117,7 +117,7 @@ export const computeContainerPermissionChanges = (
  * 把草稿权限转换成 create 差异。
  */
 const createContainerPermissionChangeFromEntry = (
-  entry: IContainerPermissionEntry,
+  entry: IContainerUserPermissionEntry,
 ): IContainerPermissionCreateChange => {
   if (entry.principalType === "people") {
     // people 分支必须带 userPrincipalName，后端创建接口才能用。

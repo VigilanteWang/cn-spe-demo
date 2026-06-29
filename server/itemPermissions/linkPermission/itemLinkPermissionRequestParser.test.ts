@@ -1,0 +1,164 @@
+import { describe, expect, it } from "vitest";
+import { ITEM_LINK_PERMISSION_SCOPES } from "../../../common/contracts/itemPermissionCommonContracts";
+import { parseItemLinkPermissionChangeSet } from "./itemLinkPermissionRequestParser";
+
+describe("parseItemLinkPermissionChangeSet", () => {
+  it("should parse create, deleteLinks, grantRecipients and revokeRecipients", () => {
+    const parsed = parseItemLinkPermissionChangeSet({
+      create: [
+        {
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
+          type: "review",
+          recipients: [
+            {
+              recipientObjectId: "user-1",
+            },
+          ],
+        },
+      ],
+      deleteLinks: [{ permissionId: "perm-delete-1" }],
+      grantRecipients: [
+        {
+          permissionId: "perm-grant-1",
+          shareId: "u!share-id-1",
+          type: "review",
+          recipients: [
+            {
+              recipientEmail: "adele@contoso.com",
+            },
+          ],
+        },
+      ],
+      revokeRecipients: [
+        {
+          permissionId: "perm-revoke-1",
+          shareId: "u!share-id-2",
+          recipients: [
+            {
+              recipientAlias: "retail-members",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed).toEqual({
+      create: [
+        {
+          scope: ITEM_LINK_PERMISSION_SCOPES.specific,
+          type: "review",
+          recipients: [
+            {
+              recipientObjectId: "user-1",
+              recipientEmail: undefined,
+              recipientAlias: undefined,
+            },
+          ],
+        },
+      ],
+      deleteLinks: [{ permissionId: "perm-delete-1" }],
+      grantRecipients: [
+        {
+          permissionId: "perm-grant-1",
+          shareId: "u!share-id-1",
+          type: "review",
+          recipients: [
+            {
+              recipientObjectId: undefined,
+              recipientEmail: "adele@contoso.com",
+              recipientAlias: undefined,
+            },
+          ],
+        },
+      ],
+      revokeRecipients: [
+        {
+          permissionId: "perm-revoke-1",
+          shareId: "u!share-id-2",
+          recipients: [
+            {
+              recipientObjectId: undefined,
+              recipientEmail: undefined,
+              recipientAlias: "retail-members",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("should reject unsupported scope, type and empty recipients", () => {
+    expect(() =>
+      parseItemLinkPermissionChangeSet({
+        create: [
+          {
+            scope: "external",
+            type: "view",
+          },
+        ],
+        deleteLinks: [],
+        grantRecipients: [],
+        revokeRecipients: [],
+      }),
+    ).toThrow("Unsupported item link permission scope");
+
+    expect(() =>
+      parseItemLinkPermissionChangeSet({
+        create: [],
+        deleteLinks: [],
+        grantRecipients: [
+          {
+            permissionId: "perm-grant-1",
+            shareId: "u!share-id-1",
+            type: "owner",
+            recipients: [{ recipientObjectId: "user-1" }],
+          },
+        ],
+        revokeRecipients: [],
+      }),
+    ).toThrow("Unsupported item link permission type");
+
+    expect(() =>
+      parseItemLinkPermissionChangeSet({
+        create: [],
+        deleteLinks: [],
+        grantRecipients: [],
+        revokeRecipients: [
+          {
+            permissionId: "perm-revoke-1",
+            shareId: "u!share-id-2",
+            recipients: [],
+          },
+        ],
+      }),
+    ).toThrow("must be a non-empty array");
+  });
+
+  it("should ignore recipients for non-specific create links", () => {
+    const parsed = parseItemLinkPermissionChangeSet({
+      create: [
+        {
+          scope: "organization",
+          type: "edit",
+          recipients: [],
+        },
+      ],
+      deleteLinks: [],
+      grantRecipients: [],
+      revokeRecipients: [],
+    });
+
+    expect(parsed).toEqual({
+      create: [
+        {
+          scope: "organization",
+          type: "edit",
+          recipients: undefined,
+        },
+      ],
+      deleteLinks: [],
+      grantRecipients: [],
+      revokeRecipients: [],
+    });
+  });
+});

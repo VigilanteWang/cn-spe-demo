@@ -36,7 +36,7 @@ export const listContainerPermissions = async (
     });
   }
 
-  // 成功后把后端扁平 entries 映射成前端页签需要的分组结构。
+  // 成功后把后端扁平 entries 映射成前端 tab 需要的分组结构。
   const payload =
     (await response.json()) as IContainerPermissionsResponseFromApi;
   return mapPermissionEntriesToTabs(payload.entries);

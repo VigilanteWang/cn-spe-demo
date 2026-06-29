@@ -1,27 +1,26 @@
 import { useCallback } from "react";
 import { Text } from "@fluentui/react-components";
 import type {
-  ContainerPermissionRole,
-  IContainerPermissionEntriesByTab,
-  IContainerPermissionEntry,
-} from "./models/containerPermissionModels";
-import type { IPermissionPrincipalCandidate } from "./models/permissionSharedModels";
+  ContainerUserPermissionRole,
+  IContainerUserPermissionEntriesByTab,
+  IContainerUserPermissionEntry,
+} from "./models/containerUserPermissionModels";
+import type { IPermissionPrincipalSearchCandidate } from "./models/permissionSharedModels";
 import { usePermissionDialogApiRequestState } from "./hooks/usePermissionDialogApiRequestState";
-import { usePermissionDialogUIState } from "./hooks/usePermissionDialogUIState";
+import { useUserPermissionDialogUIState } from "./hooks/useUserPermissionDialogUIState";
 import { usePermissionPrincipalSearch } from "./hooks/usePermissionPrincipalSearch";
+import { UserPermissionPanel } from "./components/UserPermissionPanel";
 import { IContainerPermissionDialogProps } from "./components/permissionsTypes";
 import { PermissionDialogFrame } from "./components/PermissionDialogFrame";
 import {
   applyContainerPermissionChanges,
   listContainerPermissions,
 } from "../../services/containerPermissionApi";
-import { computeContainerPermissionChanges } from "./services/containerPermissionDiff";
-import {
-  createBasePermissionEntryFromCandidate,
-  createEmptyPermissionEntriesByTab,
-} from "./utils/permissionDialogSharedUtils";
+import { computeContainerPermissionChanges } from "./utils/containerUserPermissionDiff";
+import { createEmptyPermissionEntriesByTab } from "./utils/permissionDialogSharedUtils";
+import { createBaseUserPermissionEntryFromCandidate } from "./utils/userPermissionEntryUtils";
 
-const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
+const CONTAINER_PERMISSION_ROLES: ContainerUserPermissionRole[] = [
   "Reader",
   "Writer",
   "Manager",
@@ -37,24 +36,22 @@ const CONTAINER_PERMISSION_ROLES: ContainerPermissionRole[] = [
  * @returns 一条可直接加入容器权限草稿列表的新记录。
  */
 const createContainerPermissionEntryFromCandidate = (
-  candidate: IPermissionPrincipalCandidate,
-): IContainerPermissionEntry => ({
-  ...createBasePermissionEntryFromCandidate(candidate),
+  candidate: IPermissionPrincipalSearchCandidate,
+): IContainerUserPermissionEntry => ({
+  ...createBaseUserPermissionEntryFromCandidate(candidate),
   role: "Reader",
 });
 
 /**
  * 容器权限管理对话框。
  *
- * 当前版本把原来混在组件里的三类逻辑拆开了：
- * 1. `usePermissionDialogUIState` 管共享的 tab / draft / filter / 去重逻辑
+ * 当前版本把原来混在组件里的三类逻辑拆开：
+ * 1. `useUserPermissionDialogUIState` 管共享的 tab / draft / filter / 去重逻辑
  * 2. `usePermissionPrincipalSearch` 管目录搜索
  * 3. `usePermissionDialogApiRequestState` 管加载、Apply 和反馈状态
  *
  * 组件层自己主要负责把共享状态 Hook 具体化成容器权限场景，
- * 再把三块状态组装成统一的界面骨架。
- *
- * @returns 渲染后的容器权限管理对话框。
+ * 再把这些状态组装成统一的界面。
  */
 export const ContainerPermissionDialog = ({
   open,
@@ -62,9 +59,8 @@ export const ContainerPermissionDialog = ({
   containerName,
   onClose,
 }: IContainerPermissionDialogProps) => {
-  // 先准备一份空的按 tab 分组结构，供首次渲染和重置时复用。
   const initialEntriesByTab =
-    createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
+    createEmptyPermissionEntriesByTab<IContainerUserPermissionEntry>();
 
   const {
     selectedTab,
@@ -81,7 +77,7 @@ export const ContainerPermissionDialog = ({
     replaceEntries,
     getVisibleEntries,
     isCandidateAdded,
-  } = usePermissionDialogUIState(
+  } = useUserPermissionDialogUIState(
     initialEntriesByTab,
     containerId ?? "__no-container__",
     createContainerPermissionEntryFromCandidate,
@@ -105,17 +101,13 @@ export const ContainerPermissionDialog = ({
 
   /**
    * 为 API 状态 Hook 提供“空结果工厂”，缺少容器时用它重置本地列表。
-   *
-   * @returns 空的 people/groups 权限分组结构。
    */
   const createEmptyEntries = useCallback(() => {
-    return createEmptyPermissionEntriesByTab<IContainerPermissionEntry>();
+    return createEmptyPermissionEntriesByTab<IContainerUserPermissionEntry>();
   }, []);
 
   /**
    * 加载当前容器的真实权限列表。
-   *
-   * @returns 后端返回的最新容器权限分组。
    */
   const loadPermissions = useCallback(async () => {
     return listContainerPermissions(containerId!);
@@ -123,9 +115,6 @@ export const ContainerPermissionDialog = ({
 
   /**
    * 把草稿差异写回后端，并返回服务端最新权限快照。
-   *
-   * @param changes 当前草稿相对原始数据的增删改集合。
-   * @returns 应用变更后的最新容器权限分组。
    */
   const applyChanges = useCallback(
     async (changes: ReturnType<typeof computeContainerPermissionChanges>) => {
@@ -141,7 +130,7 @@ export const ContainerPermissionDialog = ({
     permissionErrorMessages,
     handleApply,
   } = usePermissionDialogApiRequestState<
-    IContainerPermissionEntriesByTab,
+    IContainerUserPermissionEntriesByTab,
     ReturnType<typeof computeContainerPermissionChanges>
   >({
     open,
@@ -157,7 +146,7 @@ export const ContainerPermissionDialog = ({
     applyChanges,
   });
 
-  // access list 始终展示当前选中页签那一组草稿数据。
+  // access list 始终展示当前选中 tab 那一组草稿数据。
   const visibleEntries = getVisibleEntries(selectedTab);
   // 缺少目标容器、正在加载或正在保存时，都要统一禁用交互控件。
   const interactionDisabled =
@@ -175,35 +164,41 @@ export const ContainerPermissionDialog = ({
       permissionErrorMessages={permissionErrorMessages}
       selectedTab={selectedTab}
       interactionDisabled={interactionDisabled}
-      searchInputId="permission-principal-input"
-      query={query}
-      searchResults={results}
-      searchStatus={status}
-      isDropdownOpen={isDropdownOpen}
       isApplyingPermissions={isApplyingPermissions}
       applyFeedbackStatus={applyFeedbackStatus}
       isApplyDisabled={!hasUnsavedChanges || interactionDisabled}
-      accessListProps={{
-        entries: visibleEntries,
-        isLoading: isLoadingPermissions,
-        roleOptions: CONTAINER_PERMISSION_ROLES,
-        isInteractionDisabled: interactionDisabled,
-        // 角色修改要带上当前 tab，才能精确更新对应分组里的那条草稿。
-        onRoleChange: (entry, role) => {
-          updateEntryRole(selectedTab, entry.id, role);
-        },
-        // 删除同样基于当前 tab 执行，避免误删另一组草稿数据。
-        onRemove: (entry) => {
-          removeEntry(selectedTab, entry.id);
-        },
-        isRoleDisabled: (entry) => !entry.isEditable,
-        isRemoveDisabled: (entry) => !entry.isRemovable,
-      }}
+      bodyContent={
+        <UserPermissionPanel
+          selectedTab={selectedTab}
+          interactionDisabled={interactionDisabled}
+          searchInputId="permission-principal-input"
+          query={query}
+          searchResults={results}
+          searchStatus={status}
+          isDropdownOpen={isDropdownOpen}
+          onSearchQueryChange={handleQueryChange}
+          onSearchCandidateSelect={handleCandidateSelect}
+          isCandidateAdded={isCandidateAdded}
+          accessListProps={{
+            entries: visibleEntries,
+            isLoading: isLoadingPermissions,
+            roleOptions: CONTAINER_PERMISSION_ROLES,
+            isInteractionDisabled: interactionDisabled,
+            // 角色修改要带上当前 tab，才能精确更新对应分组里的那条草稿。
+            onRoleChange: (entry, role) => {
+              updateEntryRole(selectedTab, entry.id, role);
+            },
+            // 删除同样基于当前 tab 执行，避免误删另一组草稿数据。
+            onRemove: (entry) => {
+              removeEntry(selectedTab, entry.id);
+            },
+            isRoleDisabled: (entry) => !entry.isEditable,
+            isRemoveDisabled: (entry) => !entry.isRemovable,
+          }}
+        />
+      }
       onRequestClose={() => discardDraftAndClose(onClose)}
       onSelectedTabChange={setSelectedTab}
-      onSearchQueryChange={handleQueryChange}
-      onSearchCandidateSelect={handleCandidateSelect}
-      isCandidateAdded={isCandidateAdded}
       onApply={() => {
         void handleApply();
       }}

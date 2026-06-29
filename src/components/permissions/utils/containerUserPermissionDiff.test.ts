@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { IContainerPermissionEntry } from "../models/containerPermissionModels";
-import { computeContainerPermissionChanges } from "./containerPermissionDiff";
+import type { IContainerUserPermissionEntry } from "../models/containerUserPermissionModels";
+import { computeContainerPermissionChanges } from "./containerUserPermissionDiff";
 
 const createPermissionEntry = (
-  overrides: Partial<IContainerPermissionEntry>,
-): IContainerPermissionEntry => ({
+  overrides: Partial<IContainerUserPermissionEntry>,
+): IContainerUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
   principalObjectId: "user-adele-vance",
   principalUserPrincipalName: "adele.vance@contoso.com",
   principalMail: "adele.vance@contoso.com",
-  principalName: "Adele Vance",
+  principalDisplayName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
   isInherited: false,
@@ -30,7 +30,7 @@ describe("computeContainerPermissionChanges", () => {
           id: "permission:perm-group-existing",
           permissionId: "perm-group-existing",
           principalId: "group-project-owners",
-          principalName: "Project Owners",
+          principalDisplayName: "Project Owners",
           principalType: "groups",
           description: "project.owners@contoso.com",
           role: "Manager",
@@ -46,7 +46,7 @@ describe("computeContainerPermissionChanges", () => {
           permissionId: undefined,
           principalId: "user-megan-bowen",
           principalUserPrincipalName: "megan.bowen@contoso.com",
-          principalName: "Megan Bowen",
+          principalDisplayName: "Megan Bowen",
           description: "megan.bowen@contoso.com",
           role: "Reader",
         }),
@@ -56,7 +56,7 @@ describe("computeContainerPermissionChanges", () => {
           id: "groups:1afaddfa-d1d9-4c2b-9a5d-e0ff98053278",
           permissionId: undefined,
           principalId: "1afaddfa-d1d9-4c2b-9a5d-e0ff98053278",
-          principalName: "Sales and Marketing Members",
+          principalDisplayName: "Sales and Marketing Members",
           principalType: "groups",
           description: "SalesandMarketing@3ctsr2.onmicrosoft.com",
           role: "Writer",

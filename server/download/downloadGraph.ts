@@ -2,13 +2,13 @@ import {
   RedirectHandlerOptions,
   ResponseType,
 } from "@microsoft/microsoft-graph-client";
+import type { Client } from "@microsoft/microsoft-graph-client";
 import type { DriveItem } from "@microsoft/microsoft-graph-types";
 import { AppError } from "../../common/appError";
 import { sendGraphRequest, toGraphAppError } from "../../common/graphError";
-import { createGraphClient } from "../auth";
 import { FlatFile, GraphDriveItemWithDownloadUrl } from "./downloadTypes";
 
-type DownloadGraphClient = ReturnType<typeof createGraphClient>;
+type DownloadGraphClient = Client;
 
 /**
  * 递归展开用户选择的项目，返回严格失败模式下的扁平文件列表。

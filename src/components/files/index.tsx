@@ -638,6 +638,9 @@ export const Files = ({
         driveId={container.id}
         itemId={currentItemPermissionItem?.id ?? undefined}
         itemName={currentItemPermissionItem?.name ?? undefined}
+        isFolder={currentItemPermissionItem?.isFolder ?? undefined}
+        mimeType={currentItemPermissionItem?.file?.mimeType ?? undefined}
+        fileName={currentItemPermissionItem?.name ?? undefined}
         onClose={handleCloseItemPermissionDialog}
         onManageContainerPermission={onOpenContainerPermissions}
       />

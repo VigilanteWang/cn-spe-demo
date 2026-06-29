@@ -2,12 +2,12 @@ import type { IContainerPermissionEntryForUI } from "../../../../common/contract
 import type { PermissionEntriesByTab } from "./permissionSharedModels";
 
 export type {
-  ContainerPermissionRoleForUI as ContainerPermissionRole,
-  IContainerPermissionEntryForUI as IContainerPermissionEntry,
+  ContainerPermissionRoleForUI as ContainerUserPermissionRole,
+  IContainerPermissionEntryForUI as IContainerUserPermissionEntry,
 } from "../../../../common/contracts/containerPermissionCommonContracts";
 
 /**
- * 容器权限在前端按页签分组后的列表形状。
+ * 容器权限在前端按 tab 分组后的列表形状。
  */
-export type IContainerPermissionEntriesByTab =
+export type IContainerUserPermissionEntriesByTab =
   PermissionEntriesByTab<IContainerPermissionEntryForUI>;

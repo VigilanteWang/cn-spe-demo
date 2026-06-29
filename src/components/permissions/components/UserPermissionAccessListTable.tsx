@@ -23,7 +23,7 @@ import { usePermissionsStyles } from "./permissionsStyles";
  * 在共享基础权限字段之上补充 `role`，让 container / item
  * 两类权限弹窗都能复用同一套表格渲染逻辑。
  */
-export type PermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
+export type UserPermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
   role: string;
 };
 
@@ -32,8 +32,8 @@ export type PermissionAccessListEntryWithRole = IPermissionEntryBaseForUI & {
  *
  * @typeParam TEntry 单条权限记录的具体类型。
  */
-export interface IPermissionAccessListTableProps<
-  TEntry extends PermissionAccessListEntryWithRole,
+export interface IUserPermissionAccessListTableProps<
+  TEntry extends UserPermissionAccessListEntryWithRole,
 > {
   /** 当前激活的 tab，用来生成表格的可访问名称。 */
   selectedTab: PermissionTabValue;
@@ -68,8 +68,8 @@ export interface IPermissionAccessListTableProps<
  * @typeParam TEntry 单条权限记录的具体类型。
  * @returns 渲染后的权限列表表格。
  */
-export const PermissionAccessListTable = <
-  TEntry extends PermissionAccessListEntryWithRole,
+export const UserPermissionAccessListTable = <
+  TEntry extends UserPermissionAccessListEntryWithRole,
 >({
   selectedTab,
   entries,
@@ -81,7 +81,7 @@ export const PermissionAccessListTable = <
   onRemove,
   isRoleDisabled,
   isRemoveDisabled,
-}: IPermissionAccessListTableProps<TEntry>) => {
+}: IUserPermissionAccessListTableProps<TEntry>) => {
   const styles = usePermissionsStyles();
 
   // 把 loading、空列表、正常行三种状态统一折叠成同一个 TableBody 内容，避免 return 分支过多。
@@ -100,7 +100,7 @@ export const PermissionAccessListTable = <
         <TableCell className={styles.principalColumn}>
           <div className={styles.principalCellContent}>
             <div className={styles.principalCellText}>
-              <Text weight="semibold">{entry.principalName}</Text>
+              <Text weight="semibold">{entry.principalDisplayName}</Text>
               {entry.description ? (
                 <Text size={200} className={styles.principalSecondaryText}>
                   {entry.description}
@@ -138,7 +138,7 @@ export const PermissionAccessListTable = <
           {/* Fluent UI 的 Select 事件值来自原生 select，这里在边界处收敛成业务角色类型。 */}
           <Select
             className={styles.roleSelect}
-            aria-label={`${entry.principalName} role`}
+            aria-label={`${entry.principalDisplayName} role`}
             disabled={isInteractionDisabled || isRoleDisabled(entry)}
             value={entry.role}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
@@ -158,7 +158,7 @@ export const PermissionAccessListTable = <
             appearance="subtle"
             disabled={isInteractionDisabled || isRemoveDisabled(entry)}
             icon={<DeleteRegular />}
-            aria-label={`Remove ${entry.principalName}`}
+            aria-label={`Remove ${entry.principalDisplayName}`}
             onClick={() => onRemove(entry)}
           />
         </TableCell>

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { IItemPermissionEntry } from "../models/itemPermissionModels";
+import type { IItemUserPermissionEntry } from "../models/itemUserPermissionModels";
 import {
   computeItemPermissionChanges,
   buildItemPermissionValidationError,
-} from "./itemPermissionDiff";
+} from "./itemUserPermissionDiff";
 
 /**
  * 构造一条默认可编辑的 item 权限行，便于测试时只覆盖当前场景关心的字段。
@@ -12,15 +12,15 @@ import {
  * @returns 带稳定默认值的测试权限行。
  */
 const createPermissionEntry = (
-  overrides: Partial<IItemPermissionEntry>,
-): IItemPermissionEntry => ({
+  overrides: Partial<IItemUserPermissionEntry>,
+): IItemUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
   principalObjectId: "user-adele-vance",
   principalUserPrincipalName: "adele.vance@contoso.com",
   principalMail: "adele.vance@contoso.com",
-  principalName: "Adele Vance",
+  principalDisplayName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
   isInherited: false,
@@ -62,7 +62,7 @@ describe("computeItemPermissionChanges", () => {
           permissionId: "perm-group-existing",
           principalId: "group-project-owners",
           principalObjectId: "group-project-owners",
-          principalName: "Project Owners",
+          principalDisplayName: "Project Owners",
           principalType: "groups",
           description: "project.owners@contoso.com",
           role: "Reader",
@@ -80,7 +80,7 @@ describe("computeItemPermissionChanges", () => {
           principalObjectId: "user-megan-bowen",
           principalUserPrincipalName: "megan.bowen@contoso.com",
           principalMail: "megan.bowen@contoso.com",
-          principalName: "Megan Bowen",
+          principalDisplayName: "Megan Bowen",
           description: "megan.bowen@contoso.com",
           role: "Reader",
         }),
@@ -91,7 +91,7 @@ describe("computeItemPermissionChanges", () => {
           permissionId: undefined,
           principalId: "group-sales",
           principalObjectId: "group-sales",
-          principalName: "Sales and Marketing Members",
+          principalDisplayName: "Sales and Marketing Members",
           principalType: "groups",
           principalMail: "SalesandMarketing@3ctsr2.onmicrosoft.com",
           description: "SalesandMarketing@3ctsr2.onmicrosoft.com",

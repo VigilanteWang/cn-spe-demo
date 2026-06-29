@@ -24,6 +24,12 @@ export interface IItemPermissionDialogProps {
   itemId?: string;
   /** 当前正在管理的 item 显示名。 */
   itemName?: string;
+  /** 当前 item 是否为文件夹。 */
+  isFolder?: boolean;
+  /** 当前 item 的 MIME 类型。 */
+  mimeType?: string;
+  /** 当前 item 的原始文件名。 */
+  fileName?: string;
   /** 请求关闭弹窗时由页面层执行的回调。 */
   onClose: () => void;
   /** 从 item 权限切换到容器权限时触发的回调。 */

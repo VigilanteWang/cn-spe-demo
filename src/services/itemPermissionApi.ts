@@ -1,10 +1,14 @@
 import { sendAuthorizedRequest } from "./apiClient";
 import type {
-  IItemPermissionChangeSetFromUI,
-  IItemPermissionsResponseFromApi,
+  IApplyItemLinkPermissionChangesRequest,
+  IApplyItemLinkPermissionChangesResponse,
+  IItemLinkPermissionEntryForUI,
+  IItemLinkPermissionsResponseFromApi,
+  IItemUserPermissionChangeSetFromUI,
+  IItemUserPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
 import { mapApiErrorResponseToAppError } from "../common/apiErrorMapper";
-import type { IItemPermissionEntriesLoadResult } from "../components/permissions/models/itemPermissionModels";
+import type { IItemUserPermissionEntriesLoadResult } from "../components/permissions/models/itemUserPermissionModels";
 import { mapPermissionEntriesToTabs } from "./permissionApiShared";
 
 /**
@@ -18,10 +22,10 @@ import { mapPermissionEntriesToTabs } from "./permissionApiShared";
  * @returns 供权限对话框直接消费的分组选项结果。
  * @throws 当后端返回非成功状态时抛出 `AppError`。
  */
-export const listItemPermissions = async (
+export const listItemUserPermissions = async (
   driveId: string,
   itemId: string,
-): Promise<IItemPermissionEntriesLoadResult> => {
+): Promise<IItemUserPermissionEntriesLoadResult> => {
   const response = await sendAuthorizedRequest(
     // 路径参数先做 URL 编码，避免 driveId 或 itemId 中的特殊字符破坏路由。
     `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}`,
@@ -37,8 +41,9 @@ export const listItemPermissions = async (
     });
   }
 
-  // 响应体先还原成共享合同，再按权限页签需要的结构重新分组。
-  const payload = (await response.json()) as IItemPermissionsResponseFromApi;
+  // 响应体先还原成共享合同，再按权限 tab 需要的结构重新分组。
+  const payload =
+    (await response.json()) as IItemUserPermissionsResponseFromApi;
   return {
     entriesByTab: mapPermissionEntriesToTabs(payload.entries),
   };
@@ -56,11 +61,11 @@ export const listItemPermissions = async (
  * @returns 服务端应用变更后返回的最新权限分组结果。
  * @throws 当 apply 请求失败时抛出 `AppError`。
  */
-export const applyItemPermissionChanges = async (
+export const applyItemUserPermissionChanges = async (
   driveId: string,
   itemId: string,
-  changes: IItemPermissionChangeSetFromUI,
-): Promise<IItemPermissionEntriesLoadResult> => {
+  changes: IItemUserPermissionChangeSetFromUI,
+): Promise<IItemUserPermissionEntriesLoadResult> => {
   const response = await sendAuthorizedRequest(
     // `/apply` 端点表示由后端统一执行新增、更新、删除三类写回。
     `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}/apply`,
@@ -83,8 +88,81 @@ export const applyItemPermissionChanges = async (
   }
 
   // 成功后以后端确认结果为准，避免前端继续依赖旧草稿状态。
-  const payload = (await response.json()) as IItemPermissionsResponseFromApi;
+  const payload =
+    (await response.json()) as IItemUserPermissionsResponseFromApi;
   return {
     entriesByTab: mapPermissionEntriesToTabs(payload.entries),
   };
+};
+
+/**
+ * 读取指定 item 的 link permission 列表。
+ *
+ * 这个函数只负责前端请求编排和响应还原，
+ * 不在这里混入 links 草稿、排序或 UI 派生逻辑。
+ *
+ * @param driveId 当前 item 所属 drive 的标识。
+ * @param itemId 当前 item 的标识。
+ * @returns 后端确认后的 link permission 原始列表。
+ * @throws 当后端返回非成功状态时抛出 `AppError`。
+ */
+export const listItemLinkPermissions = async (
+  driveId: string,
+  itemId: string,
+): Promise<IItemLinkPermissionEntryForUI[]> => {
+  const response = await sendAuthorizedRequest(
+    `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}/links`,
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Item link permission request",
+    });
+  }
+
+  const payload =
+    (await response.json()) as IItemLinkPermissionsResponseFromApi;
+  return payload.entries;
+};
+
+/**
+ * 把 item link permission 草稿差异提交给后端，并返回最新的 link 快照。
+ *
+ * `delete/create/grant/revoke` 的真实执行顺序由后端收口，
+ * 这里仅负责按合同提交前端已经整理好的业务语义变更。
+ *
+ * @param driveId 当前 item 所属 drive 的标识。
+ * @param itemId 当前 item 的标识。
+ * @param changes links 面板整理后的变更集合。
+ * @returns 服务端应用变更后的最新 link permission 列表。
+ * @throws 当 apply 请求失败时抛出 `AppError`。
+ */
+export const applyItemLinkPermissionChanges = async (
+  driveId: string,
+  itemId: string,
+  changes: IApplyItemLinkPermissionChangesRequest,
+): Promise<IItemLinkPermissionEntryForUI[]> => {
+  const response = await sendAuthorizedRequest(
+    `/api/itemPermissions/${encodeURIComponent(driveId)}/${encodeURIComponent(itemId)}/links/apply`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(changes),
+    },
+  );
+
+  if (!response.ok) {
+    throw await mapApiErrorResponseToAppError(response, {
+      operationLabel: "Item link permission apply request",
+    });
+  }
+
+  const payload =
+    (await response.json()) as IApplyItemLinkPermissionChangesResponse;
+  return payload.entries;
 };

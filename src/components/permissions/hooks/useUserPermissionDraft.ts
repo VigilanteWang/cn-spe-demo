@@ -47,7 +47,7 @@ const areEntriesByTabEqual = <TEntry extends IPermissionEntryBaseForUI>(
  *
  * - initial 依靠父组件的 re-render 来更新，apply 后会没来得及更新至最新值，用户也会看到还有未保存更改
  */
-export const usePermissionDraft = <
+export const useUserPermissionDraft = <
   TEntry extends IPermissionEntryBaseForUI & { role: string },
 >(
   initialEntriesByTab: PermissionEntriesByTab<TEntry>,
@@ -70,7 +70,7 @@ export const usePermissionDraft = <
   }, [resetKey]);
 
   /**
-   * 向指定页签追加一条新的草稿权限记录。
+   * 向指定 tab 追加一条新的草稿权限记录。
    * 这里要返回新数组而不是直接修改原数组，这样才能符合 React state 的“不可变”更新要求。
    */
   const addEntry = (tab: PermissionTabValue, entry: TEntry) => {
@@ -98,7 +98,7 @@ export const usePermissionDraft = <
   };
 
   /**
-   * 从指定页签的草稿列表中删除一条权限项。
+   * 从指定 tab 的草稿列表中删除一条权限项。
    * 这里用 filter 生成一个新的数组，只需要留下的 entry，而不是直接在原数组上删除。
    */
   const removeEntry = (tab: PermissionTabValue, entryId: string) => {

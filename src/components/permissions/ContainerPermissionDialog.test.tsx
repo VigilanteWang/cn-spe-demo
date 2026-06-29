@@ -4,7 +4,7 @@ import { Providers, ProviderState } from "@microsoft/mgt-element";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../../../common/appError";
 import { ContainerPermissionDialog } from "./ContainerPermissionDialog";
-import type { IContainerPermissionEntry } from "./models/containerPermissionModels";
+import type { IContainerUserPermissionEntry } from "./models/containerUserPermissionModels";
 import {
   applyContainerPermissionChanges,
   listContainerPermissions,
@@ -106,14 +106,14 @@ const createSearchResult = (
  * 构造一个 access list 行模型。
  */
 const createPermissionEntry = (
-  overrides: Partial<IContainerPermissionEntry>,
-): IContainerPermissionEntry => ({
+  overrides: Partial<IContainerUserPermissionEntry>,
+): IContainerUserPermissionEntry => ({
   id: "people:user-adele-vance",
   permissionId: "perm-adele",
   principalId: "user-adele-vance",
   principalObjectId: "user-adele-vance",
   principalMail: "adele.vance@contoso.com",
-  principalName: "Adele Vance",
+  principalDisplayName: "Adele Vance",
   principalType: "people",
   description: "adele.vance@contoso.com",
   isInherited: false,
@@ -168,7 +168,7 @@ describe("ContainerPermissionDialog", () => {
           id: "groups:group-project-owners",
           permissionId: "perm-group",
           principalId: "group-project-owners",
-          principalName: "Project Owners",
+          principalDisplayName: "Project Owners",
           principalType: "groups",
           description: "project.owners@contoso.com",
           role: "Manager",
@@ -249,7 +249,7 @@ describe("ContainerPermissionDialog", () => {
           permissionId: "perm-megan",
           principalId: "04fece17-914a-4418-b835-65507ab09c84",
           principalUserPrincipalName: "megan.bowen@contoso.com",
-          principalName: "Megan Bowen",
+          principalDisplayName: "Megan Bowen",
           description: "megan.bowen@contoso.com",
           role: "Reader",
         }),
@@ -311,8 +311,8 @@ describe("ContainerPermissionDialog", () => {
 
   it("should show saving feedback while apply request is still pending", async () => {
     const deferred = createDeferred<{
-      people: IContainerPermissionEntry[];
-      groups: IContainerPermissionEntry[];
+      people: IContainerUserPermissionEntry[];
+      groups: IContainerUserPermissionEntry[];
     }>();
 
     listContainerPermissionsMock.mockResolvedValue({

@@ -9,6 +9,43 @@ import type { IErrorResponseBody } from "./errorContracts";
 export type PermissionTabValue = "people" | "groups";
 
 /**
+ * 三类 permission 共享的最小 identity 模型。
+ *
+ * 它描述的是从 Graph 的 `grantedToV2` / `grantedToIdentitiesV2`
+ * 中提炼出来、可被前后端共同理解的一组稳定字段。
+ */
+export interface IGraphPermissionIdentity {
+  /**
+   * 当前 identity 属于 people 还是 groups。
+   */
+  principalType: PermissionTabValue;
+  /**
+   * Graph 原始对象上的稳定 object id。
+   *
+   * people 分支在某些读取结果里可能缺失，因此这里保持可选。
+   */
+  graphId?: string;
+  /**
+   * 界面展示用的主标题文本。
+   */
+  displayName: string;
+  /**
+   * 界面展示用的副文本，通常取 email、UPN 或其他更适合辅助识别的字段。
+   */
+  description: string;
+  /**
+   * 用户或组的 mail 信息。
+   */
+  mail?: string;
+  /**
+   * 用户的 userPrincipalName。
+   *
+   * people 分支在后续写回 Graph 时还可能需要它，因此显式保留。
+   */
+  userPrincipalName?: string;
+}
+
+/**
  * Access List 权限记录共享的基础字段。
  *
  * container / item 都会复用这些字段；
@@ -51,7 +88,7 @@ export interface IPermissionEntryBaseForUI {
   /**
    * 界面上显示的主标题，例如用户名或组名。
    */
-  principalName: string;
+  principalDisplayName: string;
   /**
    * 当前记录属于 people 还是 groups tab。
    */

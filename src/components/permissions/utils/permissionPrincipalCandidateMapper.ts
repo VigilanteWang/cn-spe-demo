@@ -1,8 +1,8 @@
 import type {
-  IPermissionPrincipalCandidate,
+  IPermissionPrincipalSearchCandidate,
   PermissionTabValue,
 } from "../models/permissionSharedModels";
-import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/directoryPrincipalSearch";
+import { IDirectoryPrincipalSearchResult } from "../services/directoryPrincipalSearch/directoryPrincipalSearch";
 
 /**
  * 把目录搜索结果映射成权限弹窗可直接消费的候选项模型。
@@ -13,7 +13,7 @@ import { IDirectoryPrincipalSearchResult } from "./directoryPrincipalSearch/dire
 export const mapDirectorySearchResultToCandidate = (
   result: IDirectoryPrincipalSearchResult,
   tab: PermissionTabValue,
-): IPermissionPrincipalCandidate => ({
+): IPermissionPrincipalSearchCandidate => ({
   id: result.id,
   objectId: result.id,
   name: result.displayName,
@@ -27,7 +27,7 @@ export const mapDirectorySearchResultToCandidate = (
 /**
  * 从显示名称中提取最多两个首字母，供 Avatar 使用。
  */
-const getInitials = (name: string): string => {
+export const getInitials = (name: string): string => {
   const segments = name
     .trim()
     .split(/\s+/)
