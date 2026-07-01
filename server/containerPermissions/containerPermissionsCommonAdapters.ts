@@ -11,19 +11,20 @@
 import type {
   IContainerPermissionEntryForUI,
   IContainerPermissionCreateChange,
-  PermissionTabValue,
 } from "../../common/contracts/containerPermissionCommonContracts";
 import {
   mapGraphContainerPermissionRoleToUi,
   mapUiContainerPermissionRoleToGraph,
 } from "./containerPermissionRoleMapper";
-
 import {
   readGraphToRecord,
   readRequiredString,
   readStringArray,
-} from "./containerPermissionsReaders";
-import { resolveGrantedToV2 } from "../permissionsCore/permissionIdentityAdapters";
+} from "../common/graphReaders";
+import {
+  createFallbackPrincipalId,
+  resolveGrantedToV2,
+} from "../permissionsCore/permissionIdentityAdapters";
 
 /**
  * 把单条 Graph permission 对象映射成前后端共用的契约模型 IContainerPermissionEntryForUI
@@ -71,16 +72,6 @@ export const mapGraphPermissionToEntryOnUI = (
     // 这里把 Graph 小写角色翻译成 UI / 共同契约里使用的大写角色。
     role: mapGraphContainerPermissionRoleToUi(primaryRole),
   };
-};
-
-/**
- * people 没有返回 object id 时，生成仅供前端本地识别的回退 id。
- */
-export const createFallbackPrincipalId = (
-  principalType: PermissionTabValue,
-  permissionId: string,
-): string => {
-  return `${principalType}:permission:${permissionId}`;
 };
 
 /**

@@ -17,9 +17,11 @@ import {
 import { mapUiItemPermissionRoleToGraph } from "./itemPermissionRoleMapper";
 import { parseItemPermissionChangeSet } from "./itemPermissionsRequestParser";
 import {
+  readDriveId,
   readGraphToRecord,
+  readItemId,
   readOptionalString,
-} from "../permissionsCore/permissionGraphReaders";
+} from "../common/graphReaders";
 import { createValidationError } from "../common/appErrorHelpers";
 
 /**
@@ -246,30 +248,6 @@ export const applyItemPermissionChangeSet = async (
       500,
     );
   }
-};
-
-/**
- * 从请求路由参数中读取 driveId。
- *
- * @param req Restify 请求对象。
- * @returns driveId；如果不存在或类型不合法则返回 `undefined`。
- */
-const readDriveId = (req: Request): string | undefined => {
-  /** 先把 params 正规化成 record，避免直接读取 unknown 结构。 */
-  const paramsRecord = readGraphToRecord(req.params);
-  return readOptionalString(paramsRecord.driveId);
-};
-
-/**
- * 从请求路由参数中读取 itemId。
- *
- * @param req Restify 请求对象。
- * @returns itemId；如果不存在或类型不合法则返回 `undefined`。
- */
-const readItemId = (req: Request): string | undefined => {
-  /** 先把 params 正规化成 record，避免直接读取 unknown 结构。 */
-  const paramsRecord = readGraphToRecord(req.params);
-  return readOptionalString(paramsRecord.itemId);
 };
 
 /**

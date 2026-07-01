@@ -13,7 +13,7 @@ import { sendGraphRequest } from "../../../common/graphError";
 import {
   readGraphToRecord,
   readOptionalString,
-} from "../../permissionsCore/permissionGraphReaders";
+} from "../../common/graphReaders";
 import {
   mapGraphItemLinkPermissions,
   mapItemLinkPermissionTypeToGrantRole,

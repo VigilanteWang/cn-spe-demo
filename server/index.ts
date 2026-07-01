@@ -39,6 +39,14 @@ import {
   listItemLinkPermissionsFromGraph,
   listItemPermissionsFromGraph,
 } from "./itemPermissions";
+import {
+  deleteItemHistoryVersionsFromGraph,
+  deleteItemVersionFromGraph,
+  getItemVersionDownloadFromGraph,
+  getItemVersionFromGraph,
+  listItemVersionsFromGraph,
+  restoreItemVersionFromGraph,
+} from "./itemVersions";
 import { deleteItems } from "./deleteItems";
 import {
   getDownloadManifestRequest,
@@ -230,6 +238,72 @@ server.get(
 server.post(
   "/api/itemPermissions/:driveId/:itemId/links/apply",
   withErrorHandling(applyItemLinkPermissionsToGraph),
+);
+
+/**
+ * GET /api/itemVersions/:driveId/:itemId
+ *
+ * 这个接口读取指定文件的版本历史列表，
+ * 由服务端统一走 OBO 调 Graph，并把返回字段收敛成 Versions Dialog 所需的最小模型。
+ */
+server.get(
+  "/api/itemVersions/:driveId/:itemId",
+  withErrorHandling(listItemVersionsFromGraph),
+);
+
+/**
+ * DELETE /api/itemVersions/:driveId/:itemId/history
+ *
+ * 这个接口批量删除历史版本，但会显式跳过当前最新版本。
+ * 之所以把“跳过第一项”的规则放在后端，是为了让前端只表达业务动作，而不是自己编排删除序列。
+ */
+server.del(
+  "/api/itemVersions/:driveId/:itemId/history",
+  withErrorHandling(deleteItemHistoryVersionsFromGraph),
+);
+
+/**
+ * GET /api/itemVersions/:driveId/:itemId/:versionId/download
+ *
+ * 这个接口返回指定版本的下载直链；
+ * 后端不会代理文件流，而是继续沿用当前项目已有的“后端解析 URL，前端触发下载”边界。
+ */
+server.get(
+  "/api/itemVersions/:driveId/:itemId/:versionId/download",
+  withErrorHandling(getItemVersionDownloadFromGraph),
+);
+
+/**
+ * POST /api/itemVersions/:driveId/:itemId/:versionId/restore
+ *
+ * 这个接口把指定历史版本恢复为当前版本。
+ * Graph 成功时返回 204，这里保持同样的响应语义，不额外包一层响应体。
+ */
+server.post(
+  "/api/itemVersions/:driveId/:itemId/:versionId/restore",
+  withErrorHandling(restoreItemVersionFromGraph),
+);
+
+/**
+ * GET /api/itemVersions/:driveId/:itemId/:versionId
+ *
+ * 这个接口读取单条版本元数据。
+ * 当前前端 Phase 2 可以先不单独消费，但后端能力先完整提供出来。
+ */
+server.get(
+  "/api/itemVersions/:driveId/:itemId/:versionId",
+  withErrorHandling(getItemVersionFromGraph),
+);
+
+/**
+ * DELETE /api/itemVersions/:driveId/:itemId/:versionId
+ *
+ * 这个接口删除单条历史版本。
+ * 写操作成功后统一返回 204，避免前端依赖无意义的空对象响应体。
+ */
+server.del(
+  "/api/itemVersions/:driveId/:itemId/:versionId",
+  withErrorHandling(deleteItemVersionFromGraph),
 );
 
 // ── 批量删除项目 ────────────────────────────────────────────────────────────

@@ -1,8 +1,5 @@
 import type { IGraphPermissionIdentity } from "../../common/contracts/permissionCommonContracts";
-import {
-  readGraphToRecord,
-  readOptionalString,
-} from "./permissionGraphReaders";
+import { readGraphToRecord, readOptionalString } from "../common/graphReaders";
 
 /**
  * 从单个 Graph identity 对象里提取权限模块真正关心的稳定字段。
@@ -123,3 +120,13 @@ export const resolveGrantedToIdentitiesV2 = (
     return [];
   });
 };
+
+/**
+ * 当 Graph identity 没有稳定 object id 时，生成仅供前端本地识别的回退主体 id。
+ *
+ * 这个 id 只用于前端列表渲染、diff 和本地状态关联，不参与后续 Graph 写回。
+ */
+export const createFallbackPrincipalId = (
+  principalType: "people" | "groups",
+  permissionId: string,
+): string => `${principalType}:permission:${permissionId}`;

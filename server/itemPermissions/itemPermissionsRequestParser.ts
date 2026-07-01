@@ -10,7 +10,7 @@ import {
   readGraphToRecord,
   readOptionalString,
   readRequiredString,
-} from "../permissionsCore/permissionGraphReaders";
+} from "../common/graphReaders";
 import { createValidationError } from "../common/appErrorHelpers";
 
 /**

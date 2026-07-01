@@ -14,7 +14,7 @@ import { resolveGrantedToIdentitiesV2 } from "../../permissionsCore/permissionId
 import {
   readGraphToRecord,
   readOptionalString,
-} from "../../permissionsCore/permissionGraphReaders";
+} from "../../common/graphReaders";
 import { buildGraphInviteRecipient } from "../itemPermissionsGraphAdapters";
 
 /**

@@ -20,7 +20,7 @@ import type {
 import {
   readGraphToRecord,
   readRequiredString,
-} from "./containerPermissionsReaders";
+} from "../common/graphReaders";
 import { createValidationError } from "../common/appErrorHelpers";
 
 /**

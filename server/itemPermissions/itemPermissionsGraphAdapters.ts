@@ -3,12 +3,15 @@ import type {
   IItemUserPermissionEntryForUI,
   IItemUserPermissionsResponseFromApi,
 } from "../../common/contracts/itemPermissionCommonContracts";
-import { resolveGrantedToV2 } from "../permissionsCore/permissionIdentityAdapters";
+import {
+  createFallbackPrincipalId,
+  resolveGrantedToV2,
+} from "../permissionsCore/permissionIdentityAdapters";
 import {
   readGraphToRecord,
   readRequiredString,
   readStringArray,
-} from "../permissionsCore/permissionGraphReaders";
+} from "../common/graphReaders";
 import {
   mapGraphItemPermissionRoleToUi,
   mapUiItemPermissionRoleToGraph,
@@ -214,17 +217,3 @@ export const buildGraphInviteRecipient = (
     "Item invite recipient is missing all supported identifiers.",
   );
 };
-
-/**
- * 在 `people` 没有返回 object id 时，生成仅供前端本地识别的回退 id。
- *
- * 这个回退 id 不参与 Graph 写回，只用于让前端列表里每条权限都有稳定主体标识。
- *
- * @param principalType 当前主体类型。
- * @param permissionId 当前权限 id。
- * @returns 仅供前端本地识别的主体 id。
- */
-export const createFallbackPrincipalId = (
-  principalType: "people" | "groups",
-  permissionId: string,
-): string => `${principalType}:permission:${permissionId}`;
