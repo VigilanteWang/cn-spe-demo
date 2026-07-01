@@ -3,6 +3,7 @@ import type { Client } from "@microsoft/microsoft-graph-client";
 import {
   deleteItemHistoryVersions,
   deleteItemVersion,
+  getCurrentItemVersion,
   getItemVersion,
   getItemVersionDownload,
   listItemVersions,
@@ -10,7 +11,7 @@ import {
 } from "./itemVersionService";
 
 describe("itemVersionService", () => {
-  it("should keep Graph order and mark only the first version as current", async () => {
+  it("should keep Graph order when mapping version list", async () => {
     const operations: RecordedOperation[] = [];
     const graphClient = createMockGraphClient(
       {
@@ -55,14 +56,12 @@ describe("itemVersionService", () => {
           lastModifiedDateTime: "2026-07-01T07:00:00Z",
           lastModifiedByDisplayName: "Adele Vance",
           size: 300,
-          isCurrent: true,
         },
         {
           id: "2.0",
           lastModifiedDateTime: "2026-06-30T07:00:00Z",
           lastModifiedByDisplayName: "Megan Bowen",
           size: 200,
-          isCurrent: false,
         },
       ],
     });
@@ -75,7 +74,7 @@ describe("itemVersionService", () => {
     ]);
   });
 
-  it("should compare against the first listed version when building single-version response", async () => {
+  it("should read single-version metadata from the version endpoint", async () => {
     const operations: RecordedOperation[] = [];
     const graphClient = createMockGraphClient(
       {
@@ -88,9 +87,6 @@ describe("itemVersionService", () => {
             },
           },
           size: 200,
-        },
-        "/drives/drive-1/items/item-1/versions": {
-          value: [{ id: "3.0" }, { id: "2.0" }],
         },
       },
       operations,
@@ -109,7 +105,6 @@ describe("itemVersionService", () => {
         lastModifiedDateTime: "2026-06-30T07:00:00Z",
         lastModifiedByDisplayName: "Contoso Sync",
         size: 200,
-        isCurrent: false,
       },
     });
     expect(operations).toEqual([
@@ -118,8 +113,44 @@ describe("itemVersionService", () => {
         method: "get",
         version: "v1.0",
       },
+    ]);
+  });
+
+  it("should read current-version metadata from the current endpoint", async () => {
+    const operations: RecordedOperation[] = [];
+    const graphClient = createMockGraphClient(
       {
-        path: "/drives/drive-1/items/item-1/versions",
+        "/drives/drive-1/items/item-1/versions/current": {
+          id: "3.0",
+          lastModifiedDateTime: "2026-07-01T07:00:00Z",
+          lastModifiedBy: {
+            user: {
+              displayName: "Adele Vance",
+            },
+          },
+          size: 300,
+        },
+      },
+      operations,
+    );
+
+    const response = await getCurrentItemVersion(
+      graphClient as unknown as Client,
+      "drive-1",
+      "item-1",
+    );
+
+    expect(response).toEqual({
+      entry: {
+        id: "3.0",
+        lastModifiedDateTime: "2026-07-01T07:00:00Z",
+        lastModifiedByDisplayName: "Adele Vance",
+        size: 300,
+      },
+    });
+    expect(operations).toEqual([
+      {
+        path: "/drives/drive-1/items/item-1/versions/current",
         method: "get",
         version: "v1.0",
       },

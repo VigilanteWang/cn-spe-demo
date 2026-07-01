@@ -42,6 +42,7 @@ import {
 import {
   deleteItemHistoryVersionsFromGraph,
   deleteItemVersionFromGraph,
+  getCurrentItemVersionFromGraph,
   getItemVersionDownloadFromGraph,
   getItemVersionFromGraph,
   listItemVersionsFromGraph,
@@ -249,6 +250,17 @@ server.post(
 server.get(
   "/api/itemVersions/:driveId/:itemId",
   withErrorHandling(listItemVersionsFromGraph),
+);
+
+/**
+ * GET /api/itemVersions/:driveId/:itemId/current
+ *
+ * 这个接口直接读取 Graph `versions/current`，
+ * 用来返回文件当前版本的单条元数据。
+ */
+server.get(
+  "/api/itemVersions/:driveId/:itemId/current",
+  withErrorHandling(getCurrentItemVersionFromGraph),
 );
 
 /**

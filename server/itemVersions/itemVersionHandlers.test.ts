@@ -7,6 +7,7 @@ import {
   requireContainerManageRequest,
 } from "../auth";
 import {
+  getCurrentItemVersionFromGraph,
   getItemVersionFromGraph,
   listItemVersionsFromGraph,
   restoreItemVersionFromGraph,
@@ -56,6 +57,31 @@ describe("itemVersionHandlers", () => {
     const res = createMockResponse();
 
     await withErrorHandling(getItemVersionFromGraph)(req, res);
+
+    expect(res.send).toHaveBeenCalledWith(
+      400,
+      expect.objectContaining({
+        error: expect.objectContaining({
+          name: "ValidationError",
+          code: "invalidRequest",
+        }),
+      }),
+    );
+  });
+
+  it("should keep current-version route-param validation errors as ValidationError", async () => {
+    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+      token: "access-token",
+    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+
+    const req = {
+      params: {
+        driveId: "drive-1",
+      },
+    } as Parameters<typeof getCurrentItemVersionFromGraph>[0];
+    const res = createMockResponse();
+
+    await withErrorHandling(getCurrentItemVersionFromGraph)(req, res);
 
     expect(res.send).toHaveBeenCalledWith(
       400,

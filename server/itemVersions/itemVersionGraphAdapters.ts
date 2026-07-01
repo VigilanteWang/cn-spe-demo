@@ -13,13 +13,9 @@ import {
  * 把 Graph 单条版本元数据映射成前端稳定模型。
  *
  * @param version Graph 返回的单条版本对象。
- * @param isCurrent 是否为当前最新版本。
  * @returns 前端可直接消费的最小版本模型。
  */
-export const mapGraphItemVersion = (
-  version: unknown,
-  isCurrent: boolean,
-): IItemVersionEntryForUI => {
+export const mapGraphItemVersion = (version: unknown): IItemVersionEntryForUI => {
   const versionRecord = readGraphToRecord(version);
 
   return {
@@ -30,15 +26,11 @@ export const mapGraphItemVersion = (
       versionRecord.lastModifiedBy,
     ),
     size: readOptionalNumberLike(versionRecord.size) ?? 0,
-    isCurrent,
   };
 };
 
 /**
  * 把 Graph 版本数组保持原顺序映射成列表响应。
- *
- * Graph 默认顺序就是从最新到最旧，
- * 这里故意不重新排序，只按第一项标记 `isCurrent`。
  *
  * @param versions Graph 返回的版本数组。
  * @returns 供前端版本列表直接消费的标准响应体。
@@ -46,23 +38,19 @@ export const mapGraphItemVersion = (
 export const mapGraphItemVersions = (
   versions: unknown[],
 ): IItemVersionListResponseFromApi => ({
-  entries: versions.map((version, index) =>
-    mapGraphItemVersion(version, index === 0),
-  ),
+  entries: versions.map((version) => mapGraphItemVersion(version)),
 });
 
 /**
  * 把单条 Graph 版本对象映射成单条详情响应。
  *
  * @param version Graph 返回的单条版本对象。
- * @param isCurrent 是否为当前最新版本。
  * @returns 单条版本响应体。
  */
 export const mapGraphItemVersionResponse = (
   version: unknown,
-  isCurrent: boolean,
 ): IItemVersionResponseFromApi => ({
-  entry: mapGraphItemVersion(version, isCurrent),
+  entry: mapGraphItemVersion(version),
 });
 
 /**

@@ -17,6 +17,7 @@ import {
   readOptionalString,
 } from "../common/graphReaders";
 import {
+  getCurrentItemVersion,
   deleteItemHistoryVersions,
   deleteItemVersion,
   getItemVersion,
@@ -72,6 +73,30 @@ export const getItemVersionFromGraph = async (req: Request, res: Response) => {
     itemId,
     versionId,
   );
+
+  res.send(200, responseBody);
+};
+
+/**
+ * 读取当前版本元数据。
+ */
+export const getCurrentItemVersionFromGraph = async (
+  req: Request,
+  res: Response,
+) => {
+  const authorizationResult = await requireContainerManageRequest(req);
+  const driveId = readDriveId(req);
+  const itemId = readItemId(req);
+
+  if (!driveId || !itemId) {
+    throw createValidationError(
+      "driveId and itemId route parameters are required.",
+    );
+  }
+
+  const graphToken = await getGraphOBOToken(authorizationResult.token);
+  const graphClient = createGraphClient(graphToken);
+  const responseBody = await getCurrentItemVersion(graphClient, driveId, itemId);
 
   res.send(200, responseBody);
 };

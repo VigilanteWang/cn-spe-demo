@@ -36,9 +36,6 @@ export const listItemVersions = async (
 /**
  * 读取单条版本元数据。
  *
- * `isCurrent` 仍然按版本列表第一项判断，
- * 这样可以和列表接口保持完全一致的判定来源。
- *
  * @param graphClient 当前请求复用的 Graph client。
  * @param driveId 目标文件所属的 drive ID。
  * @param itemId 目标文件的 item ID。
@@ -51,16 +48,43 @@ export const getItemVersion = async (
   itemId: string,
   versionId: string,
 ): Promise<IItemVersionResponseFromApi> => {
-  const [version, versions] = await Promise.all([
-    readSingleItemVersion(graphClient, driveId, itemId, versionId),
-    readItemVersions(graphClient, driveId, itemId),
-  ]);
-
-  const currentVersionId = readOptionalString(
-    readGraphToRecord(versions[0]).id,
+  const version = await readSingleItemVersion(
+    graphClient,
+    driveId,
+    itemId,
+    versionId,
   );
 
-  return mapGraphItemVersionResponse(version, currentVersionId === versionId);
+  return mapGraphItemVersionResponse(version);
+};
+
+/**
+ * 读取当前版本元数据。
+ *
+ * 这里直接调用 Graph 的 `versions/current`，
+ * 避免为了判定“当前版本”额外拉整份版本列表。
+ *
+ * @param graphClient 当前请求复用的 Graph client。
+ * @param driveId 目标文件所属的 drive ID。
+ * @param itemId 目标文件的 item ID。
+ * @returns 当前版本详情响应。
+ */
+export const getCurrentItemVersion = async (
+  graphClient: Client,
+  driveId: string,
+  itemId: string,
+): Promise<IItemVersionResponseFromApi> => {
+  const version = await sendGraphRequest(
+    () =>
+      graphClient
+        .api(getCurrentItemVersionGraphPath(driveId, itemId))
+        .version("v1.0")
+        .get(),
+    "Unable to read the current item version.",
+    500,
+  );
+
+  return mapGraphItemVersionResponse(version);
 };
 
 /**
@@ -92,12 +116,14 @@ export const getItemVersionDownload = async (
     versionRecord["@microsoft.graph.downloadUrl"],
   );
 
+  // 某些版本详情会直接带可下载地址，命中时可以立刻返回，避免额外请求 content 端点。
   if (directDownloadUrl) {
     return {
       downloadUrl: directDownloadUrl,
     };
   }
 
+  // 如果详情里没有直链，就显式关闭自动重定向，改为自己读取 302 响应头里的 Location。
   const contentResponse = await sendGraphRequest(
     () =>
       graphClient
@@ -108,7 +134,7 @@ export const getItemVersionDownload = async (
     `Unable to resolve the download url for version ${versionId}.`,
     500,
   );
-
+  // 下载地址微软文档称放在 Location 里
   const downloadUrl = contentResponse.headers.get("location");
   if (downloadUrl) {
     return {
@@ -194,9 +220,11 @@ export const deleteItemHistoryVersions = async (
 ): Promise<void> => {
   const versions = await readItemVersions(graphClient, driveId, itemId);
 
+  // 第一项是当前保留版本，只删除后续历史版本。
   for (const version of versions.slice(1)) {
     const versionId = readOptionalString(readGraphToRecord(version).id);
 
+    // 个别脏数据可能没有可用 id，这种版本无法安全删除，直接跳过。
     if (!versionId) {
       continue;
     }
@@ -228,6 +256,7 @@ const readItemVersions = async (
     500,
   );
   const responseRecord = readGraphToRecord(response);
+  // Graph 列表接口的有效数据放在 value 中；异常结构时统一降级为空数组。
   return Array.isArray(responseRecord.value) ? responseRecord.value : [];
 };
 
@@ -271,6 +300,14 @@ const getSingleItemVersionGraphPath = (
   versionId: string,
 ): string =>
   `${getItemVersionsGraphPath(driveId, itemId)}/${encodeURIComponent(versionId)}`;
+
+/**
+ * 构造当前版本的 Graph 路径。
+ */
+const getCurrentItemVersionGraphPath = (
+  driveId: string,
+  itemId: string,
+): string => `${getItemVersionsGraphPath(driveId, itemId)}/current`;
 
 /**
  * 构造版本内容下载的 Graph 路径。

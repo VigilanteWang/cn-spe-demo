@@ -5,6 +5,7 @@
 export {
   deleteItemHistoryVersionsFromGraph,
   deleteItemVersionFromGraph,
+  getCurrentItemVersionFromGraph,
   getItemVersionDownloadFromGraph,
   getItemVersionFromGraph,
   listItemVersionsFromGraph,

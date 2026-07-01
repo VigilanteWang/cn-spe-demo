@@ -8,7 +8,6 @@ export interface IItemVersionEntryForUI {
   lastModifiedDateTime: string;
   lastModifiedByDisplayName: string;
   size: number;
-  isCurrent: boolean;
 }
 
 /**
