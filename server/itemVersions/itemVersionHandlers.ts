@@ -96,7 +96,11 @@ export const getCurrentItemVersionFromGraph = async (
 
   const graphToken = await getGraphOBOToken(authorizationResult.token);
   const graphClient = createGraphClient(graphToken);
-  const responseBody = await getCurrentItemVersion(graphClient, driveId, itemId);
+  const responseBody = await getCurrentItemVersion(
+    graphClient,
+    driveId,
+    itemId,
+  );
 
   res.send(200, responseBody);
 };
