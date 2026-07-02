@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { AppError } from "../../../../common/appError";
 import type { IItemVersionEntryForUI } from "../../../../common/contracts/itemVersionContracts";
 import type { IDriveItemExtended } from "../../../common/types";
+import type { VersionDialogPendingAction } from "../filesTypes";
 import {
   deleteItemHistoryVersions,
   deleteItemVersion,
@@ -39,6 +40,8 @@ export const useFilesVersionDialog = ({
   const [versionDialogLoading, setVersionDialogLoading] = useState(false);
   const [versionDialogActionPending, setVersionDialogActionPending] =
     useState(false);
+  const [versionDialogPendingAction, setVersionDialogPendingAction] =
+    useState<VersionDialogPendingAction | null>(null);
   const [versionDialogError, setVersionDialogError] = useState<AppError | null>(
     null,
   );
@@ -105,6 +108,7 @@ export const useFilesVersionDialog = ({
       action: () => Promise<void>,
       fallbackMessage: string,
       code: string,
+      actionType: VersionDialogPendingAction,
     ) => {
       // 弹窗没有绑定到具体文件时，不允许继续执行版本写操作。
       if (!currentVersionItem?.id) {
@@ -113,6 +117,7 @@ export const useFilesVersionDialog = ({
 
       // 恢复、删除单版本、删除历史版本都共用这一套 pending 与错误处理状态机。
       setVersionDialogActionPending(true);
+      setVersionDialogPendingAction(actionType);
       setVersionDialogError(null);
 
       try {
@@ -136,6 +141,7 @@ export const useFilesVersionDialog = ({
         return false;
       } finally {
         setVersionDialogActionPending(false);
+        setVersionDialogPendingAction(null);
       }
     },
     [containerId, currentVersionItem, loadVersionDialogData],
@@ -166,6 +172,7 @@ export const useFilesVersionDialog = ({
     setCurrentVersionId(null);
     setVersionDialogLoading(false);
     setVersionDialogActionPending(false);
+    setVersionDialogPendingAction(null);
     setVersionDialogError(null);
   }, []);
 
@@ -228,6 +235,7 @@ export const useFilesVersionDialog = ({
           ),
         "Failed to restore the selected version.",
         "restoreVersionFailed",
+        "restoreVersion",
       ),
     [containerId, currentVersionItem?.id, runVersionWriteAction],
   );
@@ -247,6 +255,7 @@ export const useFilesVersionDialog = ({
           ),
         "Failed to delete the selected version.",
         "deleteVersionFailed",
+        "deleteVersion",
       ),
     [containerId, currentVersionItem?.id, runVersionWriteAction],
   );
@@ -264,6 +273,7 @@ export const useFilesVersionDialog = ({
           ),
         "Failed to delete history versions.",
         "deleteHistoryVersionsFailed",
+        "deleteHistoryVersions",
       ),
     [containerId, currentVersionItem?.id, runVersionWriteAction],
   );
@@ -274,6 +284,7 @@ export const useFilesVersionDialog = ({
     currentVersionId,
     versionDialogLoading,
     versionDialogActionPending,
+    versionDialogPendingAction,
     versionDialogError,
     openVersionDialog,
     closeVersionDialog,

@@ -28,6 +28,7 @@ describe("VersionHistoryDialog", () => {
         currentVersionId="3.0"
         isLoading={false}
         isActionPending={false}
+        pendingAction={null}
         error={null}
         onClose={vi.fn()}
         onDownload={vi.fn()}
@@ -54,6 +55,7 @@ describe("VersionHistoryDialog", () => {
         currentVersionId={null}
         isLoading={false}
         isActionPending={false}
+        pendingAction={null}
         error={
           new AppError({
             name: "FilesVersionLoadError",
@@ -84,6 +86,7 @@ describe("VersionHistoryDialog", () => {
         currentVersionId="3.0"
         isLoading={false}
         isActionPending={false}
+        pendingAction={null}
         error={null}
         onClose={vi.fn()}
         onDownload={vi.fn()}
@@ -100,5 +103,111 @@ describe("VersionHistoryDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
 
     expect(onDeleteHistoryVersions).toHaveBeenCalledTimes(1);
+  });
+
+  it("should ask for confirmation before restoring a version", () => {
+    const onRestore = vi.fn();
+
+    render(
+      <VersionHistoryDialog
+        open
+        versions={versions}
+        currentVersionId="3.0"
+        isLoading={false}
+        isActionPending={false}
+        pendingAction={null}
+        error={null}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+        onRestore={onRestore}
+        onDelete={vi.fn()}
+        onDeleteHistoryVersions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Restore" })[1]);
+
+    expect(
+      screen.getByText(
+        "This creates a new version from the selected version and keeps all existing versions. Proceed?",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+
+    expect(onRestore).toHaveBeenCalledWith(versions[1]);
+  });
+
+  it("should ask for confirmation before deleting a version", () => {
+    const onDelete = vi.fn();
+
+    render(
+      <VersionHistoryDialog
+        open
+        versions={versions}
+        currentVersionId="3.0"
+        isLoading={false}
+        isActionPending={false}
+        pendingAction={null}
+        error={null}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+        onRestore={vi.fn()}
+        onDelete={onDelete}
+        onDeleteHistoryVersions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[1]);
+
+    expect(
+      screen.getByText("Are you sure you want to delete this version?"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+
+    expect(onDelete).toHaveBeenCalledWith(versions[1]);
+  });
+
+  it("should show loading state inside the active restore popover", () => {
+    const { rerender } = render(
+      <VersionHistoryDialog
+        open
+        versions={versions}
+        currentVersionId="3.0"
+        isLoading={false}
+        isActionPending={false}
+        pendingAction={null}
+        error={null}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+        onRestore={vi.fn()}
+        onDelete={vi.fn()}
+        onDeleteHistoryVersions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Restore" })[1]);
+
+    rerender(
+      <VersionHistoryDialog
+        open
+        versions={versions}
+        currentVersionId="3.0"
+        isLoading={false}
+        isActionPending
+        pendingAction="restoreVersion"
+        error={null}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+        onRestore={vi.fn()}
+        onDelete={vi.fn()}
+        onDeleteHistoryVersions={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Restoring")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "No" })).toBeDisabled();
   });
 });

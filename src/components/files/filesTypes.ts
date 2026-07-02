@@ -13,6 +13,14 @@ export interface IFilesProps {
 }
 
 /**
+ * Versions Dialog 当前正在执行的写动作类型。
+ */
+export type VersionDialogPendingAction =
+  | "restoreVersion"
+  | "deleteVersion"
+  | "deleteHistoryVersions";
+
+/**
  * 面包屑节点。
  */
 export interface IFilesBreadcrumbItem {

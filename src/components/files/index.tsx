@@ -229,6 +229,7 @@ export const Files = ({
     currentVersionId,
     versionDialogLoading,
     versionDialogActionPending,
+    versionDialogPendingAction,
     versionDialogError,
     openVersionDialog,
     closeVersionDialog,
@@ -592,6 +593,7 @@ export const Files = ({
         currentVersionId={currentVersionId}
         isLoading={versionDialogLoading}
         isActionPending={versionDialogActionPending}
+        pendingAction={versionDialogPendingAction}
         error={versionDialogError}
         onClose={closeVersionDialog}
         onDownload={(entry) => void downloadVersion(entry)}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   DataGrid,
@@ -12,9 +12,6 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
   Spinner,
   TableCellLayout,
   TableColumnDefinition,
@@ -29,8 +26,10 @@ import {
 } from "@fluentui/react-icons";
 import type { AppError } from "../../../../common/appError";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
+import { ActionConfirmPopover } from "../../common/ActionConfirmPopover";
 import { formatDateTimeColumnValue } from "../../../common/dateTime";
 import type { IItemVersionEntryForUI } from "../../../../common/contracts/itemVersionContracts";
+import type { VersionDialogPendingAction } from "../filesTypes";
 import { useVersionHistoryDialogStyles } from "../filesStyles";
 
 // Versions 表格的默认列宽刻意贴近内容：
@@ -70,6 +69,8 @@ interface IVersionHistoryDialogProps {
   isLoading: boolean;
   /** 写操作进行中的状态。 */
   isActionPending: boolean;
+  /** 当前正在执行的写动作类型。 */
+  pendingAction: VersionDialogPendingAction | null;
   /** 弹窗内展示的错误。 */
   error: AppError | null;
   /** 关闭弹窗。 */
@@ -99,6 +100,7 @@ export const VersionHistoryDialog = ({
   currentVersionId,
   isLoading,
   isActionPending,
+  pendingAction,
   error,
   onClose,
   onDownload,
@@ -109,13 +111,29 @@ export const VersionHistoryDialog = ({
   const styles = useVersionHistoryDialogStyles();
   const [isDeleteHistoryPopoverOpen, setIsDeleteHistoryPopoverOpen] =
     useState(false);
+  const [activeRowPopover, setActiveRowPopover] = useState<{
+    versionId: string;
+    action: Exclude<VersionDialogPendingAction, "deleteHistoryVersions">;
+  } | null>(null);
+  const wasActionPendingRef = useRef(isActionPending);
 
   useEffect(() => {
     // 弹窗关闭时顺手收起二次确认浮层，避免下次打开时沿用上一次的确认状态。
     if (!open) {
       setIsDeleteHistoryPopoverOpen(false);
+      setActiveRowPopover(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    // 写操作结束后统一收起确认浮层，让成功与失败都回到一致的起点。
+    if (wasActionPendingRef.current && !isActionPending) {
+      setIsDeleteHistoryPopoverOpen(false);
+      setActiveRowPopover(null);
+    }
+
+    wasActionPendingRef.current = isActionPending;
+  }, [isActionPending]);
 
   const columns = useMemo<TableColumnDefinition<IItemVersionEntryForUI>[]>(
     () => [
@@ -148,6 +166,12 @@ export const VersionHistoryDialog = ({
           const isCurrentVersion = entry.id === currentVersionId;
           // 读取中或写操作 pending 时统一禁用按钮，避免并发点击打乱版本状态。
           const isDisabled = isLoading || isActionPending;
+          const isRestorePopoverOpen =
+            activeRowPopover?.versionId === entry.id &&
+            activeRowPopover.action === "restoreVersion";
+          const isDeletePopoverOpen =
+            activeRowPopover?.versionId === entry.id &&
+            activeRowPopover.action === "deleteVersion";
 
           return (
             <div className={styles.actionGroup}>
@@ -161,24 +185,72 @@ export const VersionHistoryDialog = ({
                 onClick={() => onDownload(entry)}
                 disabled={isDisabled}
               />
-              <Button
-                size="small"
-                appearance="subtle"
-                className={styles.actionIconButton}
-                aria-label="Restore"
-                title="Restore"
-                icon={<ArrowCounterclockwiseRegular />}
-                onClick={() => onRestore(entry)}
+              <ActionConfirmPopover
+                trigger={
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    className={styles.actionIconButton}
+                    aria-label="Restore"
+                    title="Restore"
+                    icon={<ArrowCounterclockwiseRegular />}
+                    disabled={isDisabled || isCurrentVersion}
+                  />
+                }
+                open={isRestorePopoverOpen}
+                onOpenChange={(nextOpen) => {
+                  if (nextOpen) {
+                    setIsDeleteHistoryPopoverOpen(false);
+                    setActiveRowPopover({
+                      versionId: entry.id,
+                      action: "restoreVersion",
+                    });
+                    return;
+                  }
+
+                  if (isRestorePopoverOpen) {
+                    setActiveRowPopover(null);
+                  }
+                }}
+                message="This creates a new version from the selected version and keeps all existing versions. Proceed?"
+                loadingLabel="Restoring"
+                isPending={
+                  isActionPending && pendingAction === "restoreVersion"
+                }
+                onConfirm={() => onRestore(entry)}
                 disabled={isDisabled || isCurrentVersion}
               />
-              <Button
-                size="small"
-                appearance="subtle"
-                className={styles.actionIconButton}
-                aria-label="Delete"
-                title="Delete"
-                icon={<DeleteRegular />}
-                onClick={() => onDelete(entry)}
+              <ActionConfirmPopover
+                trigger={
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    className={styles.actionIconButton}
+                    aria-label="Delete"
+                    title="Delete"
+                    icon={<DeleteRegular />}
+                    disabled={isDisabled || isCurrentVersion}
+                  />
+                }
+                open={isDeletePopoverOpen}
+                onOpenChange={(nextOpen) => {
+                  if (nextOpen) {
+                    setIsDeleteHistoryPopoverOpen(false);
+                    setActiveRowPopover({
+                      versionId: entry.id,
+                      action: "deleteVersion",
+                    });
+                    return;
+                  }
+
+                  if (isDeletePopoverOpen) {
+                    setActiveRowPopover(null);
+                  }
+                }}
+                message="Are you sure you want to delete this version?"
+                loadingLabel="Deleting"
+                isPending={isActionPending && pendingAction === "deleteVersion"}
+                onConfirm={() => onDelete(entry)}
                 disabled={isDisabled || isCurrentVersion}
               />
             </div>
@@ -187,12 +259,14 @@ export const VersionHistoryDialog = ({
       }),
     ],
     [
+      activeRowPopover,
       currentVersionId,
       isActionPending,
       isLoading,
       onDelete,
       onDownload,
       onRestore,
+      pendingAction,
       styles.actionGroup,
       styles.actionIconButton,
     ],
@@ -226,45 +300,27 @@ export const VersionHistoryDialog = ({
               </div>
               <div className={styles.headerActions}>
                 {/* 删除全部历史版本是高风险动作，因此先经过一次轻量确认。 */}
-                <Popover
-                  open={isDeleteHistoryPopoverOpen}
-                  onOpenChange={(_event, data) => {
-                    setIsDeleteHistoryPopoverOpen(data.open);
-                  }}
-                >
-                  <PopoverTrigger disableButtonEnhancement>
+                <ActionConfirmPopover
+                  trigger={
                     <Button disabled={isLoading || isActionPending}>
                       Delete history versions
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverSurface>
-                    <div className={styles.popoverContent}>
-                      <Text>
-                        This will delete all history versions except the current
-                        version. Are you sure?
-                      </Text>
-                      <div className={styles.popoverActions}>
-                        <Button
-                          appearance="secondary"
-                          onClick={() => setIsDeleteHistoryPopoverOpen(false)}
-                        >
-                          No
-                        </Button>
-                        <Button
-                          appearance="primary"
-                          disabled={isActionPending}
-                          onClick={() => {
-                            // 先关闭确认浮层，再交给外层执行删除，避免执行后浮层状态残留。
-                            setIsDeleteHistoryPopoverOpen(false);
-                            onDeleteHistoryVersions();
-                          }}
-                        >
-                          Yes
-                        </Button>
-                      </div>
-                    </div>
-                  </PopoverSurface>
-                </Popover>
+                  }
+                  open={isDeleteHistoryPopoverOpen}
+                  onOpenChange={(nextOpen) => {
+                    if (nextOpen) {
+                      setActiveRowPopover(null);
+                    }
+                    setIsDeleteHistoryPopoverOpen(nextOpen);
+                  }}
+                  message="This will delete all history versions except the current version. Are you sure?"
+                  loadingLabel="Deleting"
+                  isPending={
+                    isActionPending && pendingAction === "deleteHistoryVersions"
+                  }
+                  onConfirm={onDeleteHistoryVersions}
+                  disabled={isLoading || isActionPending}
+                />
               </div>
             </div>
 

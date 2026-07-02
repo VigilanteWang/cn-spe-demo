@@ -167,15 +167,4 @@ export const useVersionHistoryDialogStyles = makeStyles({
   emptyText: {
     color: tokens.colorNeutralForeground2,
   },
-  popoverContent: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: "12px",
-    maxWidth: "320px",
-  },
-  popoverActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "8px",
-  },
 });

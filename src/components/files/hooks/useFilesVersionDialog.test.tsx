@@ -29,6 +29,16 @@ vi.mock("../../../services/itemVersionApi", () => ({
   deleteItemHistoryVersions: deleteItemHistoryVersionsMock,
 }));
 
+const createDeferred = () => {
+  let resolve!: () => void;
+
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+
+  return { promise, resolve };
+};
+
 describe("useFilesVersionDialog", () => {
   const versionEntries = [
     {
@@ -66,7 +76,10 @@ describe("useFilesVersionDialog", () => {
     );
 
     act(() => {
-      result.current.openVersionDialog({ id: "file-1", name: "a.docx" } as never);
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
     });
 
     await waitFor(() => {
@@ -86,7 +99,10 @@ describe("useFilesVersionDialog", () => {
     );
 
     act(() => {
-      result.current.openVersionDialog({ id: "file-1", name: "a.docx" } as never);
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
     });
 
     await waitFor(() => {
@@ -108,6 +124,8 @@ describe("useFilesVersionDialog", () => {
   });
 
   it("should reload versions after restore succeeds", async () => {
+    const restoreDeferred = createDeferred();
+    restoreItemVersionMock.mockReturnValueOnce(restoreDeferred.promise);
     const { result } = renderHook(() =>
       useFilesVersionDialog({
         containerId: "container-1",
@@ -116,15 +134,30 @@ describe("useFilesVersionDialog", () => {
     );
 
     act(() => {
-      result.current.openVersionDialog({ id: "file-1", name: "a.docx" } as never);
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
     });
 
     await waitFor(() => {
       expect(result.current.currentVersionId).toBe("3.0");
     });
 
+    act(() => {
+      void result.current.restoreVersion(versionEntries[1]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBe("restoreVersion");
+    });
+
     await act(async () => {
-      await result.current.restoreVersion(versionEntries[1]);
+      restoreDeferred.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBeNull();
     });
 
     expect(restoreItemVersionMock).toHaveBeenCalledWith(
@@ -137,6 +170,8 @@ describe("useFilesVersionDialog", () => {
   });
 
   it("should reload versions after deleting a single version", async () => {
+    const deleteDeferred = createDeferred();
+    deleteItemVersionMock.mockReturnValueOnce(deleteDeferred.promise);
     const { result } = renderHook(() =>
       useFilesVersionDialog({
         containerId: "container-1",
@@ -145,15 +180,30 @@ describe("useFilesVersionDialog", () => {
     );
 
     act(() => {
-      result.current.openVersionDialog({ id: "file-1", name: "a.docx" } as never);
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
     });
 
     await waitFor(() => {
       expect(result.current.currentVersionId).toBe("3.0");
     });
 
+    act(() => {
+      void result.current.deleteVersion(versionEntries[1]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBe("deleteVersion");
+    });
+
     await act(async () => {
-      await result.current.deleteVersion(versionEntries[1]);
+      deleteDeferred.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBeNull();
     });
 
     expect(deleteItemVersionMock).toHaveBeenCalledWith(
@@ -165,6 +215,10 @@ describe("useFilesVersionDialog", () => {
   });
 
   it("should reload versions after deleting history versions", async () => {
+    const deleteHistoryDeferred = createDeferred();
+    deleteItemHistoryVersionsMock.mockReturnValueOnce(
+      deleteHistoryDeferred.promise,
+    );
     const { result } = renderHook(() =>
       useFilesVersionDialog({
         containerId: "container-1",
@@ -173,15 +227,32 @@ describe("useFilesVersionDialog", () => {
     );
 
     act(() => {
-      result.current.openVersionDialog({ id: "file-1", name: "a.docx" } as never);
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
     });
 
     await waitFor(() => {
       expect(result.current.currentVersionId).toBe("3.0");
     });
 
+    act(() => {
+      void result.current.deleteHistoryVersions();
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBe(
+        "deleteHistoryVersions",
+      );
+    });
+
     await act(async () => {
-      await result.current.deleteHistoryVersions();
+      deleteHistoryDeferred.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.versionDialogPendingAction).toBeNull();
     });
 
     expect(deleteItemHistoryVersionsMock).toHaveBeenCalledWith(
@@ -189,5 +260,34 @@ describe("useFilesVersionDialog", () => {
       "file-1",
     );
     expect(listItemVersionsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("should clear pending action after a failed restore", async () => {
+    restoreItemVersionMock.mockRejectedValueOnce(new Error("restore failed"));
+
+    const { result } = renderHook(() =>
+      useFilesVersionDialog({
+        containerId: "container-1",
+        onDirectDownload: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.openVersionDialog({
+        id: "file-1",
+        name: "a.docx",
+      } as never);
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentVersionId).toBe("3.0");
+    });
+
+    await act(async () => {
+      await result.current.restoreVersion(versionEntries[1]);
+    });
+
+    expect(result.current.versionDialogPendingAction).toBeNull();
+    expect(result.current.versionDialogError).not.toBeNull();
   });
 });
