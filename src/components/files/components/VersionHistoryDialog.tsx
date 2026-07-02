@@ -126,6 +126,7 @@ export const VersionHistoryDialog = ({
     useState(false);
 
   useEffect(() => {
+    // 弹窗关闭时顺手收起二次确认浮层，避免下次打开时沿用上一次的确认状态。
     if (!open) {
       setIsDeleteHistoryPopoverOpen(false);
     }
@@ -158,7 +159,9 @@ export const VersionHistoryDialog = ({
         columnId: "actions",
         renderHeaderCell: () => "Actions",
         renderCell: (entry) => {
+          // “当前版本”由后端单独接口确认，而不是简单地依赖列表顺序推断。
           const isCurrentVersion = entry.id === currentVersionId;
+          // 读取中或写操作 pending 时统一禁用按钮，避免并发点击打乱版本状态。
           const isDisabled = isLoading || isActionPending;
 
           return (
@@ -205,6 +208,7 @@ export const VersionHistoryDialog = ({
       open={open}
       modalType="modal"
       onOpenChange={(_event, data) => {
+        // 把 Dialog 的关闭行为统一回收到页面层，保持弹窗开关只有一个出口。
         if (!data.open) {
           onClose();
         }
@@ -214,6 +218,7 @@ export const VersionHistoryDialog = ({
         <DialogBody>
           <DialogTitle>Versions</DialogTitle>
           <DialogContent className={styles.content}>
+            {/* 顶部区域左边显示读取状态，右边放批量动作入口。 */}
             <div className={styles.headerRow}>
               <div>
                 {isLoading && (
@@ -225,6 +230,7 @@ export const VersionHistoryDialog = ({
                 )}
               </div>
               <div className={styles.headerActions}>
+                {/* 删除全部历史版本是高风险动作，因此先经过一次轻量确认。 */}
                 <Popover
                   open={isDeleteHistoryPopoverOpen}
                   onOpenChange={(_event, data) => {
@@ -240,7 +246,7 @@ export const VersionHistoryDialog = ({
                     <div className={styles.popoverContent}>
                       <Text>
                         This will delete all history versions except the current
-                        version.
+                        version. Are you sure?
                       </Text>
                       <div className={styles.popoverActions}>
                         <Button
@@ -253,6 +259,7 @@ export const VersionHistoryDialog = ({
                           appearance="primary"
                           disabled={isActionPending}
                           onClick={() => {
+                            // 先关闭确认浮层，再交给外层执行删除，避免执行后浮层状态残留。
                             setIsDeleteHistoryPopoverOpen(false);
                             onDeleteHistoryVersions();
                           }}
@@ -266,12 +273,14 @@ export const VersionHistoryDialog = ({
               </div>
             </div>
 
+            {/* 所有读取、下载、恢复、删除类错误都汇总显示在同一位置，降低用户定位成本。 */}
             {error && (
               <Text role="alert" className={styles.errorText}>
                 {formatAppErrorMessageForUI(error, "Failed to load versions.")}
               </Text>
             )}
 
+            {/* 表格只负责展示版本条目和转发动作，不自行推导数据来源。 */}
             <div className={styles.gridWrapper}>
               <DataGrid
                 items={versions}
@@ -299,6 +308,7 @@ export const VersionHistoryDialog = ({
               </DataGrid>
             </div>
 
+            {/* 非加载中且没有错误时，空列表才真正表示“当前没有可展示的版本记录”。 */}
             {!isLoading && versions.length === 0 && !error && (
               <Text className={styles.emptyText}>No versions found.</Text>
             )}

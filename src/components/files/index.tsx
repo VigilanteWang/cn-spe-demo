@@ -9,90 +9,75 @@ import {
   DialogTitle,
   DialogTrigger,
   Input,
-  InputOnChangeData,
-  InputProps,
   Label,
   Spinner,
   Text,
   tokens,
 } from "@fluentui/react-components";
 import Preview from "../preview";
-import { IDriveItemExtended } from "../../common/types";
-import { deleteItems } from "../../services/backendApi";
+import { type IDriveItemExtended } from "../../common/types";
 import { useFilesStyles } from "./filesStyles";
-import { IFilesProps } from "./filesTypes";
+import { type IFilesProps } from "./filesTypes";
 import { toProgressValue } from "./filesUtils";
 import { FilesBreadcrumb } from "./components/FilesBreadcrumb";
 import { FilesToolbar } from "./components/FilesToolbar";
 import { FilesDataGrid } from "./components/FilesDataGrid";
 import { FilesProgress } from "./components/FilesProgress";
+import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
 import { useFilesData } from "./hooks/useFilesData";
 import { useFilesNavigation } from "./hooks/useFilesNavigation";
 import { useFilesUpload } from "./hooks/useFilesUpload";
 import { useFilesArchiveDownload } from "./hooks/useFilesArchiveDownload";
-import { Providers } from "@microsoft/mgt-element";
+import { useFilesFolderCreation } from "./hooks/useFilesFolderCreation";
+import { useFilesDeleteAction } from "./hooks/useFilesDeleteAction";
+import { useFilesPreviewActions } from "./hooks/useFilesPreviewActions";
+import { useFilesVersionDialog } from "./hooks/useFilesVersionDialog";
 import { ItemPermissionDialog } from "../permissions";
-import {
-  formatAppErrorMessageForUI,
-  type AppError,
-} from "../../../common/appError";
-import type { IItemVersionEntryForUI } from "../../../common/contracts/itemVersionContracts";
-import {
-  deleteItemHistoryVersions,
-  deleteItemVersion,
-  getCurrentItemVersion,
-  getItemVersionDownload,
-  listItemVersions,
-  restoreItemVersion,
-} from "../../services/itemVersionApi";
-import {
-  buildDeletePartialFailureError,
-  normalizeFilesOperationError,
-} from "./services/filesErrors";
-import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
+import { formatAppErrorMessageForUI } from "../../../common/appError";
 
 /**
  * 文件管理组件模块。
  *
  * 本模块负责：
- * 1. 展示选中容器内的文件和文件夹列表（DataGrid 表格）
- * 2. 支持文件/文件夹的上传（单文件、多文件、整个文件夹）
- * 3. 支持文件下载（单文件直链下载、多文件/文件夹 ZIP 归档下载）
- * 4. 支持文件/文件夹的删除（批量删除）
- * 5. 支持创建新文件夹
- * 6. 支持文件夹导航（面包屑导航 + 返回上级）
- * 7. 支持文件预览（通过 <Preview /> 子组件）。
+ * 1. 作为 files 页面入口，串联文件列表、导航、上传、下载、预览、版本历史与权限管理等子能力
+ * 2. 维护少量页面级 UI 状态，例如弹窗开关、当前预览文件、当前权限管理目标
+ * 3. 把具体业务副作用委托给专门的 hook，自身主要承担页面编排职责
  *
  * 组件结构：
  *   <div>
- *     <input type="file" hidden />       ← 隐藏的文件上传和文件夹上传输入框
- *     <a hidden />                       ← 隐藏的下载链接（用于单文件下载）
- *     <FilesBreadcrumb />                ← 面包屑导航
- *     <FilesToolbar />                   ← 工具栏（返回、新建文件夹、上传、下载、删除）
- *     <FilesProgress />                  ← 上传与下载进度提示
- *     <Dialog newFolder />               ← 新建文件夹对话框
- *     <Dialog delete />                  ← 确认删除对话框
- *     <FilesDataGrid />                  ← 文件列表表格（支持多选）
- *     <Preview />                        ← 文件预览对话框
+ *     <input type="file" hidden />       ← 隐藏的文件上传输入框
+ *     <input type="file" webkitdirectory hidden /> ← 隐藏的文件夹上传输入框
+ *     <a hidden />                       ← 隐藏的单文件下载链接
+ *     <FilesBreadcrumb />                ← 当前目录面包屑
+ *     <FilesToolbar />                   ← 页面主操作区
+ *     <FilesProgress />                  ← 上传/下载进度展示
+ *     <Dialog newFolder />               ← 新建文件夹弹窗
+ *     <Dialog delete />                  ← 批量删除确认弹窗
+ *     <FilesDataGrid />                  ← 文件与文件夹列表
+ *     <VersionHistoryDialog />           ← 版本历史弹窗
+ *     <ItemPermissionDialog />           ← item 权限管理弹窗
+ *     <Preview />                        ← 文件预览弹窗
  *   </div>
  *
- * Graph API 调用（前端直接调用，不经后端）：
- * - GET  /drives/{driveId}/items/{itemId}/children  → 列出文件夹内容
- * - POST /drives/{driveId}/items/{itemId}/children  → 创建子文件夹
- * - PUT  /drives/{driveId}/items/{itemId}:/{name}:/content  → 上传文件
- *
- * 后端 API 调用（通过 backendApi 模块）：
- * - deleteItems()            → 批量删除文件
- * - startDownload()          → 启动 ZIP 下载准备任务
- * - getDownloadProgress()    → 轮询归档准备进度
- * - getDownloadManifest()    → 获取归档清单
- *
- * 前端归档模块调用（通过 archiveDownloader 模块）：
- * - downloadArchiveFromManifest() → 前端流式下载并压缩
+ * 引用的 hook：
+ * - useFilesData：负责读取当前目录内容，并维护表格选中状态与列表加载错误。
+ * - useFilesNavigation：负责当前目录切换、返回上级和面包屑路径维护。
+ * - useFilesUpload：负责单文件/文件夹上传流程，以及上传进度状态。
+ * - useFilesArchiveDownload：负责单文件外的归档下载流程、轮询与进度展示。
+ * - useFilesFolderCreation：负责新建文件夹输入、提交流程与错误状态。
+ * - useFilesDeleteAction：负责当前列表的批量删除动作与删除错误状态。
+ * - useFilesPreviewActions：负责预览弹窗中的删除动作与相关错误状态。
+ * - useFilesVersionDialog：负责版本历史弹窗的数据读取、写操作与状态机。
  */
 
 /**
  * Files 文件管理组件。
+ *
+ * 页面层主要负责：
+ * 1. 串联各个专项 hook
+ * 2. 维护少量页面级弹窗开关与当前上下文
+ * 3. 组织各展示组件之间的接线
+ *
  * @param props 组件属性。
  * @returns 文件管理页面。
  */
@@ -100,43 +85,23 @@ export const Files = ({
   container,
   onOpenContainerPermissions,
 }: IFilesProps) => {
-  // =============== 页面级编排状态 ===============
+  // =============== state ===============
   const styles = useFilesStyles();
-  // useRef 主要用于在多次 render 之间存储一个可变且持久的引用，而不会触发组件 re-render；
-  // 它既可以引用 DOM 元素，也可以引用任何普通的 JavaScript 变量。
+  // 使用隐藏 `<a>` 复用浏览器原生的直链下载行为。
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
-  const [folderName, setFolderName] = useState("");
-  const [creatingFolder, setCreatingFolder] = useState(false);
+  // 这些开关和当前上下文都属于“页面壳层状态”，因为它们只决定哪个弹窗打开、
+  // 当前聚焦的是哪一个文件/条目，本身不承载具体业务副作用。
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [newFolderError, setNewFolderError] = useState<AppError | null>(null);
-  const [deleteDialogError, setDeleteDialogError] = useState<AppError | null>(
-    null,
-  );
-  const [previewActionError, setPreviewActionError] = useState<AppError | null>(
-    null,
-  );
-  const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
-    useState(false);
-  const [versionDialogOpen, setVersionDialogOpen] = useState(false);
-  const [versionDialogEntries, setVersionDialogEntries] = useState<
-    IItemVersionEntryForUI[]
-  >([]);
-  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
-  const [versionDialogLoading, setVersionDialogLoading] = useState(false);
-  const [versionDialogActionPending, setVersionDialogActionPending] =
-    useState(false);
-  const [versionDialogError, setVersionDialogError] = useState<AppError | null>(
-    null,
-  );
   const [currentPreviewFile, setCurrentPreviewFile] =
     useState<IDriveItemExtended | null>(null);
+  const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
+    useState(false);
   const [currentItemPermissionItem, setCurrentItemPermissionItem] =
     useState<IDriveItemExtended | null>(null);
-  const [currentVersionItem, setCurrentVersionItem] =
-    useState<IDriveItemExtended | null>(null);
 
+  // =============== hook ===============
   const {
     driveItems,
     selectedRows,
@@ -149,6 +114,10 @@ export const Files = ({
   } = useFilesData({
     containerId: container.id,
   });
+  // 列表数据与目录导航是分层的：
+  // - useFilesData 负责“当前目录里有什么”
+  // - useFilesNavigation 负责“当前在哪个目录”
+  // 这里把两个 hook 接在一起，让页面层同时拿到内容和位置。
 
   const {
     folderId,
@@ -161,6 +130,12 @@ export const Files = ({
     clearSelection,
   });
 
+  /**
+   * 统一刷新当前目录。
+   *
+   * 这里把“空值目录回退到 root”的细节集中在一个回调里，
+   * 供上传、新建文件夹等多个 hook 复用，避免每个 hook 都重复判断一次。
+   */
   const reloadCurrentFolder = useCallback(async () => {
     return loadItems(folderId || "root");
   }, [folderId, loadItems]);
@@ -178,9 +153,11 @@ export const Files = ({
     currentFolderId,
     reloadCurrentFolder,
   });
+  // 上传 hook 需要当前目录 ID，用来决定文件最终写入哪个文件夹；
+  // 上传成功后则通过 reloadCurrentFolder 让列表与后端保持同步。
 
   /**
-   * 使用隐藏链接触发单文件直链下载。
+   * 触发单文件直链下载。
    * @param downloadUrl Graph 返回的下载地址。
    */
   const onDownloadItemClick = useCallback((downloadUrl: string) => {
@@ -193,6 +170,43 @@ export const Files = ({
     link.href = downloadUrl;
     link.click();
   }, []);
+
+  const {
+    folderName,
+    creatingFolder,
+    newFolderError,
+    onFolderNameChange,
+    createFolder,
+    resetFolderCreationState,
+  } = useFilesFolderCreation({
+    containerId: container.id,
+    folderId,
+    reloadCurrentFolder,
+  });
+  // 新建文件夹、批量删除、预览删除、版本历史都已经拆到专项 hook 中。
+  // 页面层这里只保留接线：把当前容器、目录和成功后的页面收尾动作传给它们。
+
+  const { deleteDialogError, deleteSelectedItems, resetDeleteError } =
+    useFilesDeleteAction({
+      containerId: container.id,
+      selectedRows,
+      folderId,
+      loadItems,
+      updateSelectedRows,
+    });
+
+  const { previewActionError, deletePreviewItem, clearPreviewActionError } =
+    useFilesPreviewActions({
+      containerId: container.id,
+      currentPreviewFile,
+      folderId,
+      loadItems,
+      onDeleteSuccess: () => {
+        // 预览删除成功后，页面层只负责关闭弹窗和清理临时错误提示。
+        clearPreviewActionError();
+        setPreviewOpen(false);
+      },
+    });
 
   const {
     downloadProgress,
@@ -209,188 +223,76 @@ export const Files = ({
     onDirectDownload: onDownloadItemClick,
   });
 
+  const {
+    versionDialogOpen,
+    versionDialogEntries,
+    currentVersionId,
+    versionDialogLoading,
+    versionDialogActionPending,
+    versionDialogError,
+    openVersionDialog,
+    closeVersionDialog,
+    downloadVersion,
+    restoreVersion,
+    deleteVersion,
+    deleteHistoryVersions,
+  } = useFilesVersionDialog({
+    containerId: container.id,
+    onDirectDownload: onDownloadItemClick,
+  });
+
+  // =============== handler ===============
   /**
    * 打开删除确认框。
+   *
+   * 这里只负责打开 UI，不直接执行删除。
+   * 真正的删除逻辑已经下沉到 useFilesDeleteAction。
    */
   const onToolbarDeleteClick = useCallback(() => {
     if (selectedRows.size === 0) {
       return;
     }
 
-    setDeleteDialogError(null);
+    resetDeleteError();
     setDeleteDialogOpen(true);
-  }, [selectedRows.size]);
-
-  /**
-   * 处理批量删除。
-   *
-   * 流程：
-   * 1. 收集当前选中项 ID。
-   * 2. 在异步删除前快照当前文件夹 ID，避免删除过程中用户导航导致刷新到错误目录。
-   * 3. 调用后端删除接口并记录失败项日志。
-   * 4. 删除完成后刷新快照目录，关闭对话框并清空选择状态。
-   */
-  const onDeleteItemClick = useCallback(async () => {
-    const selectedIds = Array.from(selectedRows) as string[];
-
-    if (selectedIds.length === 0) {
-      return;
-    }
-
-    const folderIdSnapshot = folderId || "root";
-
-    try {
-      const result = await deleteItems(container.id, selectedIds);
-
-      if (result.failed.length > 0) {
-        const partialDeleteError = buildDeletePartialFailureError(
-          result.failed,
-        );
-        console.warn("Some items failed to delete:", partialDeleteError);
-        setDeleteDialogError(partialDeleteError);
-        updateSelectedRows(new Set(result.failed.map((item) => item.id)));
-        await loadItems(folderIdSnapshot);
-        return;
-      }
-
-      await loadItems(folderIdSnapshot);
-      setDeleteDialogOpen(false);
-      setDeleteDialogError(null);
-      // 新引用来更新 State，确保组件重新 render。
-      updateSelectedRows(new Set());
-    } catch (error: unknown) {
-      const deleteError = normalizeFilesOperationError(error, {
-        code: "deleteItemsFailed",
-        fallbackMessage: "Failed to delete selected items.",
-        name: "FilesDeleteError",
-        context: { itemIds: selectedIds },
-      });
-      console.error("Delete failed:", deleteError);
-      setDeleteDialogError(deleteError);
-    }
-  }, [container.id, folderId, loadItems, selectedRows, updateSelectedRows]);
-
-  /**
-   * 创建新文件夹。
-   * 在当前目录下创建子文件夹，使用 conflictBehavior: "rename" 避免重名冲突。
-   */
-  const onFolderCreateClick = useCallback(async () => {
-    setCreatingFolder(true);
-    setNewFolderError(null);
-
-    try {
-      const graphClient = Providers.globalProvider.graph.client;
-      const endpoint = `/drives/${container.id}/items/${folderId}/children`;
-      // 调用 Graph API 在当前目录下创建子文件夹。
-      await graphClient.api(endpoint).post({
-        name: folderName,
-        folder: {},
-        "@microsoft.graph.conflictBehavior": "rename",
-      });
-
-      await loadItems(folderId);
-      setFolderName("");
-      setNewFolderDialogOpen(false);
-    } catch (error: unknown) {
-      const createFolderError = normalizeFilesOperationError(error, {
-        code: "createFolderFailed",
-        fallbackMessage: "Failed to create folder.",
-        name: "FilesCreateFolderError",
-        context: { folderId, folderName },
-      });
-      console.error("Create folder failed:", createFolderError);
-      setNewFolderError(createFolderError);
-    } finally {
-      setCreatingFolder(false);
-    }
-  }, [container.id, folderId, folderName, loadItems]);
-
-  /**
-   * 同步新文件夹名称输入框。
-   * @param _event 输入事件。
-   * @param data 输入数据。
-   */
-  const onHandleFolderNameChange: InputProps["onChange"] = useCallback(
-    (_event: ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
-      if (newFolderError) {
-        setNewFolderError(null);
-      }
-      setFolderName(data.value);
-    },
-    [newFolderError],
-  );
+  }, [resetDeleteError, selectedRows.size]);
 
   /**
    * 处理预览中的文件切换。
+   *
+   * Preview 内部支持前后浏览文件，这个回调用于在切换目标文件时同步页面层上下文。
+   * 每次切换前先清掉旧错误，避免上一个文件的删除失败提示残留到新文件上。
    * @param file 目标文件。
    */
-  const handlePreviewNavigate = useCallback((file: IDriveItemExtended) => {
-    setPreviewActionError(null);
-    setCurrentPreviewFile(file);
-  }, []);
-
-  /**
-   * 处理预览中的下载动作。
-   * @param downloadUrl 下载地址。
-   */
-  const handlePreviewDownload = useCallback(
-    (downloadUrl: string) => {
-      onDownloadItemClick(downloadUrl);
+  const handlePreviewNavigate = useCallback(
+    (file: IDriveItemExtended) => {
+      clearPreviewActionError();
+      setCurrentPreviewFile(file);
     },
-    [onDownloadItemClick],
+    [clearPreviewActionError],
   );
 
   /**
-   * 处理预览中的删除动作。
-   * 删除完成后刷新文件列表，使 UI 保持同步。
-   */
-  const handlePreviewDelete = useCallback(async () => {
-    if (!currentPreviewFile?.id) {
-      return;
-    }
-
-    // 在异步删除前快照当前目录，避免删除过程中导航导致刷新目录漂移。
-    const folderIdSnapshot = folderId || "root";
-
-    try {
-      const result = await deleteItems(container.id, [currentPreviewFile.id]);
-
-      if (result.failed.length > 0) {
-        const previewDeleteError = buildDeletePartialFailureError(
-          result.failed,
-        );
-        console.warn("Preview delete failed:", previewDeleteError);
-        setPreviewActionError(previewDeleteError);
-        return;
-      }
-
-      await loadItems(folderIdSnapshot);
-      setPreviewActionError(null);
-      setPreviewOpen(false);
-    } catch (error: unknown) {
-      const previewDeleteError = normalizeFilesOperationError(error, {
-        code: "previewDeleteFailed",
-        fallbackMessage: "Failed to delete the current file.",
-        name: "FilesPreviewDeleteError",
-        context: { itemId: currentPreviewFile.id },
-      });
-      console.error("Preview delete failed:", previewDeleteError);
-      setPreviewActionError(previewDeleteError);
-    }
-  }, [container.id, currentPreviewFile?.id, folderId, loadItems]);
-
-  /**
    * 打开文件预览。
+   *
+   * 打开前同样先清理旧错误，确保每次进入预览时看到的是当前文件的全新状态。
    * @param file 目标文件。
    */
-  const handlePreviewOpen = useCallback((file: IDriveItemExtended) => {
-    setPreviewActionError(null);
-    setCurrentPreviewFile(file);
-    setPreviewOpen(true);
-  }, []);
+  const handlePreviewOpen = useCallback(
+    (file: IDriveItemExtended) => {
+      clearPreviewActionError();
+      setCurrentPreviewFile(file);
+      setPreviewOpen(true);
+    },
+    [clearPreviewActionError],
+  );
 
   /**
    * 打开当前行 item 的权限管理对话框。
+   *
+   * 页面层在这里仅保存“当前正在管理哪个 item”，
+   * 真正的权限读写仍由 ItemPermissionDialog 内部继续负责。
+   * @param item 当前条目。
    */
   const handleManageItemPermissions = useCallback(
     (item: IDriveItemExtended) => {
@@ -408,218 +310,11 @@ export const Files = ({
     setCurrentItemPermissionItem(null);
   }, []);
 
-  /**
-   * 统一读取 Versions Dialog 依赖的 list + current 数据。
-   *
-   * @param item 当前正在查看版本历史的文件。
-   * @param resetBeforeLoad 是否在读取前清空旧数据。
-   */
-  const loadVersionDialogData = useCallback(
-    async (
-      item: IDriveItemExtended,
-      options: { resetBeforeLoad?: boolean } = {},
-    ) => {
-      if (options.resetBeforeLoad) {
-        setVersionDialogEntries([]);
-        setCurrentVersionId(null);
-      }
-
-      setVersionDialogLoading(true);
-      setVersionDialogError(null);
-
-      try {
-        const [entries, currentEntry] = await Promise.all([
-          listItemVersions(container.id, item.id as string),
-          getCurrentItemVersion(container.id, item.id as string),
-        ]);
-
-        setVersionDialogEntries(entries);
-        setCurrentVersionId(currentEntry.id);
-      } catch (error: unknown) {
-        const loadVersionsError = normalizeFilesOperationError(error, {
-          code: "loadVersionsFailed",
-          fallbackMessage: "Failed to load versions.",
-          name: "FilesVersionLoadError",
-          context: {
-            containerId: container.id,
-            itemId: item.id,
-          },
-        });
-        console.error("Load versions failed:", loadVersionsError);
-        setVersionDialogError(loadVersionsError);
-      } finally {
-        setVersionDialogLoading(false);
-      }
-    },
-    [container.id],
-  );
-
-  /**
-   * 打开版本历史弹窗，并主动读取列表与当前版本元数据。
-   */
-  const handleManageVersions = useCallback(
-    (item: IDriveItemExtended) => {
-      setCurrentVersionItem(item);
-      setVersionDialogOpen(true);
-      void loadVersionDialogData(item, { resetBeforeLoad: true });
-    },
-    [loadVersionDialogData],
-  );
-
-  /**
-   * 关闭版本历史弹窗，并清理当前文件上下文。
-   */
-  const handleCloseVersionDialog = useCallback(() => {
-    setVersionDialogOpen(false);
-    setCurrentVersionItem(null);
-    setVersionDialogEntries([]);
-    setCurrentVersionId(null);
-    setVersionDialogLoading(false);
-    setVersionDialogActionPending(false);
-    setVersionDialogError(null);
-  }, []);
-
-  /**
-   * 执行版本写操作，并在成功后统一重读 list + current。
-   *
-   * @param action 写操作实现。
-   * @param fallbackMessage 兜底错误文案。
-   * @param code 稳定错误码。
-   */
-  const runVersionWriteAction = useCallback(
-    async (
-      action: () => Promise<void>,
-      fallbackMessage: string,
-      code: string,
-    ) => {
-      if (!currentVersionItem?.id) {
-        return;
-      }
-
-      setVersionDialogActionPending(true);
-      setVersionDialogError(null);
-
-      try {
-        await action();
-        await loadVersionDialogData(currentVersionItem);
-      } catch (error: unknown) {
-        const versionActionError = normalizeFilesOperationError(error, {
-          code,
-          fallbackMessage,
-          name: "FilesVersionActionError",
-          context: {
-            containerId: container.id,
-            itemId: currentVersionItem.id,
-          },
-        });
-        console.error("Version action failed:", versionActionError);
-        setVersionDialogError(versionActionError);
-      } finally {
-        setVersionDialogActionPending(false);
-      }
-    },
-    [container.id, currentVersionItem, loadVersionDialogData],
-  );
-
-  /**
-   * 下载指定版本。
-   *
-   * 这里沿用页面已有的隐藏 `<a>` 直链下载模式。
-   *
-   * @param entry 目标版本条目。
-   */
-  const handleVersionDownload = useCallback(
-    async (entry: IItemVersionEntryForUI) => {
-      if (!currentVersionItem?.id) {
-        return;
-      }
-
-      setVersionDialogError(null);
-
-      try {
-        const downloadUrl = await getItemVersionDownload(
-          container.id,
-          currentVersionItem.id,
-          entry.id,
-        );
-        onDownloadItemClick(downloadUrl);
-      } catch (error: unknown) {
-        const downloadVersionError = normalizeFilesOperationError(error, {
-          code: "downloadVersionFailed",
-          fallbackMessage: "Failed to download the selected version.",
-          name: "FilesVersionDownloadError",
-          context: {
-            containerId: container.id,
-            itemId: currentVersionItem.id,
-            versionId: entry.id,
-          },
-        });
-        console.error("Version download failed:", downloadVersionError);
-        setVersionDialogError(downloadVersionError);
-      }
-    },
-    [container.id, currentVersionItem, onDownloadItemClick],
-  );
-
-  /**
-   * 恢复指定历史版本。
-   *
-   * @param entry 目标版本条目。
-   */
-  const handleVersionRestore = useCallback(
-    async (entry: IItemVersionEntryForUI) => {
-      await runVersionWriteAction(
-        () =>
-          restoreItemVersion(
-            container.id,
-            currentVersionItem?.id as string,
-            entry.id,
-          ),
-        "Failed to restore the selected version.",
-        "restoreVersionFailed",
-      );
-    },
-    [container.id, currentVersionItem?.id, runVersionWriteAction],
-  );
-
-  /**
-   * 删除指定历史版本。
-   *
-   * @param entry 目标版本条目。
-   */
-  const handleVersionDelete = useCallback(
-    async (entry: IItemVersionEntryForUI) => {
-      await runVersionWriteAction(
-        () =>
-          deleteItemVersion(
-            container.id,
-            currentVersionItem?.id as string,
-            entry.id,
-          ),
-        "Failed to delete the selected version.",
-        "deleteVersionFailed",
-      );
-    },
-    [container.id, currentVersionItem?.id, runVersionWriteAction],
-  );
-
-  /**
-   * 删除除当前版本外的所有历史版本。
-   */
-  const handleDeleteHistoryVersions = useCallback(async () => {
-    await runVersionWriteAction(
-      () =>
-        deleteItemHistoryVersions(
-          container.id,
-          currentVersionItem?.id as string,
-        ),
-      "Failed to delete history versions.",
-      "deleteHistoryVersionsFailed",
-    );
-  }, [container.id, currentVersionItem?.id, runVersionWriteAction]);
-
+  // Preview 只接受文件，不接受文件夹，因此这里预先过滤一次，
+  // 避免在预览组件内部重复判断哪一类条目可以前后切换。
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
 
+  // =============== jsx ===============
   return (
     <div className={styles.filesContainer}>
       {/*
@@ -683,7 +378,8 @@ export const Files = ({
           isDownloadActive={downloadProgress.isActive}
           onBack={navigateToParentFolder}
           onCreateFolder={() => {
-            setNewFolderError(null);
+            // 打开弹窗前先清掉上一次输入和错误，避免旧状态“带进来”。
+            resetFolderCreationState();
             setNewFolderDialogOpen(true);
           }}
           onUploadFile={onUploadFileClick}
@@ -721,8 +417,8 @@ export const Files = ({
       {/*
         新建文件夹对话框：由工具栏 "New Folder" 按钮触发。
         - 输入框绑定 folderName 状态，空字符串时禁用确认按钮
-        - 点击 "Create Folder" 调用 onFolderCreateClick，期间显示 Spinner 并禁用所有按钮
-        - 创建完成后自动关闭对话框并刷新当前文件夹列表
+        - 点击 "Create Folder" 调用 createFolder，由 hook 负责请求、错误和刷新逻辑
+        - 页面层只根据 createFolder 的返回值决定是否关闭对话框
       */}
       <Dialog open={newFolderDialogOpen}>
         <DialogSurface>
@@ -736,7 +432,7 @@ export const Files = ({
                 autoFocus
                 required
                 value={folderName}
-                onChange={onHandleFolderNameChange}
+                onChange={onFolderNameChange}
               />
               {/* 创建中显示 Spinner 阻止用户重复提交 */}
               {creatingFolder && (
@@ -764,7 +460,7 @@ export const Files = ({
                   appearance="secondary"
                   onClick={() => {
                     setNewFolderDialogOpen(false);
-                    setNewFolderError(null);
+                    resetFolderCreationState();
                   }}
                   disabled={creatingFolder}
                 >
@@ -774,7 +470,14 @@ export const Files = ({
               {/* folderName 为空或正在创建时禁用，避免提交空名称或重复请求 */}
               <Button
                 appearance="primary"
-                onClick={() => void onFolderCreateClick()}
+                onClick={async () => {
+                  // createFolder 返回布尔值，让页面层能用最少逻辑决定是否关弹窗。
+                  const didCreate = await createFolder();
+
+                  if (didCreate) {
+                    setNewFolderDialogOpen(false);
+                  }
+                }}
                 disabled={creatingFolder || folderName === ""}
               >
                 Create Folder
@@ -787,14 +490,15 @@ export const Files = ({
       {/*
         确认删除对话框：由工具栏 "Delete" 按钮触发。
         - 标题和正文根据 selectedRows.size 动态展示单/多项措辞
-        - 点击 "Delete" 调用 onDeleteItemClick（批量删除 → 刷新列表 → 关闭对话框）
+        - 点击 "Delete" 调用 deleteSelectedItems，由 hook 处理批量删除、错误和列表刷新
+        - 页面层只在 deleteSelectedItems 成功时关闭对话框
       */}
       <Dialog
         open={deleteDialogOpen}
         modalType="modal"
         onOpenChange={() => {
           setDeleteDialogOpen(false);
-          setDeleteDialogError(null);
+          resetDeleteError();
         }}
       >
         <DialogSurface>
@@ -830,7 +534,7 @@ export const Files = ({
                   appearance="secondary"
                   onClick={() => {
                     setDeleteDialogOpen(false);
-                    setDeleteDialogError(null);
+                    resetDeleteError();
                   }}
                 >
                   Cancel
@@ -838,7 +542,15 @@ export const Files = ({
               </DialogTrigger>
               <Button
                 appearance="primary"
-                onClick={() => void onDeleteItemClick()}
+                onClick={async () => {
+                  // 删除 hook 负责区分“完全成功 / 部分失败 / 抛异常”，
+                  // 这里仅根据最终结果控制弹窗开关。
+                  const didDelete = await deleteSelectedItems();
+
+                  if (didDelete) {
+                    setDeleteDialogOpen(false);
+                  }
+                }}
               >
                 Delete
               </Button>
@@ -851,6 +563,7 @@ export const Files = ({
         文件列表 DataGrid：展示当前文件夹内所有文件和子文件夹。
         - items: 当前文件夹的 DriveItem 列表（IDriveItemExtended）
         - selectionMode="multiselect": 支持多选，选中集合存入 selectedRows
+        - 行内动作不会自己处理副作用，而是回调到页面层，再由页面层分发给各专项 hook
       */}
       {/* DataGrid 独立滚动区：仅表格横向溢出时滚动，不影响页面其他部分 */}
       <div className={styles.dataGridWrapper}>
@@ -861,12 +574,18 @@ export const Files = ({
           onOpenFolder={navigateToFolder}
           onPreviewFile={handlePreviewOpen}
           onManagePermissions={handleManageItemPermissions}
-          onManageVersions={handleManageVersions}
+          onManageVersions={openVersionDialog}
           actionsButtonGroupClassName={styles.actionsButtonGroup}
           nameCellContentClassName={styles.nameCellContent}
         />
       </div>
 
+      {/*
+        版本历史弹窗：
+        - 展示层由 VersionHistoryDialog 负责
+        - 数据读取、下载、恢复、删除版本等动作由 useFilesVersionDialog 负责
+        - 页面层只做 props 转发，不再持有这套状态机细节
+      */}
       <VersionHistoryDialog
         open={versionDialogOpen}
         versions={versionDialogEntries}
@@ -874,13 +593,18 @@ export const Files = ({
         isLoading={versionDialogLoading}
         isActionPending={versionDialogActionPending}
         error={versionDialogError}
-        onClose={handleCloseVersionDialog}
-        onDownload={(entry) => void handleVersionDownload(entry)}
-        onRestore={(entry) => void handleVersionRestore(entry)}
-        onDelete={(entry) => void handleVersionDelete(entry)}
-        onDeleteHistoryVersions={() => void handleDeleteHistoryVersions()}
+        onClose={closeVersionDialog}
+        onDownload={(entry) => void downloadVersion(entry)}
+        onRestore={(entry) => void restoreVersion(entry)}
+        onDelete={(entry) => void deleteVersion(entry)}
+        onDeleteHistoryVersions={() => void deleteHistoryVersions()}
       />
 
+      {/*
+        Item 权限弹窗：
+        - 打开条件和当前 item 上下文由页面层维护
+        - 这样 DataGrid 只需要关心“用户点了哪个条目”，不用知道权限弹窗内部实现
+      */}
       <ItemPermissionDialog
         open={itemPermissionDialogOpen}
         driveId={container.id}
@@ -898,19 +622,20 @@ export const Files = ({
         - currentFile: 当前预览文件
         - allFiles: 仅包含非文件夹文件，用于前/后导航
         - onDownload: 调用隐藏 <a> 标签触发直链下载
-        - onDelete: 删除当前文件并刷新列表后关闭对话框
+        - onDelete: 调用 preview 删除 hook，由 hook 负责删除与刷新，页面层负责开关弹窗
       */}
       <Preview
         isOpen={previewOpen}
         onDismiss={() => {
-          setPreviewActionError(null);
+          // 关闭预览时同时清掉动作错误，避免下次打开仍看到旧提示。
+          clearPreviewActionError();
           setPreviewOpen(false);
         }}
         currentFile={currentPreviewFile}
         allFiles={previewableFiles}
         onNavigate={handlePreviewNavigate}
-        onDownload={handlePreviewDownload}
-        onDelete={() => void handlePreviewDelete()}
+        onDownload={onDownloadItemClick}
+        onDelete={() => void deletePreviewItem()}
         containerId={container.id}
         actionError={previewActionError}
       />
