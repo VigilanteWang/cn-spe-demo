@@ -49,9 +49,7 @@ export const readRequiredString = (
  * Graph 正常会返回 number，但测试桩或边界场景里也可能是可解析字符串，
  * 这里统一做一次宽松收窄，保证最终使用方拿到稳定 number。
  */
-export const readOptionalNumberLike = (
-  value: unknown,
-): number | undefined => {
+export const readOptionalNumberLike = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }

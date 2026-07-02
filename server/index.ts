@@ -100,12 +100,16 @@ const ALLOWED_ORIGINS = new Set(
     .filter(Boolean),
 );
 
+// 明确声明允许浏览器跨域调用的 HTTP 方法，避免 DELETE 等非简单方法在预检阶段被拦截。
+const ALLOWED_CORS_METHODS = "GET, POST, DELETE, OPTIONS";
+
 server.pre((req, res, next) => {
   const origin = req.header("origin") ?? "";
   // 仅回显白名单中的 Origin，防止 CORS 头被任意域利用。
   if (ALLOWED_ORIGINS.has(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
   }
+  res.header("Access-Control-Allow-Methods", ALLOWED_CORS_METHODS);
   res.header(
     "Access-Control-Allow-Headers",
     req.header("Access-Control-Request-Headers"),

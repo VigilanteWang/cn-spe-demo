@@ -98,3 +98,84 @@ export const useFilesStyles = makeStyles({
     wordBreak: "break-word",
   },
 });
+
+/**
+ * Version history dialog 的样式定义。
+ */
+export const useVersionHistoryDialogStyles = makeStyles({
+  surface: {
+    // Versions Dialog 默认给到一个稍宽的可用空间，
+    // 让表格能在桌面视口下更自然地铺开；窄屏时仍然受 viewport 限制。
+    width: "min(670px, calc(100vw - 32px))",
+    minWidth: "min(600px, calc(100vw - 32px))",
+    maxWidth: "min(670px, calc(100vw - 32px))",
+  },
+  body: {
+    display: "flex",
+    flexDirection: "column",
+    height: "50vh",
+    minHeight: "280px",
+    maxHeight: "calc(100vh - 32px)",
+  },
+  content: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "12px",
+    flex: 1,
+    minHeight: 0,
+    maxWidth: "100%",
+  },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  gridWrapper: {
+    overflowX: "auto",
+    overflowY: "auto",
+    flex: 1,
+    minHeight: 0,
+    maxWidth: "100%",
+  },
+  grid: {
+    // 表格默认占满 dialog 可用宽度；
+    // 当列最小宽度总和更大时，再退回横向滚动而不是把列硬压坏。
+    width: "100%",
+    minWidth: "max-content",
+  },
+  actionGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    width: "fit-content",
+  },
+  actionIconButton: {
+    minWidth: "28px",
+    width: "28px",
+    paddingLeft: "4px",
+    paddingRight: "4px",
+  },
+  errorText: {
+    color: tokens.colorPaletteRedForeground1,
+  },
+  emptyText: {
+    color: tokens.colorNeutralForeground2,
+  },
+  popoverContent: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "12px",
+    maxWidth: "320px",
+  },
+  popoverActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "8px",
+  },
+});

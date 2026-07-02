@@ -18,61 +18,46 @@ import {
   Spinner,
   TableCellLayout,
   TableColumnDefinition,
+  TableColumnSizingOptions,
   Text,
   createTableColumn,
-  makeStyles,
-  tokens,
 } from "@fluentui/react-components";
+import {
+  ArrowCounterclockwiseRegular,
+  ArrowDownloadRegular,
+  DeleteRegular,
+} from "@fluentui/react-icons";
 import type { AppError } from "../../../../common/appError";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import { formatDateTimeColumnValue } from "../../../common/dateTime";
 import type { IItemVersionEntryForUI } from "../../../../common/contracts/itemVersionContracts";
+import { useVersionHistoryDialogStyles } from "../filesStyles";
 
-const useVersionHistoryDialogStyles = makeStyles({
-  content: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: "12px",
-    minWidth: "720px",
-    maxWidth: "960px",
+// Versions 表格的默认列宽刻意贴近内容：
+// - 默认先按内容附近的紧凑宽度渲染，避免少量列把整个 dialog 撑得过宽
+// - 仍保留较小的 minWidth，让窄视口时先收缩，实在放不下时再出现横向滚动
+const versionColumnSizingOptions: TableColumnSizingOptions = {
+  versionId: {
+    minWidth: 60,
+    idealWidth: 72,
+    defaultWidth: 72,
   },
-  headerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
+  modified: {
+    minWidth: 116,
+    idealWidth: 190,
+    defaultWidth: 190,
   },
-  headerActions: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
+  modifiedBy: {
+    minWidth: 116,
+    idealWidth: 190,
+    defaultWidth: 190,
   },
-  gridWrapper: {
-    overflowX: "auto",
+  actions: {
+    minWidth: 70,
+    idealWidth: 90,
+    defaultWidth: 90,
   },
-  actionGroup: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  errorText: {
-    color: tokens.colorPaletteRedForeground1,
-  },
-  emptyText: {
-    color: tokens.colorNeutralForeground2,
-  },
-  popoverContent: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: "12px",
-    maxWidth: "320px",
-  },
-  popoverActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "8px",
-  },
-});
+};
 
 interface IVersionHistoryDialogProps {
   /** 当前 Versions Dialog 是否打开。 */
@@ -168,25 +153,34 @@ export const VersionHistoryDialog = ({
             <div className={styles.actionGroup}>
               <Button
                 size="small"
+                appearance="subtle"
+                className={styles.actionIconButton}
+                aria-label="Download"
+                title="Download"
+                icon={<ArrowDownloadRegular />}
                 onClick={() => onDownload(entry)}
                 disabled={isDisabled}
-              >
-                Download
-              </Button>
+              />
               <Button
                 size="small"
+                appearance="subtle"
+                className={styles.actionIconButton}
+                aria-label="Restore"
+                title="Restore"
+                icon={<ArrowCounterclockwiseRegular />}
                 onClick={() => onRestore(entry)}
                 disabled={isDisabled || isCurrentVersion}
-              >
-                Restore
-              </Button>
+              />
               <Button
                 size="small"
+                appearance="subtle"
+                className={styles.actionIconButton}
+                aria-label="Delete"
+                title="Delete"
+                icon={<DeleteRegular />}
                 onClick={() => onDelete(entry)}
                 disabled={isDisabled || isCurrentVersion}
-              >
-                Delete
-              </Button>
+              />
             </div>
           );
         },
@@ -200,6 +194,7 @@ export const VersionHistoryDialog = ({
       onDownload,
       onRestore,
       styles.actionGroup,
+      styles.actionIconButton,
     ],
   );
 
@@ -214,8 +209,8 @@ export const VersionHistoryDialog = ({
         }
       }}
     >
-      <DialogSurface>
-        <DialogBody>
+      <DialogSurface className={styles.surface}>
+        <DialogBody className={styles.body}>
           <DialogTitle>Versions</DialogTitle>
           <DialogContent className={styles.content}>
             {/* 顶部区域左边显示读取状态，右边放批量动作入口。 */}
@@ -286,6 +281,10 @@ export const VersionHistoryDialog = ({
                 items={versions}
                 columns={columns}
                 getRowId={(entry) => entry.id}
+                className={styles.grid}
+                resizableColumns
+                resizableColumnsOptions={{ autoFitColumns: false }}
+                columnSizingOptions={versionColumnSizingOptions}
               >
                 <DataGridHeader>
                   <DataGridRow>
