@@ -7,6 +7,12 @@ import { Files } from "./index";
 
 const {
   deleteItemsMock,
+  listItemVersionsMock,
+  getCurrentItemVersionMock,
+  getItemVersionDownloadMock,
+  restoreItemVersionMock,
+  deleteItemVersionMock,
+  deleteItemHistoryVersionsMock,
   loadItemsMock,
   updateSelectedRowsMock,
   graphPostMock,
@@ -16,6 +22,12 @@ const {
   useFilesArchiveDownloadMock,
 } = vi.hoisted(() => ({
   deleteItemsMock: vi.fn(),
+  listItemVersionsMock: vi.fn(),
+  getCurrentItemVersionMock: vi.fn(),
+  getItemVersionDownloadMock: vi.fn(),
+  restoreItemVersionMock: vi.fn(),
+  deleteItemVersionMock: vi.fn(),
+  deleteItemHistoryVersionsMock: vi.fn(),
   loadItemsMock: vi.fn().mockResolvedValue(true),
   updateSelectedRowsMock: vi.fn(),
   graphPostMock: vi.fn(),
@@ -43,6 +55,15 @@ vi.mock("./hooks/useFilesUpload", () => ({
 
 vi.mock("./hooks/useFilesArchiveDownload", () => ({
   useFilesArchiveDownload: useFilesArchiveDownloadMock,
+}));
+
+vi.mock("../../services/itemVersionApi", () => ({
+  listItemVersions: listItemVersionsMock,
+  getCurrentItemVersion: getCurrentItemVersionMock,
+  getItemVersionDownload: getItemVersionDownloadMock,
+  restoreItemVersion: restoreItemVersionMock,
+  deleteItemVersion: deleteItemVersionMock,
+  deleteItemHistoryVersions: deleteItemHistoryVersionsMock,
 }));
 
 vi.mock("./filesStyles", () => ({
@@ -93,18 +114,59 @@ vi.mock("./components/FilesDataGrid", () => ({
   FilesDataGrid: ({
     driveItems,
     onPreviewFile,
+    onManageVersions,
   }: {
     driveItems: Array<{ name?: string }>;
     onPreviewFile: (item: never) => void;
+    onManageVersions: (item: never) => void;
   }) => (
     <div>
       {driveItems.length > 0 && (
-        <button onClick={() => onPreviewFile(driveItems[0] as never)}>
-          Open Preview
-        </button>
+        <>
+          <button onClick={() => onPreviewFile(driveItems[0] as never)}>
+            Open Preview
+          </button>
+          <button onClick={() => onManageVersions(driveItems[0] as never)}>
+            Open Versions
+          </button>
+        </>
       )}
     </div>
   ),
+}));
+
+vi.mock("./components/VersionHistoryDialog", () => ({
+  VersionHistoryDialog: ({
+    open,
+    versions,
+    currentVersionId,
+    error,
+    onDownload,
+    onRestore,
+    onDelete,
+    onDeleteHistoryVersions,
+  }: {
+    open: boolean;
+    versions: Array<{ id: string }>;
+    currentVersionId: string | null;
+    error?: Error | null;
+    onDownload: (entry: { id: string }) => void;
+    onRestore: (entry: { id: string }) => void;
+    onDelete: (entry: { id: string }) => void;
+    onDeleteHistoryVersions: () => void;
+  }) =>
+    open ? (
+      <div>
+        <div>Versions Dialog</div>
+        <div>Current Version: {currentVersionId}</div>
+        <div>Entries: {versions.map((entry) => entry.id).join(",")}</div>
+        <button onClick={() => onDownload(versions[0])}>Dialog Download</button>
+        <button onClick={() => onRestore(versions[1])}>Dialog Restore</button>
+        <button onClick={() => onDelete(versions[1])}>Dialog Delete</button>
+        <button onClick={onDeleteHistoryVersions}>Dialog Delete History</button>
+        {error ? <div>{error.message}</div> : null}
+      </div>
+    ) : null,
 }));
 
 vi.mock("../preview", () => ({
@@ -212,6 +274,33 @@ describe("Files", () => {
       getArchiveProgressPercentText: vi.fn().mockReturnValue("0%"),
       getArchiveProgressText: vi.fn().mockReturnValue(""),
     });
+
+    listItemVersionsMock.mockResolvedValue([
+      {
+        id: "3.0",
+        lastModifiedDateTime: "2026-07-02T10:00:00Z",
+        lastModifiedByDisplayName: "Megan Bowen",
+        size: 300,
+      },
+      {
+        id: "2.0",
+        lastModifiedDateTime: "2026-07-01T10:00:00Z",
+        lastModifiedByDisplayName: "Adele Vance",
+        size: 200,
+      },
+    ]);
+    getCurrentItemVersionMock.mockResolvedValue({
+      id: "3.0",
+      lastModifiedDateTime: "2026-07-02T10:00:00Z",
+      lastModifiedByDisplayName: "Megan Bowen",
+      size: 300,
+    });
+    getItemVersionDownloadMock.mockResolvedValue(
+      "https://contoso.example/download/version-2",
+    );
+    restoreItemVersionMock.mockResolvedValue(undefined);
+    deleteItemVersionMock.mockResolvedValue(undefined);
+    deleteItemHistoryVersionsMock.mockResolvedValue(undefined);
   });
 
   it("should show folder creation errors inside the new-folder dialog", async () => {
@@ -282,6 +371,129 @@ describe("Files", () => {
       expect(
         screen.getByText("Failed to delete the current file."),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("should load versions list and current version when opening the versions dialog", async () => {
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Versions" }));
+
+    await waitFor(() => {
+      expect(listItemVersionsMock).toHaveBeenCalledWith("container-1", "file-1");
+      expect(getCurrentItemVersionMock).toHaveBeenCalledWith(
+        "container-1",
+        "file-1",
+      );
+      expect(screen.getByText("Current Version: 3.0")).toBeInTheDocument();
+      expect(screen.getByText("Entries: 3.0,2.0")).toBeInTheDocument();
+    });
+  });
+
+  it("should request version download and trigger the hidden anchor", async () => {
+    const anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Versions" }));
+
+    await screen.findByText("Versions Dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Dialog Download" }));
+
+    await waitFor(() => {
+      expect(getItemVersionDownloadMock).toHaveBeenCalledWith(
+        "container-1",
+        "file-1",
+        "3.0",
+      );
+      expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    anchorClickSpy.mockRestore();
+  });
+
+  it("should refresh list and current version after restore succeeds", async () => {
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Versions" }));
+    await screen.findByText("Versions Dialog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dialog Restore" }));
+
+    await waitFor(() => {
+      expect(restoreItemVersionMock).toHaveBeenCalledWith(
+        "container-1",
+        "file-1",
+        "2.0",
+      );
+      expect(listItemVersionsMock).toHaveBeenCalledTimes(2);
+      expect(getCurrentItemVersionMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("should refresh list and current version after deleting history versions", async () => {
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Versions" }));
+    await screen.findByText("Versions Dialog");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dialog Delete History" }),
+    );
+
+    await waitFor(() => {
+      expect(deleteItemHistoryVersionsMock).toHaveBeenCalledWith(
+        "container-1",
+        "file-1",
+      );
+      expect(listItemVersionsMock).toHaveBeenCalledTimes(2);
+      expect(getCurrentItemVersionMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("should refresh list and current version after deleting a single version", async () => {
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Versions" }));
+    await screen.findByText("Versions Dialog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dialog Delete" }));
+
+    await waitFor(() => {
+      expect(deleteItemVersionMock).toHaveBeenCalledWith(
+        "container-1",
+        "file-1",
+        "2.0",
+      );
+      expect(listItemVersionsMock).toHaveBeenCalledTimes(2);
+      expect(getCurrentItemVersionMock).toHaveBeenCalledTimes(2);
     });
   });
 });

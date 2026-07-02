@@ -36,10 +36,20 @@ import {
   formatAppErrorMessageForUI,
   type AppError,
 } from "../../../common/appError";
+import type { IItemVersionEntryForUI } from "../../../common/contracts/itemVersionContracts";
+import {
+  deleteItemHistoryVersions,
+  deleteItemVersion,
+  getCurrentItemVersion,
+  getItemVersionDownload,
+  listItemVersions,
+  restoreItemVersion,
+} from "../../services/itemVersionApi";
 import {
   buildDeletePartialFailureError,
   normalizeFilesOperationError,
 } from "./services/filesErrors";
+import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
 
 /**
  * 文件管理组件模块。
@@ -109,9 +119,22 @@ export const Files = ({
   );
   const [itemPermissionDialogOpen, setItemPermissionDialogOpen] =
     useState(false);
+  const [versionDialogOpen, setVersionDialogOpen] = useState(false);
+  const [versionDialogEntries, setVersionDialogEntries] = useState<
+    IItemVersionEntryForUI[]
+  >([]);
+  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
+  const [versionDialogLoading, setVersionDialogLoading] = useState(false);
+  const [versionDialogActionPending, setVersionDialogActionPending] =
+    useState(false);
+  const [versionDialogError, setVersionDialogError] = useState<AppError | null>(
+    null,
+  );
   const [currentPreviewFile, setCurrentPreviewFile] =
     useState<IDriveItemExtended | null>(null);
   const [currentItemPermissionItem, setCurrentItemPermissionItem] =
+    useState<IDriveItemExtended | null>(null);
+  const [currentVersionItem, setCurrentVersionItem] =
     useState<IDriveItemExtended | null>(null);
 
   const {
@@ -385,6 +408,216 @@ export const Files = ({
     setCurrentItemPermissionItem(null);
   }, []);
 
+  /**
+   * 统一读取 Versions Dialog 依赖的 list + current 数据。
+   *
+   * @param item 当前正在查看版本历史的文件。
+   * @param resetBeforeLoad 是否在读取前清空旧数据。
+   */
+  const loadVersionDialogData = useCallback(
+    async (
+      item: IDriveItemExtended,
+      options: { resetBeforeLoad?: boolean } = {},
+    ) => {
+      if (options.resetBeforeLoad) {
+        setVersionDialogEntries([]);
+        setCurrentVersionId(null);
+      }
+
+      setVersionDialogLoading(true);
+      setVersionDialogError(null);
+
+      try {
+        const [entries, currentEntry] = await Promise.all([
+          listItemVersions(container.id, item.id as string),
+          getCurrentItemVersion(container.id, item.id as string),
+        ]);
+
+        setVersionDialogEntries(entries);
+        setCurrentVersionId(currentEntry.id);
+      } catch (error: unknown) {
+        const loadVersionsError = normalizeFilesOperationError(error, {
+          code: "loadVersionsFailed",
+          fallbackMessage: "Failed to load versions.",
+          name: "FilesVersionLoadError",
+          context: {
+            containerId: container.id,
+            itemId: item.id,
+          },
+        });
+        console.error("Load versions failed:", loadVersionsError);
+        setVersionDialogError(loadVersionsError);
+      } finally {
+        setVersionDialogLoading(false);
+      }
+    },
+    [container.id],
+  );
+
+  /**
+   * 打开版本历史弹窗，并主动读取列表与当前版本元数据。
+   */
+  const handleManageVersions = useCallback(
+    (item: IDriveItemExtended) => {
+      setCurrentVersionItem(item);
+      setVersionDialogOpen(true);
+      void loadVersionDialogData(item, { resetBeforeLoad: true });
+    },
+    [loadVersionDialogData],
+  );
+
+  /**
+   * 关闭版本历史弹窗，并清理当前文件上下文。
+   */
+  const handleCloseVersionDialog = useCallback(() => {
+    setVersionDialogOpen(false);
+    setCurrentVersionItem(null);
+    setVersionDialogEntries([]);
+    setCurrentVersionId(null);
+    setVersionDialogLoading(false);
+    setVersionDialogActionPending(false);
+    setVersionDialogError(null);
+  }, []);
+
+  /**
+   * 执行版本写操作，并在成功后统一重读 list + current。
+   *
+   * @param action 写操作实现。
+   * @param fallbackMessage 兜底错误文案。
+   * @param code 稳定错误码。
+   */
+  const runVersionWriteAction = useCallback(
+    async (
+      action: () => Promise<void>,
+      fallbackMessage: string,
+      code: string,
+    ) => {
+      if (!currentVersionItem?.id) {
+        return;
+      }
+
+      setVersionDialogActionPending(true);
+      setVersionDialogError(null);
+
+      try {
+        await action();
+        await loadVersionDialogData(currentVersionItem);
+      } catch (error: unknown) {
+        const versionActionError = normalizeFilesOperationError(error, {
+          code,
+          fallbackMessage,
+          name: "FilesVersionActionError",
+          context: {
+            containerId: container.id,
+            itemId: currentVersionItem.id,
+          },
+        });
+        console.error("Version action failed:", versionActionError);
+        setVersionDialogError(versionActionError);
+      } finally {
+        setVersionDialogActionPending(false);
+      }
+    },
+    [container.id, currentVersionItem, loadVersionDialogData],
+  );
+
+  /**
+   * 下载指定版本。
+   *
+   * 这里沿用页面已有的隐藏 `<a>` 直链下载模式。
+   *
+   * @param entry 目标版本条目。
+   */
+  const handleVersionDownload = useCallback(
+    async (entry: IItemVersionEntryForUI) => {
+      if (!currentVersionItem?.id) {
+        return;
+      }
+
+      setVersionDialogError(null);
+
+      try {
+        const downloadUrl = await getItemVersionDownload(
+          container.id,
+          currentVersionItem.id,
+          entry.id,
+        );
+        onDownloadItemClick(downloadUrl);
+      } catch (error: unknown) {
+        const downloadVersionError = normalizeFilesOperationError(error, {
+          code: "downloadVersionFailed",
+          fallbackMessage: "Failed to download the selected version.",
+          name: "FilesVersionDownloadError",
+          context: {
+            containerId: container.id,
+            itemId: currentVersionItem.id,
+            versionId: entry.id,
+          },
+        });
+        console.error("Version download failed:", downloadVersionError);
+        setVersionDialogError(downloadVersionError);
+      }
+    },
+    [container.id, currentVersionItem, onDownloadItemClick],
+  );
+
+  /**
+   * 恢复指定历史版本。
+   *
+   * @param entry 目标版本条目。
+   */
+  const handleVersionRestore = useCallback(
+    async (entry: IItemVersionEntryForUI) => {
+      await runVersionWriteAction(
+        () =>
+          restoreItemVersion(
+            container.id,
+            currentVersionItem?.id as string,
+            entry.id,
+          ),
+        "Failed to restore the selected version.",
+        "restoreVersionFailed",
+      );
+    },
+    [container.id, currentVersionItem?.id, runVersionWriteAction],
+  );
+
+  /**
+   * 删除指定历史版本。
+   *
+   * @param entry 目标版本条目。
+   */
+  const handleVersionDelete = useCallback(
+    async (entry: IItemVersionEntryForUI) => {
+      await runVersionWriteAction(
+        () =>
+          deleteItemVersion(
+            container.id,
+            currentVersionItem?.id as string,
+            entry.id,
+          ),
+        "Failed to delete the selected version.",
+        "deleteVersionFailed",
+      );
+    },
+    [container.id, currentVersionItem?.id, runVersionWriteAction],
+  );
+
+  /**
+   * 删除除当前版本外的所有历史版本。
+   */
+  const handleDeleteHistoryVersions = useCallback(async () => {
+    await runVersionWriteAction(
+      () =>
+        deleteItemHistoryVersions(
+          container.id,
+          currentVersionItem?.id as string,
+        ),
+      "Failed to delete history versions.",
+      "deleteHistoryVersionsFailed",
+    );
+  }, [container.id, currentVersionItem?.id, runVersionWriteAction]);
+
   const previewableFiles = driveItems.filter((item) => !item.isFolder);
 
   return (
@@ -628,10 +861,25 @@ export const Files = ({
           onOpenFolder={navigateToFolder}
           onPreviewFile={handlePreviewOpen}
           onManagePermissions={handleManageItemPermissions}
+          onManageVersions={handleManageVersions}
           actionsButtonGroupClassName={styles.actionsButtonGroup}
           nameCellContentClassName={styles.nameCellContent}
         />
       </div>
+
+      <VersionHistoryDialog
+        open={versionDialogOpen}
+        versions={versionDialogEntries}
+        currentVersionId={currentVersionId}
+        isLoading={versionDialogLoading}
+        isActionPending={versionDialogActionPending}
+        error={versionDialogError}
+        onClose={handleCloseVersionDialog}
+        onDownload={(entry) => void handleVersionDownload(entry)}
+        onRestore={(entry) => void handleVersionRestore(entry)}
+        onDelete={(entry) => void handleVersionDelete(entry)}
+        onDeleteHistoryVersions={() => void handleDeleteHistoryVersions()}
+      />
 
       <ItemPermissionDialog
         open={itemPermissionDialogOpen}
