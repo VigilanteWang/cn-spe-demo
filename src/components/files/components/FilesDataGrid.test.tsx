@@ -137,4 +137,32 @@ describe("FilesDataGrid", () => {
     fireEvent.click(versionsButtons[0]);
     expect(onManageVersions).toHaveBeenCalledWith(fileItem);
   });
+
+  it("should render permissions before versions in the actions cell", () => {
+    render(
+      <FilesDataGrid
+        driveItems={[createItem({ id: "file-5", name: "guide.docx" })]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        onManagePermissions={vi.fn()}
+        onManageVersions={vi.fn()}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    const actionButtons = screen.getAllByRole("button");
+    const permissionsIndex = actionButtons.findIndex(
+      (button) => button.getAttribute("aria-label") === "Permissions",
+    );
+    const versionsIndex = actionButtons.findIndex(
+      (button) => button.getAttribute("aria-label") === "Versions",
+    );
+
+    expect(permissionsIndex).toBeGreaterThanOrEqual(0);
+    expect(versionsIndex).toBeGreaterThanOrEqual(0);
+    expect(permissionsIndex).toBeLessThan(versionsIndex);
+  });
 });

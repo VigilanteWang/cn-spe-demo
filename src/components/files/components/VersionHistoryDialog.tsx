@@ -23,6 +23,7 @@ import {
   ArrowCounterclockwiseRegular,
   ArrowDownloadRegular,
   DeleteRegular,
+  DismissRegular,
 } from "@fluentui/react-icons";
 import type { AppError } from "../../../../common/appError";
 import { formatAppErrorMessageForUI } from "../../../../common/appError";
@@ -115,6 +116,8 @@ export const VersionHistoryDialog = ({
     versionId: string;
     action: Exclude<VersionDialogPendingAction, "deleteHistoryVersions">;
   } | null>(null);
+  // 单看当前 isActionPending 只能知道“现在是否仍在执行”，
+  // 这里额外记住上一轮的值，是为了识别 isActionPending 从 true 变为 false 的时刻
   const wasActionPendingRef = useRef(isActionPending);
 
   useEffect(() => {
@@ -166,6 +169,12 @@ export const VersionHistoryDialog = ({
           const isCurrentVersion = entry.id === currentVersionId;
           // 读取中或写操作 pending 时统一禁用按钮，避免并发点击打乱版本状态。
           const isDisabled = isLoading || isActionPending;
+          // Popover 采用“受控打开”模式：
+          // 当前这一行是否打开，不由 ActionConfirmPopover 自己记状态，
+          // 而是由本组件的 activeRowPopover 统一记录“哪一行、哪个动作正在确认”。
+          // 因此用户点击 trigger 后，会先通过 onOpenChange 把“想打开”的意图传回来，
+          // 再由 setActiveRowPopover 触发本组件重新 render，
+          // 下一轮 render 才会把 open=true 传给对应那一个 Popover。
           const isRestorePopoverOpen =
             activeRowPopover?.versionId === entry.id &&
             activeRowPopover.action === "restoreVersion";
@@ -200,7 +209,14 @@ export const VersionHistoryDialog = ({
                 open={isRestorePopoverOpen}
                 onOpenChange={(nextOpen) => {
                   if (nextOpen) {
+                    // 顶部的“Delete history versions”和行内确认框是互斥的：
+                    // 这里一旦准备打开某一行的 Restore 确认框，就先强制关闭顶部确认框，
+                    // 避免页面上同时存在两个高风险动作的确认浮层。
                     setIsDeleteHistoryPopoverOpen(false);
+                    // 把“当前打开的是哪一行的 Restore 确认框”写入组件 state。
+                    // 这个 setState 会触发 VersionHistoryDialog 重新 render，
+                    // 然后当前行重新计算出 isRestorePopoverOpen === true，
+                    // 最终把 open=true 传回 ActionConfirmPopover / Popover。
                     setActiveRowPopover({
                       versionId: entry.id,
                       action: "restoreVersion",
@@ -209,10 +225,12 @@ export const VersionHistoryDialog = ({
                   }
 
                   if (isRestorePopoverOpen) {
+                    // 关闭意图到来时，只需要清空当前行记录；
+                    // 下一轮 render 后，这一行的 open 就会回到 false。
                     setActiveRowPopover(null);
                   }
                 }}
-                message="This creates a new version from the selected version and keeps all existing versions. Proceed?"
+                message="Are you sure you want to restore this version? This will create a copy of it and make it the latest version."
                 loadingLabel="Restoring"
                 isPending={
                   isActionPending && pendingAction === "restoreVersion"
@@ -235,7 +253,10 @@ export const VersionHistoryDialog = ({
                 open={isDeletePopoverOpen}
                 onOpenChange={(nextOpen) => {
                   if (nextOpen) {
+                    // 和 Restore 一样，行内 Delete 确认框打开前也要先收起顶部确认框，
+                    // 保持整个 dialog 同一时间只存在一个确认浮层。
                     setIsDeleteHistoryPopoverOpen(false);
+                    // 统一由 activeRowPopover 记录当前打开的行内确认框。
                     setActiveRowPopover({
                       versionId: entry.id,
                       action: "deleteVersion",
@@ -244,6 +265,7 @@ export const VersionHistoryDialog = ({
                   }
 
                   if (isDeletePopoverOpen) {
+                    // 清空后重新 render，这一行的受控 open 会回到 false。
                     setActiveRowPopover(null);
                   }
                 }}
@@ -285,32 +307,38 @@ export const VersionHistoryDialog = ({
     >
       <DialogSurface className={styles.surface}>
         <DialogBody className={styles.body}>
-          <DialogTitle>Versions</DialogTitle>
+          {/* 标题区保持和 Preview 一致：左侧标题，右侧提供显式关闭入口。 */}
+          <div className={styles.titleRow}>
+            <DialogTitle>Versions</DialogTitle>
+            <Button
+              appearance="subtle"
+              icon={<DismissRegular />}
+              onClick={onClose}
+              aria-label="Close versions"
+            />
+          </div>
           <DialogContent className={styles.content}>
-            {/* 顶部区域左边显示读取状态，右边放批量动作入口。 */}
+            {/* 顶部区域改为从左到右排列：先放批量动作入口，再放读取状态。 */}
             <div className={styles.headerRow}>
-              <div>
-                {isLoading && (
-                  <Spinner
-                    size="small"
-                    label="Loading versions..."
-                    labelPosition="after"
-                  />
-                )}
-              </div>
               <div className={styles.headerActions}>
                 {/* 删除全部历史版本是高风险动作，因此先经过一次轻量确认。 */}
                 <ActionConfirmPopover
                   trigger={
-                    <Button disabled={isLoading || isActionPending}>
+                    <Button
+                      size="small"
+                      disabled={isLoading || isActionPending}
+                    >
                       Delete history versions
                     </Button>
                   }
                   open={isDeleteHistoryPopoverOpen}
                   onOpenChange={(nextOpen) => {
                     if (nextOpen) {
+                      // 顶部批量删除确认框打开时，反过来清空所有行内确认框。
+                      // 这样顶部确认框与任意一行的 Restore/Delete 确认框始终互斥。
                       setActiveRowPopover(null);
                     }
+                    // 顶部确认框自己的开关状态单独保存在 isDeleteHistoryPopoverOpen。
                     setIsDeleteHistoryPopoverOpen(nextOpen);
                   }}
                   message="This will delete all history versions except the current version. Are you sure?"
@@ -321,6 +349,16 @@ export const VersionHistoryDialog = ({
                   onConfirm={onDeleteHistoryVersions}
                   disabled={isLoading || isActionPending}
                 />
+              </div>
+              <div className={styles.headerLoading}>
+                {isLoading && (
+                  <Spinner
+                    size="tiny"
+                    className={styles.headerLoadingSpinner}
+                    label="Loading versions..."
+                    labelPosition="after"
+                  />
+                )}
               </div>
             </div>
 

@@ -20,6 +20,31 @@ const versions = [
 ];
 
 describe("VersionHistoryDialog", () => {
+  it("should call onClose when clicking the close button", () => {
+    const onClose = vi.fn();
+
+    render(
+      <VersionHistoryDialog
+        open
+        versions={versions}
+        currentVersionId="3.0"
+        isLoading={false}
+        isActionPending={false}
+        pendingAction={null}
+        error={null}
+        onClose={onClose}
+        onDownload={vi.fn()}
+        onRestore={vi.fn()}
+        onDelete={vi.fn()}
+        onDeleteHistoryVersions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close versions" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("should disable restore and delete for the current version", () => {
     render(
       <VersionHistoryDialog
@@ -129,7 +154,7 @@ describe("VersionHistoryDialog", () => {
 
     expect(
       screen.getByText(
-        "This creates a new version from the selected version and keeps all existing versions. Proceed?",
+        "Are you sure you want to restore this version? This will create a copy of it and make it the latest version.",
       ),
     ).toBeInTheDocument();
 

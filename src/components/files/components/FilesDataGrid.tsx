@@ -156,6 +156,13 @@ export const FilesDataGrid = ({
         renderHeaderCell: () => "Actions",
         renderCell: (driveItem) => (
           <div className={actionsButtonGroupClassName}>
+            <Button
+              aria-label="Permissions"
+              icon={<PeopleRegular />}
+              onClick={() => onManagePermissions(driveItem)}
+            >
+              Permissions
+            </Button>
             {/* Versions 只对文件开放；文件夹不展示该入口。 */}
             {!driveItem.isFolder && (
               <Button
@@ -166,13 +173,6 @@ export const FilesDataGrid = ({
                 Versions
               </Button>
             )}
-            <Button
-              aria-label="Permissions"
-              icon={<PeopleRegular />}
-              onClick={() => onManagePermissions(driveItem)}
-            >
-              Permissions
-            </Button>
           </div>
         ),
       }),

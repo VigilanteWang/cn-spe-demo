@@ -107,6 +107,8 @@ export const ActionConfirmPopover = ({
 }: IActionConfirmPopoverProps) => {
   const styles = useActionConfirmPopoverStyles();
 
+  // 外层既可能通过 trigger 自己传 disabled，也可能通过通用确认组件统一禁用；
+  // 无论禁用决定来自触发器自身，还是来自 ActionConfirmPopover 这一层，最终用户看到的按钮状态都一致。
   const mergedTrigger =
     isValidElement(trigger) && typeof disabled === "boolean"
       ? cloneElement(trigger, {
@@ -118,6 +120,8 @@ export const ActionConfirmPopover = ({
     <Popover
       open={open}
       onOpenChange={(_event, data) => {
+        // 当前组件本身不持有 open state，因此这里只负责把这个“开关意图”
+        // 转交给外层状态机，由外层更新 state 后再触发下一轮 render。
         // 执行中保持浮层可见，避免用户在 loading 过程中误以为动作没有开始。
         if (!isPending) {
           onOpenChange(data.open);
@@ -127,6 +131,7 @@ export const ActionConfirmPopover = ({
       <PopoverTrigger disableButtonEnhancement>{mergedTrigger}</PopoverTrigger>
       <PopoverSurface className={styles.surface}>
         <div className={styles.content}>
+          {/* 正文区域只展示两种状态：确认提示，或动作执行中的 loading 反馈。 */}
           <div className={styles.contentBody}>
             {isPending ? (
               <div className={styles.pendingState}>
@@ -137,6 +142,7 @@ export const ActionConfirmPopover = ({
               <Text className={styles.message}>{message}</Text>
             )}
           </div>
+          {/* 底部按钮区始终保留，执行中统一禁用，避免重复确认或中途取消造成状态混乱。 */}
           <div className={styles.actions}>
             <Button
               size="small"

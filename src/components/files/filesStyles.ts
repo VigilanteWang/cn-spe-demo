@@ -125,16 +125,35 @@ export const useVersionHistoryDialogStyles = makeStyles({
     minHeight: 0,
     maxWidth: "100%",
   },
-  headerRow: {
+  titleRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
   },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: "12px",
+  },
   headerActions: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
+  },
+  headerLoading: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: "24px",
+    fontSize: "12px",
+    lineHeight: "16px",
+  },
+  headerLoadingSpinner: {
+    "& .fui-Spinner__label": {
+      fontSize: "12px",
+      lineHeight: "16px",
+    },
   },
   gridWrapper: {
     overflowX: "auto",
