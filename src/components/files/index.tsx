@@ -422,7 +422,7 @@ export const Files = ({
         - 页面层只根据 createFolder 的返回值决定是否关闭对话框
       */}
       <Dialog open={newFolderDialogOpen}>
-        <DialogSurface>
+        <DialogSurface className={styles.newFolderDialogSurface}>
           <DialogBody>
             <DialogTitle>Create New Folder</DialogTitle>
             <DialogContent className={styles.dialogContent}>
@@ -443,46 +443,49 @@ export const Files = ({
                   labelPosition="after"
                 />
               )}
-              {newFolderError && (
-                <Text
-                  role="alert"
-                  style={{ color: tokens.colorPaletteRedForeground1 }}
-                >
+            </DialogContent>
+
+            <div className={styles.dialogFooterErrorSlot}>
+              {newFolderError ? (
+                <Text role="alert" className={styles.dialogErrorText}>
                   {formatAppErrorMessageForUI(
                     newFolderError,
                     "Failed to create folder.",
                   )}
                 </Text>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <DialogTrigger disableButtonEnhancement>
-                <Button
-                  appearance="secondary"
-                  onClick={() => {
-                    setNewFolderDialogOpen(false);
-                    resetFolderCreationState();
-                  }}
-                  disabled={creatingFolder}
-                >
-                  Cancel
-                </Button>
-              </DialogTrigger>
-              {/* folderName 为空或正在创建时禁用，避免提交空名称或重复请求 */}
-              <Button
-                appearance="primary"
-                onClick={async () => {
-                  // createFolder 返回布尔值，让页面层能用最少逻辑决定是否关弹窗。
-                  const didCreate = await createFolder();
+              ) : null}
+            </div>
 
-                  if (didCreate) {
-                    setNewFolderDialogOpen(false);
-                  }
-                }}
-                disabled={creatingFolder || folderName === ""}
-              >
-                Create Folder
-              </Button>
+            <DialogActions className={styles.dialogFooterActions}>
+              <div className={styles.dialogFooterButtons}>
+                <DialogTrigger disableButtonEnhancement>
+                  <Button
+                    appearance="secondary"
+                    onClick={() => {
+                      setNewFolderDialogOpen(false);
+                      resetFolderCreationState();
+                    }}
+                    disabled={creatingFolder}
+                  >
+                    Cancel
+                  </Button>
+                </DialogTrigger>
+                {/* folderName 为空或正在创建时禁用，避免提交空名称或重复请求 */}
+                <Button
+                  appearance="primary"
+                  onClick={async () => {
+                    // createFolder 返回布尔值，让页面层能用最少逻辑决定是否关弹窗。
+                    const didCreate = await createFolder();
+
+                    if (didCreate) {
+                      setNewFolderDialogOpen(false);
+                    }
+                  }}
+                  disabled={creatingFolder || folderName === ""}
+                >
+                  Create Folder
+                </Button>
+              </div>
             </DialogActions>
           </DialogBody>
         </DialogSurface>

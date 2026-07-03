@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Files } from "./index";
+import { AppError } from "../../../common/appError";
 
 const {
   useFilesDataMock,
@@ -69,8 +70,13 @@ vi.mock("./filesStyles", () => ({
     progressStatusText: "progressStatusText",
     progressStatusRight: "progressStatusRight",
     progressPercent: "progressPercent",
+    newFolderDialogSurface: "newFolderDialogSurface",
     dialogContent: "dialogContent",
     dialogInputControl: "dialogInputControl",
+    dialogFooterErrorSlot: "dialogFooterErrorSlot",
+    dialogFooterActions: "dialogFooterActions",
+    dialogFooterButtons: "dialogFooterButtons",
+    dialogErrorText: "dialogErrorText",
     dataGridWrapper: "dataGridWrapper",
     actionsButtonGroup: "actionsButtonGroup",
     nameCellContent: "nameCellContent",
@@ -288,6 +294,35 @@ describe("Files", () => {
 
     expect(useFilesDeleteActionMock.mock.results[0]?.value.resetDeleteError).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Delete Item")).toBeInTheDocument();
+  });
+
+  it("should keep new-folder errors inside the dialog", () => {
+    useFilesFolderCreationMock.mockReturnValue({
+      folderName: "Existing Folder",
+      creatingFolder: false,
+      newFolderError: new AppError({
+        name: "FilesCreateFolderError",
+        code: "createFolderFailed",
+        message: "Folder already exists.",
+      }),
+      onFolderNameChange: vi.fn(),
+      createFolder: vi.fn().mockResolvedValue(false),
+      resetFolderCreationState: vi.fn(),
+    });
+
+    render(
+      <Files
+        container={{ id: "container-1" } as never}
+        onOpenContainerPermissions={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "New Folder" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create New Folder" });
+    expect(
+      within(dialog).getByText("FilesCreateFolderError: Folder already exists."),
+    ).toBeInTheDocument();
   });
 
   it("should open the preview when a grid file is selected", () => {

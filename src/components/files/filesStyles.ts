@@ -4,14 +4,45 @@ import { makeStyles, tokens } from "@fluentui/react-components";
  * Files 功能区域的样式定义。
  */
 export const useFilesStyles = makeStyles({
+  newFolderDialogSurface: {
+    // 新建文件夹弹窗与 Create container 保持同样的宽度策略，
+    // 这样桌面端和窄屏下的整体视觉节奏会一致。
+    maxWidth: "550px",
+    width: "calc(100vw - 32px)",
+  },
   dialogInputControl: {
-    width: "400px",
+    width: "360px",
+    maxWidth: "100%",
   },
   dialogContent: {
     display: "flex",
     flexDirection: "column",
     rowGap: "10px",
     marginBottom: "25px",
+  },
+  dialogFooterErrorSlot: {
+    gridRowStart: 3,
+    gridRowEnd: 4,
+    gridColumnStart: 1,
+    gridColumnEnd: 3,
+    alignSelf: "end",
+    minHeight: "24px",
+    minWidth: 0,
+    paddingRight: "16px",
+  },
+  dialogFooterActions: {
+    gridColumnStart: 3,
+    gridColumnEnd: 4,
+    justifySelf: "end",
+  },
+  dialogFooterButtons: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "12px",
+  },
+  dialogErrorText: {
+    color: tokens.colorPaletteRedForeground1,
+    overflowWrap: "anywhere",
   },
   breadcrumbContainer: {
     padding: "6px 0",
