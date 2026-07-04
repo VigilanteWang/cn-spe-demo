@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  Client,
-  GraphRequest,
-} from "@microsoft/microsoft-graph-client";
+import type { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
 import {
   applyContainerPermissionChangeSet,
   fetchMapContainerPermissionFromGraphToEntries,
@@ -13,7 +10,7 @@ import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMa
 vi.mock("../auth", () => ({
   createGraphClient: vi.fn(),
   getGraphOBOToken: vi.fn(),
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
 }));
 
 vi.mock("./containerPermissionsCommonAdapters", async () => {
@@ -68,9 +65,11 @@ describe("containerPermissionsHandlers GraphError boundary", () => {
   it("should keep local role mapping failures out of GraphError", async () => {
     const graphClient = createMockGraphClient({});
 
-    vi.mocked(mapUiContainerPermissionRoleToGraph).mockImplementationOnce(() => {
-      throw new Error("local container role mapping failed");
-    });
+    vi.mocked(mapUiContainerPermissionRoleToGraph).mockImplementationOnce(
+      () => {
+        throw new Error("local container role mapping failed");
+      },
+    );
 
     await expect(
       applyContainerPermissionChangeSet(graphClient, "container-1", {

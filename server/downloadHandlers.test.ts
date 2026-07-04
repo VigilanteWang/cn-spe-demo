@@ -7,7 +7,7 @@ import {
 } from "./downloadHandlers";
 
 const authMocks = vi.hoisted(() => ({
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
 }));
 
 const downloadMocks = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ vi.mock("./download", () => downloadMocks);
 describe("downloadHandlers error handling", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    authMocks.requireContainerManageRequest.mockResolvedValue({
+    authMocks.requireContainerAccessAsUserRequest.mockResolvedValue({
       token: "user-token",
       claims: { oid: "user-oid" },
     });

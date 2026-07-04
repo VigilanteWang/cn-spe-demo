@@ -6,7 +6,7 @@ const createHeadersLike = (entries: Record<string, string>) =>
   new Headers(entries);
 
 const authMocks = vi.hoisted(() => ({
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
   getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
@@ -19,7 +19,7 @@ vi.mock("./config", () => ({
 describe("listContainers error handling", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    authMocks.requireContainerManageRequest.mockResolvedValue({
+    authMocks.requireContainerAccessAsUserRequest.mockResolvedValue({
       token: "user-token",
     });
     authMocks.getGraphOBOToken.mockResolvedValue("graph-token");

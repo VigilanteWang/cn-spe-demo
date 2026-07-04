@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { listContainers } from "./backendApi";
+import { listContainers } from "./containerAndFileApi";
 import { sendAuthorizedRequest } from "./apiClient";
 
 vi.mock("./apiClient", () => ({
@@ -8,7 +8,7 @@ vi.mock("./apiClient", () => ({
 
 const sendAuthorizedRequestMock = vi.mocked(sendAuthorizedRequest);
 
-describe("backendApi", () => {
+describe("containerAndFileApi", () => {
   it("should preserve structured backend error fields when listContainers fails", async () => {
     sendAuthorizedRequestMock.mockResolvedValue(
       new Response(

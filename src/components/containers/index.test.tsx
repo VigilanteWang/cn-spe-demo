@@ -17,7 +17,7 @@ const { listContainersMock, createContainerMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../services/backendApi", () => {
+vi.mock("../../services/containerAndFileApi", () => {
   return {
     listContainers: listContainersMock,
     createContainer: createContainerMock,

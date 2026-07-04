@@ -3,7 +3,7 @@ import { withErrorHandling } from "./common/errorResponse";
 import { deleteItems } from "./deleteItems";
 
 const authMocks = vi.hoisted(() => ({
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
   getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
@@ -13,7 +13,7 @@ vi.mock("./auth", () => authMocks);
 describe("deleteItems error handling", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    authMocks.requireContainerManageRequest.mockResolvedValue({
+    authMocks.requireContainerAccessAsUserRequest.mockResolvedValue({
       token: "user-token",
     });
     authMocks.getGraphOBOToken.mockResolvedValue("graph-token");

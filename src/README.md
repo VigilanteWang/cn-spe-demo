@@ -41,7 +41,7 @@ src/
 1. **index.tsx** 初始化 `Msal2Provider`，配置 clientId、authority、scopes
 2. **App.tsx** 中的 `<Login />` 组件提供登录 UI，使用全局 Provider 完成登录
 3. **spembedded.ts** 的 `getApiAccessToken()` 从全局 Provider 获取 API 专用 Token
-4. Token 的 scope 格式为 `api://{apiClientId}/Container.Manage`
+4. Token 的 scope 格式为 `api://{apiClientId}/Container.AccessAsUser`
 5. 后端收到 Token 后通过 OBO（On-Behalf-Of）流程换取 Graph API Token
 
 ### MGT (Microsoft Graph Toolkit)

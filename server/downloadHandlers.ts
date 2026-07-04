@@ -1,5 +1,5 @@
 import { Request, Response } from "restify";
-import { requireContainerManageRequest } from "./auth";
+import { requireContainerAccessAsUserRequest } from "./auth";
 import { createValidationError } from "./common/appErrorHelpers";
 import { getJobManifest, getJobProgress, startDownloadJob } from "./download";
 
@@ -15,7 +15,7 @@ interface IStartDownloadRequestBody {
  * @param res Restify 响应对象。
  */
 export const startDownloadRequest = async (req: Request, res: Response) => {
-  const authResult = await requireContainerManageRequest(req);
+  const authResult = await requireContainerAccessAsUserRequest(req);
   const body = (req.body ?? {}) as IStartDownloadRequestBody;
   const containerId = readNonEmptyString(body.containerId);
   const itemIds = readStringArray(body.itemIds);
@@ -46,7 +46,7 @@ export const getDownloadProgressRequest = async (
   req: Request,
   res: Response,
 ) => {
-  const authResult = await requireContainerManageRequest(req);
+  const authResult = await requireContainerAccessAsUserRequest(req);
   const jobId = readNonEmptyString(req.params?.jobId);
 
   if (!jobId) {
@@ -68,7 +68,7 @@ export const getDownloadManifestRequest = async (
   req: Request,
   res: Response,
 ) => {
-  const authResult = await requireContainerManageRequest(req);
+  const authResult = await requireContainerAccessAsUserRequest(req);
   const jobId = readNonEmptyString(req.params?.jobId);
 
   if (!jobId) {

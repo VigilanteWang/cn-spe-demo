@@ -2,7 +2,7 @@ import type { Request, Response } from "restify";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../auth";
 import { createValidationError } from "../common/appErrorHelpers";
 import type {
@@ -33,7 +33,7 @@ export const listItemVersionsFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
 
@@ -54,7 +54,7 @@ export const listItemVersionsFromGraph = async (
  * 读取指定单条版本元数据。
  */
 export const getItemVersionFromGraph = async (req: Request, res: Response) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
   const versionId = readVersionId(req);
@@ -84,7 +84,7 @@ export const getCurrentItemVersionFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
 
@@ -112,7 +112,7 @@ export const getItemVersionDownloadFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
   const versionId = readVersionId(req);
@@ -142,7 +142,7 @@ export const restoreItemVersionFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
   const versionId = readVersionId(req);
@@ -167,7 +167,7 @@ export const deleteItemVersionFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
   const versionId = readVersionId(req);
@@ -192,7 +192,7 @@ export const deleteItemHistoryVersionsFromGraph = async (
   req: Request,
   res: Response,
 ) => {
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
 

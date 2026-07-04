@@ -3,7 +3,7 @@ import type { Client } from "@microsoft/microsoft-graph-client";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../auth";
 import type {
   IItemUserPermissionChangeSetFromUI,
@@ -45,7 +45,7 @@ export const listItemPermissionsFromGraph = async (
   res: Response,
 ) => {
   /** 先校验当前请求是否具备管理容器权限，避免未授权访问下游 Graph。 */
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   /** 从路由参数中读取目标 drive 标识。 */
   const driveId = readDriveId(req);
   /** 从路由参数中读取目标 item 标识。 */
@@ -82,7 +82,7 @@ export const applyItemPermissionsToGraph = async (
   res: Response,
 ) => {
   /** 权限写操作开始前先完成鉴权。 */
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   /** 读取目标 drive 标识。 */
   const driveId = readDriveId(req);
   /** 读取目标 item 标识。 */

@@ -17,7 +17,7 @@ import { sendGraphRequest } from "../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "./auth";
 import { serverConfig } from "./config";
 
@@ -32,7 +32,7 @@ import { serverConfig } from "./config";
  */
 export const listContainers = async (req: Request, res: Response) => {
   /** 先做权限校验，避免未授权请求访问下游服务。 */
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const graphToken = await getGraphOBOToken(authorizationResult.token);
   const graphClient = createGraphClient(graphToken);
 

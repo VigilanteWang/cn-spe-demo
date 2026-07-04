@@ -25,10 +25,10 @@
 
 | 方法 | 路径                                        | 说明                   | 认证                            |
 | ---- | ------------------------------------------- | ---------------------- | ------------------------------- |
-| GET  | `/api/listContainers`                       | 列出当前用户的所有容器 | Bearer Token + Container.Manage |
-| POST | `/api/createContainer`                      | 创建新容器             | Bearer Token + Container.Manage |
-| POST | `/api/deleteItems`                          | 批量删除文件/文件夹    | Bearer Token + Container.Manage |
-| POST | `/api/download/start`                  | 启动 ZIP 下载准备任务  | Bearer Token + Container.Manage |
+| GET  | `/api/listContainers`                       | 列出当前用户的所有容器 | Bearer Token + Container.AccessAsUser |
+| POST | `/api/createContainer`                      | 创建新容器             | Bearer Token + Container.AccessAsUser |
+| POST | `/api/deleteItems`                          | 批量删除文件/文件夹    | Bearer Token + Container.AccessAsUser |
+| POST | `/api/download/start`                  | 启动 ZIP 下载准备任务  | Bearer Token + Container.AccessAsUser |
 | GET  | `/api/download/progress/:jobId`        | 查询归档任务进度       | Bearer Token                    |
 | GET  | `/api/download/manifest/:jobId`        | 读取下载清单 manifest  | Bearer Token                    |
 
@@ -82,7 +82,7 @@
 
 - ✅ 验证前端发来的 Access Token 是否有效
 - ✅ 提取 Token 中的身份信息（用户ID、租户ID、权限等）
-- ✅ 检查用户是否拥有必要的权限（Container.Manage）
+- ✅ 检查用户是否拥有必要的权限（Container.AccessAsUser）
 - ✅ 用 OBO 流程兑换微软 Graph API Token
 - ✅ 创建与 Graph API 通信的客户端
 
@@ -155,12 +155,12 @@ OBO 是一种安全的权限委托方式：
 
 ### 代码路由解析
 
-#### 主函数: `authorizeContainerManageRequest()`
+#### 主函数: `authorizeContainerAccessAsUserRequest()`
 
 这个函数是 API 的守门员，检查：
 
 ```typescript
-export const authorizeContainerManageRequest = async (
+export const authorizeContainerAccessAsUserRequest = async (
   req: Request,
 ): Promise<AuthorizationResult> => {
   // 步骤 1️⃣: 获取 Authorization header
@@ -177,7 +177,7 @@ export const authorizeContainerManageRequest = async (
   const claims = await verifyAccessToken(token);
 
   // 步骤 4️⃣: 检查权限范围
-  // Token 的 scp claim 必须包含 "Container.Manage"
+  // Token 的 scp claim 必须包含 "Container.AccessAsUser"
   // 否则即使 Token 有效也拒绝访问 (403 Forbidden)
 
   return { ok: true, token, claims }; // 全部通过！
@@ -283,7 +283,7 @@ const jwksClients = {
 ```typescript
 export const createContainer = async (req: Request, res: Response) => {
   // 【第1步】身份验证
-  const authResult = await authorizeContainerManageRequest(req);
+  const authResult = await authorizeContainerAccessAsUserRequest(req);
   if (!authResult.ok) {
     // ❌ 验证失败：返回 401/403 错误
     res.send(authResult.status, authResult.body);

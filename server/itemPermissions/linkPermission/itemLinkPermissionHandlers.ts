@@ -2,7 +2,7 @@ import { Request, Response } from "restify";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../../auth";
 import type {
   IApplyItemLinkPermissionChangesResponse,
@@ -24,7 +24,7 @@ export const listItemLinkPermissionsFromGraph = async (
   res: Response,
 ) => {
   // 这里统一要求容器管理权限，避免普通读取能力越权访问链接权限元数据。
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
 
@@ -55,7 +55,7 @@ export const applyItemLinkPermissionsToGraph = async (
   res: Response,
 ) => {
   // 写操作沿用同一层权限门槛，确保只有允许管理容器的调用方才能修改链接权限。
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
   const driveId = readDriveId(req);
   const itemId = readItemId(req);
 
