@@ -29,6 +29,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={onPreviewFile}
         onManagePermissions={vi.fn()}
+        onManageVersions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -51,6 +52,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={onOpenFolder}
         onPreviewFile={vi.fn()}
         onManagePermissions={vi.fn()}
+        onManageVersions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -77,6 +79,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={vi.fn()}
         onManagePermissions={vi.fn()}
+        onManageVersions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -97,6 +100,7 @@ describe("FilesDataGrid", () => {
         onOpenFolder={vi.fn().mockResolvedValue(undefined)}
         onPreviewFile={vi.fn()}
         onManagePermissions={onManagePermissions}
+        onManageVersions={vi.fn()}
         actionsButtonGroupClassName="actions"
         nameCellContentClassName="name-cell"
       />,
@@ -104,5 +108,61 @@ describe("FilesDataGrid", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Permissions" }));
     expect(onManagePermissions).toHaveBeenCalledWith(targetItem);
+  });
+
+  it("should only show versions for files and call the versions callback", () => {
+    const onManageVersions = vi.fn();
+    const fileItem = createItem({ id: "file-4", name: "spec.docx" });
+
+    render(
+      <FilesDataGrid
+        driveItems={[
+          fileItem,
+          createItem({ id: "folder-2", name: "Archive", isFolder: true }),
+        ]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        onManagePermissions={vi.fn()}
+        onManageVersions={onManageVersions}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    const versionsButtons = screen.getAllByRole("button", { name: "Versions" });
+    expect(versionsButtons).toHaveLength(1);
+
+    fireEvent.click(versionsButtons[0]);
+    expect(onManageVersions).toHaveBeenCalledWith(fileItem);
+  });
+
+  it("should render permissions before versions in the actions cell", () => {
+    render(
+      <FilesDataGrid
+        driveItems={[createItem({ id: "file-5", name: "guide.docx" })]}
+        selectedRows={new Set()}
+        onSelectionChange={vi.fn()}
+        onOpenFolder={vi.fn().mockResolvedValue(undefined)}
+        onPreviewFile={vi.fn()}
+        onManagePermissions={vi.fn()}
+        onManageVersions={vi.fn()}
+        actionsButtonGroupClassName="actions"
+        nameCellContentClassName="name-cell"
+      />,
+    );
+
+    const actionButtons = screen.getAllByRole("button");
+    const permissionsIndex = actionButtons.findIndex(
+      (button) => button.getAttribute("aria-label") === "Permissions",
+    );
+    const versionsIndex = actionButtons.findIndex(
+      (button) => button.getAttribute("aria-label") === "Versions",
+    );
+
+    expect(permissionsIndex).toBeGreaterThanOrEqual(0);
+    expect(versionsIndex).toBeGreaterThanOrEqual(0);
+    expect(permissionsIndex).toBeLessThan(versionsIndex);
   });
 });

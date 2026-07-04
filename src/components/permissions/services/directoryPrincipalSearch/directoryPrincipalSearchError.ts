@@ -59,8 +59,12 @@ export const createDirectoryPrincipalSearchError = (
 /**
  * 将 Graph SDK 抛出的 unknown 错误映射为稳定错误对象。
  *
- * 本模块不处理 429 retry loop，因为 Graph SDK / MGT client 已经内置重试；
- * 这里处理的是重试后仍然失败的最终错误。
+ * 本模块不处理目录搜索这条 Microsoft Graph 请求链路里的 429/503/504 retry loop，
+ * 因为这里使用的 Graph SDK / MGT Graph client 已经内置了 retry middleware。
+ * 这里处理的是这些 Graph 请求重试耗尽后仍然失败的最终错误。
+ *
+ * 注意：这里讨论的是 Graph 请求层的 throttling / retry，
+ * 不是 AAD / MSAL 在获取 access token 时的节流或静默续期控制。
  */
 export const mapGraphError = (error: unknown): AppError => {
   if (

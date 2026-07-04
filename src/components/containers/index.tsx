@@ -70,8 +70,10 @@ export const Containers = () => {
   const [isContainerPermissionDialogOpen, setIsContainerPermissionDialogOpen] =
     useState(false);
 
-  // =============== 错误状态：容器加载失败或创建失败时展示 ===============
-  const [containerError, setContainerError] = useState<string | null>(null);
+  // =============== 页面级错误状态：这里只负责容器列表加载失败 ===============
+  const [listContainersError, setListContainersError] = useState<string | null>(
+    null,
+  );
 
   // =============== 副作用：初始加载容器列表 ===============
   // 组件挂载时立即调用后端 API 获取容器列表
@@ -82,7 +84,7 @@ export const Containers = () => {
         setContainers(nextContainers);
       } catch (error) {
         // 加载容器列表失败时，在按鈕旁显示错误提示
-        setContainerError(
+        setListContainersError(
           formatAppErrorMessageForUI(error, "Failed to load containers"),
         );
       }
@@ -114,8 +116,6 @@ export const Containers = () => {
   const handleContainerCreated = (container: IContainer) => {
     setContainers((currentContainers) => [...currentContainers, container]);
     setSelectedContainer(container);
-    // 创建成功后清除之前的错误提示
-    setContainerError(null);
   };
 
   return (
@@ -149,9 +149,9 @@ export const Containers = () => {
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               Create container
             </Button>
-            {/* 创建容器失败或加载错误时，在按鈕右侧显示错误文字 */}
-            {containerError && (
-              <span className={styles.errorLabel}>{containerError}</span>
+            {/* 这里只显示页面级的容器列表加载错误；创建失败改由 Dialog 内部自己承载。 */}
+            {listContainersError && (
+              <span className={styles.errorLabel}>{listContainersError}</span>
             )}
           </div>
         </div>
@@ -162,11 +162,6 @@ export const Containers = () => {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onContainerCreated={handleContainerCreated}
-        onError={(error) =>
-          setContainerError(
-            formatAppErrorMessageForUI(error, "Failed to create container"),
-          )
-        }
       />
 
       {/* 容器权限对话框：本步只接入静态骨架，不做真实 Graph 权限读取或写回 */}

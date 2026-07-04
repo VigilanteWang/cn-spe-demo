@@ -4,14 +4,45 @@ import { makeStyles, tokens } from "@fluentui/react-components";
  * Files 功能区域的样式定义。
  */
 export const useFilesStyles = makeStyles({
+  newFolderDialogSurface: {
+    // 新建文件夹弹窗与 Create container 保持同样的宽度策略，
+    // 这样桌面端和窄屏下的整体视觉节奏会一致。
+    maxWidth: "550px",
+    width: "calc(100vw - 32px)",
+  },
   dialogInputControl: {
-    width: "400px",
+    width: "360px",
+    maxWidth: "100%",
   },
   dialogContent: {
     display: "flex",
     flexDirection: "column",
     rowGap: "10px",
     marginBottom: "25px",
+  },
+  dialogFooterErrorSlot: {
+    gridRowStart: 3,
+    gridRowEnd: 4,
+    gridColumnStart: 1,
+    gridColumnEnd: 3,
+    alignSelf: "end",
+    minHeight: "24px",
+    minWidth: 0,
+    paddingRight: "16px",
+  },
+  dialogFooterActions: {
+    gridColumnStart: 3,
+    gridColumnEnd: 4,
+    justifySelf: "end",
+  },
+  dialogFooterButtons: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "12px",
+  },
+  dialogErrorText: {
+    color: tokens.colorPaletteRedForeground1,
+    overflowWrap: "anywhere",
   },
   breadcrumbContainer: {
     padding: "6px 0",
@@ -96,5 +127,94 @@ export const useFilesStyles = makeStyles({
   nameCellContent: {
     whiteSpace: "normal",
     wordBreak: "break-word",
+  },
+});
+
+/**
+ * Version history dialog 的样式定义。
+ */
+export const useVersionHistoryDialogStyles = makeStyles({
+  surface: {
+    // Versions Dialog 默认给到一个稍宽的可用空间，
+    // 让表格能在桌面视口下更自然地铺开；窄屏时仍然受 viewport 限制。
+    width: "min(670px, calc(100vw - 32px))",
+    minWidth: "min(600px, calc(100vw - 32px))",
+    maxWidth: "min(670px, calc(100vw - 32px))",
+  },
+  body: {
+    display: "flex",
+    flexDirection: "column",
+    height: "50vh",
+    minHeight: "280px",
+    maxHeight: "calc(100vh - 32px)",
+  },
+  content: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: "12px",
+    flex: 1,
+    minHeight: 0,
+    maxWidth: "100%",
+  },
+  titleRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: "12px",
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  headerLoading: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: "24px",
+    fontSize: "12px",
+    lineHeight: "16px",
+  },
+  headerLoadingSpinner: {
+    "& .fui-Spinner__label": {
+      fontSize: "12px",
+      lineHeight: "16px",
+    },
+  },
+  gridWrapper: {
+    overflowX: "auto",
+    overflowY: "auto",
+    flex: 1,
+    minHeight: 0,
+    maxWidth: "100%",
+  },
+  grid: {
+    // 表格默认占满 dialog 可用宽度；
+    // 当列最小宽度总和更大时，再退回横向滚动而不是把列硬压坏。
+    width: "100%",
+    minWidth: "max-content",
+  },
+  actionGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    width: "fit-content",
+  },
+  actionIconButton: {
+    minWidth: "28px",
+    width: "28px",
+    paddingLeft: "4px",
+    paddingRight: "4px",
+  },
+  errorText: {
+    color: tokens.colorPaletteRedForeground1,
+  },
+  emptyText: {
+    color: tokens.colorNeutralForeground2,
   },
 });

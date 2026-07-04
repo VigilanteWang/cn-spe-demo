@@ -8,10 +8,7 @@ import type {
   IApplyItemLinkPermissionChangesResponse,
   IItemLinkPermissionsResponseFromApi,
 } from "../../../common/contracts/itemPermissionCommonContracts";
-import {
-  readGraphToRecord,
-  readOptionalString,
-} from "../../permissionsCore/permissionGraphReaders";
+import { readDriveId, readItemId } from "../../common/graphReaders";
 import { createValidationError } from "../../common/appErrorHelpers";
 import { parseItemLinkPermissionChangeSet } from "./itemLinkPermissionRequestParser";
 import {
@@ -88,18 +85,6 @@ export const applyItemLinkPermissionsToGraph = async (
   );
 
   res.send(200, responseBody);
-};
-
-const readDriveId = (req: Request): string | undefined => {
-  // 路由参数来自外部请求，这里先收窄成 record 再读取可选字符串，避免直接信任原始形状。
-  const paramsRecord = readGraphToRecord(req.params);
-  return readOptionalString(paramsRecord.driveId);
-};
-
-const readItemId = (req: Request): string | undefined => {
-  // itemId 与 driveId 的收窄逻辑保持一致，减少不同参数处理方式带来的分支差异。
-  const paramsRecord = readGraphToRecord(req.params);
-  return readOptionalString(paramsRecord.itemId);
 };
 
 export type {

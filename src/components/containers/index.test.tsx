@@ -178,4 +178,36 @@ describe("Containers", () => {
       await screen.findByText("Error: Container list request was throttled."),
     ).toBeInTheDocument();
   });
+
+  it("should keep createContainer errors inside the create dialog instead of the page header", async () => {
+    listContainersMock.mockResolvedValue([]);
+    createContainerMock.mockRejectedValue(
+      new Error("Expired Container type."),
+    );
+
+    render(<Containers />);
+
+    await waitFor(() => {
+      expect(listContainersMock).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create container" }));
+    fireEvent.change(screen.getByLabelText("Container name:"), {
+      target: { value: "test" },
+    });
+    fireEvent.change(screen.getByLabelText("Container description:"), {
+      target: { value: "test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create container" });
+    const header = screen.getByTestId("containers-header");
+    expect(
+      await within(dialog).findByText("Error: Expired Container type."),
+    ).toBeInTheDocument();
+    expect(createContainerMock).toHaveBeenCalledWith("test", "test");
+    expect(
+      within(header).queryByText("Error: Expired Container type."),
+    ).not.toBeInTheDocument();
+  });
 });

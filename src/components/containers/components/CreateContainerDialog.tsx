@@ -40,8 +40,11 @@ import {
   InputProps,
   Label,
   Spinner,
+  Text,
   makeStyles,
+  tokens,
 } from "@fluentui/react-components";
+import { formatAppErrorMessageForUI } from "../../../../common/appError";
 import { IContainer } from "../../../common/types";
 import { createContainer } from "../../../services/backendApi";
 
@@ -52,6 +55,11 @@ import { createContainer } from "../../../services/backendApi";
  * - input: 输入框统一宽度，保持与页面容器选择器视觉一致
  **/
 const useStyles = makeStyles({
+  dialogSurface: {
+    // 直接限制弹窗外层宽度，避免只调输入框时整体 Dialog 仍保持 Fluent UI 默认大宽度。
+    maxWidth: "550px",
+    width: "calc(100vw - 32px)",
+  },
   content: {
     display: "flex",
     flexDirection: "column",
@@ -59,8 +67,32 @@ const useStyles = makeStyles({
     marginBottom: "25px",
   },
   input: {
-    width: "400px",
+    width: "360px",
     maxWidth: "100%",
+  },
+  footerErrorSlot: {
+    gridRowStart: 3,
+    gridRowEnd: 4,
+    gridColumnStart: 1,
+    gridColumnEnd: 3,
+    alignSelf: "end",
+    minHeight: "24px",
+    minWidth: 0,
+    paddingRight: "16px",
+  },
+  actionErrorText: {
+    color: tokens.colorPaletteRedForeground1,
+    overflowWrap: "anywhere",
+  },
+  footerActions: {
+    gridColumnStart: 3,
+    gridColumnEnd: 4,
+    justifySelf: "end",
+  },
+  footerButtons: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "12px",
   },
 });
 
@@ -71,8 +103,6 @@ export interface ICreateContainerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onContainerCreated: (container: IContainer) => void;
-  /** 创建失败时的回调，用于向父组件上报错误信息（弹窗保持打开）。 */
-  onError: (error: unknown) => void;
 }
 
 /**
@@ -91,7 +121,6 @@ export const CreateContainerDialog = ({
   open,
   onOpenChange,
   onContainerCreated,
-  onError,
 }: ICreateContainerDialogProps) => {
   const styles = useStyles();
 
@@ -99,6 +128,8 @@ export const CreateContainerDialog = ({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creatingContainer, setCreatingContainer] = useState(false);
+  const [createError, setCreateError] = useState<unknown>(null);
+  const hasCreateError = createError !== null;
 
   // =============== 表单输入处理 ===============
   /** 容器名称输入变化处理 */
@@ -107,6 +138,8 @@ export const CreateContainerDialog = ({
     data: InputOnChangeData,
   ) => {
     setName(data.value);
+    // 名称变化时清除旧错误，避免已经修正输入后仍展示过期失败信息。
+    setCreateError(null);
   };
 
   /** 容器描述输入变化处理 */
@@ -115,6 +148,8 @@ export const CreateContainerDialog = ({
     data: InputOnChangeData,
   ) => {
     setDescription(data.value);
+    // 描述变化时同样清除旧错误，允许用户基于新输入重新尝试。
+    setCreateError(null);
   };
 
   /**
@@ -125,6 +160,7 @@ export const CreateContainerDialog = ({
   const closeDialog = () => {
     setName("");
     setDescription("");
+    setCreateError(null);
     onOpenChange(false);
   };
 
@@ -140,14 +176,15 @@ export const CreateContainerDialog = ({
    **/
   const handleCreateClick = async () => {
     setCreatingContainer(true);
+    setCreateError(null);
 
     try {
       const nextContainer = await createContainer(name, description);
       onContainerCreated(nextContainer);
       closeDialog();
     } catch (error) {
-      // 创建失败时上报错误给父组件展示，弹窗保持打开以便用户重试
-      onError(error);
+      // 创建失败时把错误保留在弹窗内部，避免污染页面级错误展示区。
+      setCreateError(error);
     } finally {
       setCreatingContainer(false);
     }
@@ -165,7 +202,7 @@ export const CreateContainerDialog = ({
         onOpenChange(true);
       }}
     >
-      <DialogSurface>
+      <DialogSurface className={styles.dialogSurface}>
         <DialogBody>
           <DialogTitle>Create container</DialogTitle>
           <DialogContent className={styles.content}>
@@ -199,23 +236,36 @@ export const CreateContainerDialog = ({
             )}
           </DialogContent>
 
-          <DialogActions>
-            {/* 关闭按钮：创建中禁用，避免在请求过程中打断交互状态 */}
-            <Button
-              appearance="secondary"
-              onClick={closeDialog}
-              disabled={creatingContainer}
-            >
-              Close
-            </Button>
-            {/* 创建按钮：name 为空或正在创建时禁用，避免空提交和重复提交 */}
-            <Button
-              appearance="primary"
-              onClick={() => void handleCreateClick()}
-              disabled={creatingContainer || name.trim() === ""}
-            >
-              Create
-            </Button>
+          <div className={styles.footerErrorSlot}>
+            {hasCreateError ? (
+              <Text role="alert" className={styles.actionErrorText}>
+                {formatAppErrorMessageForUI(
+                  createError,
+                  "Failed to create container.",
+                )}
+              </Text>
+            ) : null}
+          </div>
+
+          <DialogActions className={styles.footerActions}>
+            <div className={styles.footerButtons}>
+              {/* 关闭按钮：创建中禁用，避免在请求过程中打断交互状态 */}
+              <Button
+                appearance="secondary"
+                onClick={closeDialog}
+                disabled={creatingContainer}
+              >
+                Close
+              </Button>
+              {/* 创建按钮：name 为空或正在创建时禁用，避免空提交和重复提交 */}
+              <Button
+                appearance="primary"
+                onClick={() => void handleCreateClick()}
+                disabled={creatingContainer || name.trim() === ""}
+              >
+                Create
+              </Button>
+            </div>
           </DialogActions>
         </DialogBody>
       </DialogSurface>

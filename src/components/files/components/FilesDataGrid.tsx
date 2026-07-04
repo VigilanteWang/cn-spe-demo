@@ -57,6 +57,8 @@ interface IFilesDataGridProps {
   onPreviewFile: (file: IDriveItemExtended) => void;
   /** 打开 item 权限管理。 */
   onManagePermissions: (item: IDriveItemExtended) => void;
+  /** 打开版本历史管理。 */
+  onManageVersions: (item: IDriveItemExtended) => void;
   /** 操作按钮容器样式类名。 */
   actionsButtonGroupClassName: string;
   /** Name 列单元格内容样式类名，用于启用文字换行。 */
@@ -79,6 +81,7 @@ export const FilesDataGrid = ({
   onOpenFolder,
   onPreviewFile,
   onManagePermissions,
+  onManageVersions,
   actionsButtonGroupClassName,
   nameCellContentClassName,
 }: IFilesDataGridProps) => {
@@ -151,37 +154,34 @@ export const FilesDataGrid = ({
       createTableColumn({
         columnId: "actions",
         renderHeaderCell: () => "Actions",
-        renderCell: (driveItem) => {
-          // 占位处理函数：当前仅用于展示版本按钮，不包含真实业务实现。
-          const onVersionsClick = () => {
-            console.log("Versions placeholder clicked for:", driveItem.id);
-          };
-
-          return (
-            <div className={actionsButtonGroupClassName}>
+        renderCell: (driveItem) => (
+          <div className={actionsButtonGroupClassName}>
+            <Button
+              aria-label="Permissions"
+              icon={<PeopleRegular />}
+              onClick={() => onManagePermissions(driveItem)}
+            >
+              Permissions
+            </Button>
+            {/* Versions 只对文件开放；文件夹不展示该入口。 */}
+            {!driveItem.isFolder && (
               <Button
                 aria-label="Versions"
                 icon={<HistoryRegular />}
-                onClick={onVersionsClick}
+                onClick={() => onManageVersions(driveItem)}
               >
                 Versions
               </Button>
-              <Button
-                aria-label="Permissions"
-                icon={<PeopleRegular />}
-                onClick={() => onManagePermissions(driveItem)}
-              >
-                Permissions
-              </Button>
-            </div>
-          );
-        },
+            )}
+          </div>
+        ),
       }),
     ],
     [
       actionsButtonGroupClassName,
       nameCellContentClassName,
       onManagePermissions,
+      onManageVersions,
       onOpenFolder,
       onPreviewFile,
     ],

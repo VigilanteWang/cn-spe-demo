@@ -32,7 +32,7 @@ import { parseContainerPermissionChangeSet } from "./containerPermissionsRequest
 import {
   readOptionalString,
   readGraphToRecord,
-} from "./containerPermissionsReaders";
+} from "../common/graphReaders";
 import { createValidationError } from "../common/appErrorHelpers";
 
 /**
