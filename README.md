@@ -90,39 +90,49 @@ spe-demo/
 
 ## 主要功能
 
-| 功能          | 说明                                                  |
-| ------------- | ----------------------------------------------------- |
-| 🔐 用户登录   | 通过 MGT `<Login />` 组件，使用 MSAL 弹窗登录         |
-| 📦 容器管理   | 列出、选择、创建 SharePoint Embedded 存储容器         |
-| 🛡️ 容器权限   | 查看并修改容器级权限，管理容器访问主体与角色          |
-| 📄 文件浏览   | 展示容器内文件/文件夹，支持进入子目录、返回上级和面包屑导航 |
-| ⬆️ 上传与建目录 | 支持单文件、多文件、整个文件夹上传，并可在当前目录新建子文件夹 |
-| ⬇️ 文件下载   | 支持单文件直链下载，以及多文件/文件夹归档下载并展示进度 |
-| 🗑️ 删除管理   | 支持列表批量删除，也支持在预览态删除当前文件          |
-| 👁️ 文件预览   | 内嵌文件预览，支持在新标签页打开，并提供预览态下载入口 |
-| 👥 项目权限   | 查看并修改文件或文件夹的显式权限，区分直接权限与继承权限 |
-| 🔗 链接分享权限 | 管理 item-level link share，支持创建、删除、授权与撤销接收人 |
-| 🕘 版本历史   | 查看文件历史版本，支持下载指定版本、恢复版本、删除单个版本或清理历史版本 |
+| 功能            | 说明                                                                     |
+| --------------- | ------------------------------------------------------------------------ |
+| 🔐 用户登录     | 通过 MGT `<Login />` 组件，使用 MSAL 弹窗登录                            |
+| 📦 容器管理     | 列出、选择、创建 SharePoint Embedded 存储容器                            |
+| 🛡️ 容器权限     | 查看并修改容器级权限，管理容器访问主体与角色                             |
+| 📄 文件浏览     | 展示容器内文件/文件夹，支持进入子目录、返回上级和面包屑导航              |
+| ⬆️ 上传与建目录 | 支持单文件、多文件、整个文件夹上传，并可在当前目录新建子文件夹           |
+| ⬇️ 文件下载     | 支持单文件直链下载，以及多文件/文件夹归档下载并展示进度                  |
+| 🗑️ 删除管理     | 支持列表批量删除，也支持在预览态删除当前文件                             |
+| 👁️ 文件预览     | 内嵌文件预览，支持在新标签页打开，并提供预览态下载入口                   |
+| 👥 项目权限     | 查看并修改文件或文件夹的显式权限，区分直接权限与继承权限                 |
+| 🔗 链接分享权限 | 管理 item-level link share，支持创建、删除、授权与撤销接收人             |
+| 🕘 版本历史     | 查看文件历史版本，支持下载指定版本、恢复版本、删除单个版本或清理历史版本 |
 
-## 配置文件
+## 快速配置
 
-- `.env.development.local`：**开发环境本地配置文件，不提交到 Git**。复制 `.env.development.local.example` 后填入真实值。
-- `.env.production.local`：**本地模拟生产配置文件，不提交到 Git**。复制 `.env.production.local.example` 后填入真实值。
-- `.env.example`：通用变量模板，仅含占位符，无真实密钥，可安全提交到 Git。
+1. 注册两个 Microsoft Entra App：`frontend` 和 `backend`。README 这里只给快速入口，Azure Portal 中每一步该点什么，请直接看 [Azure Portal 双应用注册指南](docs/spe/azure-portal-app-registration-guide.md)。
+2. 用 Postman 配置 SharePoint Embedded 环境，创建并注册 container type，再把 `frontend` 和 `backend` 两个 app 授权进去。详细步骤、Collection 说明、云环境切换和管理员前置条件，请看 [Postman 与 SPE 初始化指南](docs/spe/postman-spe-setup-guide.md)。
+3. 复制 `.env.development.local.example` 为 `.env.development.local`，开发时重点填好这些值：
+   - `CLOUD_ENV`
+   - `API_ENTRA_APP_CLIENT_ID=<your-api-entra-app-client-id>`
+   - `API_ENTRA_APP_CLIENT_SECRET=<your-api-entra-app-client-secret>`
+   - `API_ENTRA_APP_TENANT_ID=<your-tenant-id>`
+   - `CONTAINER_TYPE_ID=<your-container-type-id>`
+   - `VITE_CLIENT_ENTRA_APP_CLIENT_ID=<your-client-entra-app-client-id>`
+   其余变量的说明见 `.env.example`；模板里已经给出的派生项和本地默认值通常无需改动。
+4. 安装依赖并启动开发环境：
+
+```bash
+npm install
+npm run dev
+```
+
+启动后访问 `http://localhost:3000`。
 
 > **注意**：`VITE_*` 前缀的变量会由 Vite 注入浏览器 bundle，**对最终用户可见**，切勿将 secret 或敏感信息放入这些变量。后端私有配置（`API_ENTRA_APP_CLIENT_SECRET` 等）仅在服务端进程中读取，不会打包进前端。
 
-## 运行与调试
-
-### 环境准备
-
-1. 复制 `.env.development.local.example` 为 `.env.development.local` 并填写开发环境参数。
-2. 复制 `.env.production.local.example` 为 `.env.production.local` 并填写本地模拟生产参数。
+## 如何调试
 
 ### npm 命令
 
 - `npm run dev`：开发模式并行启动前后端。
-- `npm run dev:frontend`：仅启动前端开发服务器（CRA）。
+- `npm run dev:frontend`：仅启动前端开发服务器（Vite）。
 - `npm run dev:backend`：仅启动后端（`nodemon + ts-node`，读取 `.env.development.local`）。
 - `npm run start:prod`：本地模拟生产模式（先构建前后端，再以 production 启动后端，读取 `.env.production.local`）。
 
@@ -132,7 +142,3 @@ spe-demo/
 
 - `Run Dev`：复合调试配置，一次启动前端 Chrome 调试和后端 Node 附加调试。
 - `Start Prod (Local)`：在 VS Code 内执行本地模拟生产启动链路。
-
-## SharePoint Embedded 概念指南
-
-如果你想快速了解 SharePoint Embedded 的核心概念（架构、权限、计费、实施路径等），请参阅：
