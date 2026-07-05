@@ -156,28 +156,43 @@ App 需要在 Azure AD App Registration 中声明以下核心 Graph API 权限�
 
 ## 5. 共享与权限管理
 
-### 权限继承与 Additive Permission
+SPE 中与共享相关的能力，建议先区分为两类：
 
-Container 内的内容默认继承父级权限（Container → Folder → File），这个继承链 **不可打破**。但可以通过 Additive Permission（附加权限）给特定文件或文件夹添加额外权限。
+### User Permission
+
+`User Permission` 指直接把访问权限授予用户或组，本质上是显式权限控制，即 **Direct Access**。实现方式是对 `driveItem` 调用 [invite](https://learn.microsoft.com/en-us/graph/api/driveitem-invite?view=graph-rest-1.0&tabs=http)。
+
+### Link permission
+
+`Link permission` 指通过 Share Link 授予访问文件的能力。每个 link 都有一个 `scope`（谁可以访问）和 `type`（访问能力），用户只要拿到这个 link，就可以访问文件。
+
+- `scope` 目前主要有 `anonymous`、`organization`、`users`。
+- `type` 目前主要有 `view`、`edit`、`review`、`blocksDownload`。
+- SharePoint Embedded中，link 只对受支持的 Office 文件有实际意义；文件夹和普通文件即使创建链接，点击后会被重定向到 https://aka.ms/spe-openfilelocation。
+
+详见 [introduce-ItemLinkPermissionModule.md](../../src/components/permissions/documents/introduce-ItemLinkPermissionModule.md)。
+
+### User Permission 的继承与 Additive Permission
+
+Container 内的内容默认继承父级权限（Container → Folder → File），这个继承链 **不可打破**。
+
+`Additive Permission` 不是一个严格的专有名词，更像是微软用来强调的一种描述：在继承链固定的前提下，再给下级对象附加的 **额外权限**。这里说的主要是 `User Permission`，因为 `Link permission` 对容器和文件夹本身并没有对应意义。
+
+因此，在 SPE 语境里，可以把它理解为：文件或文件夹继续继承父级权限，同时再额外添加一条显式的User Permission。
 
 > 经研究，这其实类似普通 SharePoint Library里，文件的 **Direct Access 权限** (如下图，用户会被添加到文件的访问列表中)，但区别在于，这个权限继承在 SPE 中是不会断开的
 >
 > <img src="./img/DirectAccessShare.jpg" alt="Direct Access" width="600" />
->
-> 其次， **没有** 文档表示 SPE 支持 **Shareable Link**。
->
-> Note: 经验证，用 createLink API 去创建 link 会报错。
 
-具体操作，使用 driveItem 的 [invite](https://learn.microsoft.com/en-us/graph/api/driveitem-invite?view=graph-rest-1.0&tabs=http) 为文件文件夹添加权限。
-
+<br/>
 经实测，
 
 1. 可以仅共享单个文件，而无需授予用户 Container 访问权限。
 2. 用户仍须通过 App 访问（上文已提过，SPE中的权限必须是 App 权限 ∩ 用户权限）。比如只共享了一个文件，那访问 container 就只能看到这个文件，这与普通 SharePoint 是一致的。
 
-**限制：** 不能对 Container 本身添加 Additive Permission（这相当于直接修改角色了），且只能通过 Delegated 模式设置。
+**限制：** 不能对 Container 本身添加这类附加的 `User Permission`（那更接近直接调整容器角色），且只能通过 Delegated 模式设置。
 
-### 谁能给文件添加 Additive Permission?
+### 谁能给文件添加 User Permission?
 
 文档中有说明 Open 和 Restrictive 两种模式，实际对应了 Container Type 中 isSharingRestricted 属性：
 
