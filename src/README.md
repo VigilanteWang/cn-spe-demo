@@ -157,14 +157,14 @@ npm run dev:frontend
 
 | 变量名                                 | 说明                                        |
 | -------------------------------------- | ------------------------------------------- |
-| `REACT_APP_CLIENT_ENTRA_APP_CLIENT_ID` | 前端 Entra App 的客户端 ID                  |
-| `REACT_APP_CLIENT_ENTRA_APP_TENANT_ID` | Azure AD 租户 ID                            |
-| `REACT_APP_API_ENTRA_APP_CLIENT_ID`    | 后端 API 的 Entra App 客户端 ID             |
-| `REACT_APP_API_SERVER_URL`             | 后端 API 地址（如 `http://localhost:3001`） |
-| `REACT_APP_CLOUD_ENV`                  | 云环境：`global`（默认）或 `china`          |
-| `REACT_APP_GRAPH_BASE_URL`             | （可选）自定义 Graph API 基础 URL           |
+| `VITE_CLIENT_ENTRA_APP_CLIENT_ID` | 前端 Entra App 的客户端 ID                  |
+| `VITE_CLIENT_ENTRA_APP_TENANT_ID` | Azure AD 租户 ID                            |
+| `VITE_API_ENTRA_APP_CLIENT_ID`    | 后端 API 的 Entra App 客户端 ID             |
+| `VITE_API_SERVER_URL`             | 后端 API 地址（如 `http://localhost:3001`） |
+| `VITE_CLOUD_ENV`                  | 云环境：`global`（默认）或 `china`          |
+| `VITE_GRAPH_BASE_URL`             | （可选）自定义 Graph API 基础 URL           |
 
-> **安全注意**：`REACT_APP_*` 前缀变量会打包进浏览器 bundle，对最终用户可见，不能放入 secret！
+> **安全注意**：`VITE_*` 前缀变量会被 Vite 注入浏览器 bundle，对最终用户可见，不能放入 secret！
 
 ### 与后端集成
 
