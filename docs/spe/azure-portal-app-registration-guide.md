@@ -1,13 +1,6 @@
 # Azure Portal 双应用注册指南
 
-本文档把本仓库示例所需的 Entra App 配置，翻译成 Azure Portal 里的实际菜单、按钮和表单项，方便你直接照着点。
-
 本指南默认创建两个应用：
-
-- `frontend`：浏览器里的单页应用，负责用户登录、请求 Graph delegated token、再向后端请求 API token。
-- `backend`：Node.js 后端，负责校验前端 token、执行 OBO（On-Behalf-Of）流程，并访问 Microsoft Graph 和 SharePoint Embedded 管理接口。
-
-## 一图理解前后端职责
 
 | 应用       | 作用                    | 典型能力                                                                            |
 | ---------- | ----------------------- | ----------------------------------------------------------------------------------- |
@@ -16,10 +9,10 @@
 
 ## 开始前先准备
 
-- 登录 [Azure Portal](https://portal.azure.com/)。
+- 准备一个可用的 `Microsoft 365` 环境，至少需要具备 `Application Administrator` 和 `SharePoint Embedded Administrator` 权限。
+- 如果你当前没有可用环境，可以先注册一个全球版开发环境：[Microsoft 365 Developer Program](https://developer.microsoft.com/en-us/microsoft-365/dev-program)
+- 登录 [Azure Portal](https://portal.azure.com/) / [21v Azure Portal](https://portal.azure.cn/) 。
 - 进入 `Microsoft Entra ID`。
-- 如果你使用世纪互联环境，请切到对应租户后再开始。
-- 本文档默认本地前端地址是 `http://localhost:3000`，与仓库当前 Vite 开发服务器保持一致。
 
 ## 注册 `backend` 应用
 
@@ -42,24 +35,19 @@
 - `Application (client) ID`
 - `Directory (tenant) ID`
 
-这两个值后面会分别对应：
-
-- `.env.development.local` 的 `API_ENTRA_APP_CLIENT_ID`
-- `.env.development.local` 的 `API_ENTRA_APP_TENANT_ID`
-
 ### 2. Authentication：补 Postman 回调地址
 
 进入 `backend` 应用后：
 
 1. 打开左侧 `Authentication`
-2. 点击 `Add a platform`
+2. 点击 `Add a platform` 或 `Add Redirect URI`
 3. 选择 `Web`
 4. 添加两个 Redirect URI：
    - `https://oauth.pstmn.io/v1/browser-callback`
    - `https://oauth.pstmn.io/v1/callback`
 5. 点击 `Configure`
 
-这两个地址是给 Postman OAuth 流程使用的，方便你在初始化 SPE 环境时直接用 Postman 获取 token。
+这两个地址是给 Postman OAuth 流程使用的
 
 ### 3. Expose an API：暴露给前端调用的 delegated scope
 
@@ -74,13 +62,17 @@ api://<backend-client-id>
 
 3. 点击 `Add a scope`
 4. 按下面方式填写：
-   - `Scope name`: `Container.AccessAsUser`
-   - `Who can consent?`: `Admins and users`
-   - `Admin consent display name`: `Access SharePoint Embedded Containers as a user.`
-   - `Admin consent description`: `The application can call this app's API to access SharePoint Embedded Storage Containers as a user`
-   - `User consent display name`: `Access SharePoint Embedded Containers as a user.`
-   - `User consent description`: `The application can call this app's API to access SharePoint Embedded Storage Containers as a user`
-   - `State`: `Enabled`
+
+| 字段                         | 值                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Scope name`                 | `Container.AccessAsUser`                                                                             |
+| `Who can consent?`           | `admin only`                                                                                         |
+| `Admin consent display name` | `Access SharePoint Embedded Containers as a user.`                                                   |
+| `Admin consent description`  | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
+| `User consent display name`  | `Access SharePoint Embedded Containers as a user.`                                                   |
+| `User consent description`   | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
+| `State`                      | `Enabled`                                                                                            |
+
 5. 点击 `Add scope`
 
 这个 scope 就是前端后续要申请的 `api://<backend-client-id>/Container.AccessAsUser`。
@@ -135,7 +127,7 @@ API_ENTRA_APP_CLIENT_SECRET=<your-api-entra-app-client-secret>
 如果你的租户要求管理员同意：
 
 1. 在 `API permissions` 页面点击 `Grant admin consent for <Tenant>`
-2. 确认所有需要的 delegated permissions 都已变成已同意状态
+2. 确认所有需要的 delegated permissions 都已变成已 Granted 状态
 
 ## 注册 `frontend` 应用
 
@@ -152,11 +144,7 @@ API_ENTRA_APP_CLIENT_SECRET=<your-api-entra-app-client-secret>
      - `URI`: `http://localhost:3000`
 3. 点击 `Register`
 
-注册完成后记下 `Application (client) ID`，后面填到：
-
-```text
-VITE_CLIENT_ENTRA_APP_CLIENT_ID=<your-client-entra-app-client-id>
-```
+注册完成后记下 `Application (client) ID`
 
 ### 2. Authentication：确认本地开发回调地址
 
@@ -169,28 +157,17 @@ VITE_CLIENT_ENTRA_APP_CLIENT_ID=<your-client-entra-app-client-id>
 
 ### 2.1 如果前端也想在 Postman 里模拟测试
 
-如果你除了让真实浏览器前端使用 `frontend` 这个 app，还想在 Postman 里直接模拟“以前端身份登录并拿 token”，那仅有 `SPA` 回调还不够，还需要额外补一组 `Mobile and desktop applications` 回调地址。
+如果你还想在 Postman 里直接模拟“以前端身份登录并拿 token”，那仅有 `SPA` 回调还不够，还需要额外补一组 `Mobile and desktop applications` 回调地址。
 
 操作方式：
 
 1. 仍在 `frontend` 应用左侧 `Authentication`
-2. 点击 `Add a platform`
+2. 点击 `Add a platform` 或 `Add Redirect URI`
 3. 选择 `Mobile and desktop applications`
 4. 添加这两个 Redirect URI：
    - `https://oauth.pstmn.io/v1/browser-callback`
    - `https://oauth.pstmn.io/v1/callback`
 5. 点击 `Configure`
-
-这样做的原因是：
-
-- `http://localhost:3000` 这一条是给真实浏览器 SPA 用的
-- Postman 的 `oauth.pstmn.io` 回调不是你自己的浏览器前端地址，不能直接拿 `SPA` 回调去代替
-- 如果把 Postman 的回调错误地挂到 `SPA`，常见现象就是在 Postman 用 `Authorization Code + PKCE` 时收到类似 `AADSTS9002327` 的报错
-
-可以把这套配置理解成：
-
-- `SPA` 平台：给真实前端页面使用
-- `Mobile and desktop applications` 平台：给 Postman 这类本机测试客户端使用
 
 ### 3. API permissions：添加 Microsoft Graph delegated permissions
 
@@ -221,7 +198,7 @@ VITE_CLIENT_ENTRA_APP_CLIENT_ID=<your-client-entra-app-client-id>
 仍在 `API permissions` 页面：
 
 1. 点击 `Add a permission`
-2. 选择 `My APIs`
+2. 选择 `APIs my organization uses`
 3. 选择刚才创建的 `backend`
 4. 勾选它暴露出的 delegated permission：
    - `Container.AccessAsUser`
@@ -240,7 +217,7 @@ api://<backend-client-id>/Container.AccessAsUser
 1. 在 `API permissions` 页面点击 `Grant admin consent for <Tenant>`
 2. 确认 Graph 权限和 `backend` 自定义权限都已授权
 
-## 最终要带走的配置值
+## 要记下的配置值
 
 完成两个应用注册后，你至少要保存这些值，供下一步文档继续使用：
 
