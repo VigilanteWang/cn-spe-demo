@@ -108,101 +108,101 @@ spe-demo/
 
 注：这里 Owning Tenant 和 Consuming Tenant 都用一个 tenant
 
-1. 注册两个 Microsoft Entra App。这里只放最关键配置，逐点击步骤见 [Azure Portal 双应用注册指南](docs/spe/azure-portal-app-registration-guide.md)。
+1.  注册两个 Microsoft Entra App。这里只放最关键配置，逐点击步骤见 [Azure Portal 双应用注册指南](docs/spe/azure-portal-app-registration-guide.md)。
 
-   | app        | name       | redirect url and platform type                                                                                                                        | API permissions                                                                                                                                                         |
-   | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `backend`  | `backend`  | `Web`<br>`https://oauth.pstmn.io/v1/browser-callback`<br>`https://oauth.pstmn.io/v1/callback`                                                         | `Microsoft Graph / Delegated`: `FileStorageContainer.Selected`<br>初始化时临时再加：`FileStorageContainerType.Manage.All`、`FileStorageContainerTypeReg.Manage.All`     |
-   | `frontend` | `frontend` | `Single-page application (SPA)`<br>`http://localhost:3000`<br>如需在 Postman 模拟前端登录，再补 `Mobile and desktop applications` 的两个 Postman 回调 | `Microsoft Graph / Delegated`: `FileStorageContainer.Selected`、`User.Read`、`User.ReadBasic.All`、`GroupMember.Read.All`、`ProfilePhoto.Read.All`、`Presence.Read.All` |
+    | name       | redirect url and platform type                                                                                                                        | API permissions                                                                                                                                                         |
+    | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `backend`  | `Web`<br>`https://oauth.pstmn.io/v1/browser-callback`<br>`https://oauth.pstmn.io/v1/callback`                                                         | `Microsoft Graph / Delegated`: `FileStorageContainer.Selected`<br>初始化时临时再加：`FileStorageContainerType.Manage.All`、`FileStorageContainerTypeReg.Manage.All`     |
+    | `frontend` | `Single-page application (SPA)`<br>`http://localhost:3000`<br>如需在 Postman 模拟前端登录，再补 `Mobile and desktop applications` 的两个 Postman 回调 | `Microsoft Graph / Delegated`: `FileStorageContainer.Selected`、`User.Read`、`User.ReadBasic.All`、`GroupMember.Read.All`、`ProfilePhoto.Read.All`、`Presence.Read.All` |
 
-   `backend` 还需要：
+    `backend` 还需要：
 
-   - 新建一个 client secret
+    - 新建一个 client secret
 
-   - `Expose an API` 使用默认 `Application ID URI`：`api://<backend-client-id>`
+    - `Expose an API` 使用默认 `Application ID URI`：`api://<backend-client-id>`
 
-     添加一个 `Container.AccessAsUser` scope 配置：
+      添加一个 `Container.AccessAsUser` scope 配置：
 
-     | field                        | value                                                                                                |
-     | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-     | `Scope name`                 | `Container.AccessAsUser`                                                                             |
-     | `Who can consent?`           | `Admins only`                                                                                        |
-     | `Admin consent display name` | `Access SharePoint Embedded Containers as a user.`                                                   |
-     | `Admin consent description`  | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
-     | `User consent display name`  | `Access SharePoint Embedded Containers as a user.`                                                   |
-     | `User consent description`   | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
-     | `State`                      | `Enabled`                                                                                            |
+      | field                        | value                                                                                                |
+      | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+      | `Scope name`                 | `Container.AccessAsUser`                                                                             |
+      | `Who can consent?`           | `Admins only`                                                                                        |
+      | `Admin consent display name` | `Access SharePoint Embedded Containers as a user.`                                                   |
+      | `Admin consent description`  | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
+      | `User consent display name`  | `Access SharePoint Embedded Containers as a user.`                                                   |
+      | `User consent description`   | `The application can call this app's API to access SharePoint Embedded Storage Containers as a user` |
+      | `State`                      | `Enabled`                                                                                            |
 
-     然后让 `frontend` 在 `API permissions -> APIs my organization uses` 中授权 `backend` 暴露的 `Container.AccessAsUser`。
+      然后让 `frontend` 在 `API permissions -> APIs my organization uses` 中授权 `backend` 暴露的 `Container.AccessAsUser`。
 
-2. 用 Postman 初始化 SPE。详细说明见 [Postman 与 SPE 初始化指南](docs/spe/postman-spe-setup-guide.md)：
+2.  用 Postman 初始化 SPE。详细说明见 [Postman 与 SPE 初始化指南](docs/spe/postman-spe-setup-guide.md)：
 
-   - 导入 [collection](postman/SharePoint%20Embedded%20%28Cloud%20Switch-%20commercial%20%2B%2021v%29.postman_collection.json) 和 [environment template](postman/template.cloudswitch.postman_environment.json)
-   - 先填 environment：`CloudName`、`ClientID=<backend client-id>`、`ClientSecret=<backend secret>`、`ConsumingTenantId`、`RootSiteUrl`
-   - 随便运行一次任意请求，让 cloud switch 自动补齐当前云环境变量
-   - 运行 `Delegate -> Authorization` 拿 token
-   - 创建 container type，记下返回的 `id` 回填 `ContainerTypeId`
-   - 注册 container type，把 `backend` 和 `frontend` 都授进去
+    - 导入 [collection](postman/SharePoint%20Embedded%20%28Cloud%20Switch-%20commercial%20%2B%2021v%29.postman_collection.json) 和 [environment template](postman/template.cloudswitch.postman_environment.json)
+    - 先填 environment：`CloudName`、`ClientID=<backend client-id>`、`ClientSecret=<backend secret>`、`ConsumingTenantId`、`RootSiteUrl`
+    - 随便运行一次任意请求，让 cloud switch 自动补齐当前云环境变量
+    - 运行 `Delegate -> Authorization` 拿 token
+    - 创建 container type，记下返回的 `id` 回填 `ContainerTypeId`
+    - 注册 container type，把 `backend` 和 `frontend` 都授进去
 
-   创建 container type：
+    创建 container type：
 
-   ```http
-   POST /v1.0/storage/fileStorage/containerTypes
-   Content-Type: application/json
-   ```
+    ```http
+    POST /v1.0/storage/fileStorage/containerTypes
+    Content-Type: application/json
+    ```
 
-   ```json
-   {
-     "name": "My Trial Container Type",
-     "owningAppId": "<backend-client-id>",
-     "billingClassification": "trial",
-     "settings": {
-       "isItemVersioningEnabled": true,
-       "isSharingRestricted": false
-     }
-   }
-   ```
+    ```json
+    {
+      "name": "My Trial Container Type",
+      "owningAppId": "<backend-client-id>",
+      "billingClassification": "trial",
+      "settings": {
+        "isItemVersioningEnabled": true,
+        "isSharingRestricted": false
+      }
+    }
+    ```
 
-   创建 container type registration：
+    创建 container type registration：
 
-   ```http
-   PUT /v1.0/storage/fileStorage/containerTypeRegistrations/<container-type-id>
-   Content-Type: application/json
-   ```
+    ```http
+    PUT /v1.0/storage/fileStorage/containerTypeRegistrations/<container-type-id>
+    Content-Type: application/json
+    ```
 
-   ```json
-   {
-     "applicationPermissionGrants": [
-       {
-         "appId": "<backend-client-id>",
-         "delegatedPermissions": ["full"],
-         "applicationPermissions": ["full"]
-       },
-       {
-         "appId": "<frontend-client-id>",
-         "delegatedPermissions": ["full"],
-         "applicationPermissions": ["full"]
-       }
-     ]
-   }
-   ```
+    ```json
+    {
+      "applicationPermissionGrants": [
+        {
+          "appId": "<backend-client-id>",
+          "delegatedPermissions": ["full"],
+          "applicationPermissions": ["full"]
+        },
+        {
+          "appId": "<frontend-client-id>",
+          "delegatedPermissions": ["full"],
+          "applicationPermissions": ["full"]
+        }
+      ]
+    }
+    ```
 
-3. 复制 `.env.development.local.example` 为 `.env.development.local`，开发时填好这些值：
+3.  复制 `.env.development.local.example` 为 `.env.development.local`，开发时填好这些值：
 
-   | 变量                              | 填什么                                |
-   | --------------------------------- | ------------------------------------- |
-   | `CLOUD_ENV`                       | 商业云填 `global`，世纪互联填 `china` |
-   | `API_ENTRA_APP_CLIENT_ID`         | `backend` 的 client id                |
-   | `API_ENTRA_APP_CLIENT_SECRET`     | `backend` 的 client secret            |
-   | `API_ENTRA_APP_TENANT_ID`         | 当前租户的 tenant id                  |
-   | `CONTAINER_TYPE_ID`               | 刚创建的 container type id            |
-   | `VITE_CLIENT_ENTRA_APP_CLIENT_ID` | `frontend` 的 client id               |
+    | 变量                              | 填什么                                |
+    | --------------------------------- | ------------------------------------- |
+    | `CLOUD_ENV`                       | 商业云填 `global`，世纪互联填 `china` |
+    | `API_ENTRA_APP_CLIENT_ID`         | `backend` 的 client id                |
+    | `API_ENTRA_APP_CLIENT_SECRET`     | `backend` 的 client secret            |
+    | `API_ENTRA_APP_TENANT_ID`         | 当前租户的 tenant id                  |
+    | `CONTAINER_TYPE_ID`               | 刚创建的 container type id            |
+    | `VITE_CLIENT_ENTRA_APP_CLIENT_ID` | `frontend` 的 client id               |
 
-   其余变量的说明见 `.env.example`；模板里已经给出的派生项和本地默认值通常无需改动。
+    其余变量的说明见 `.env.example`；模板里已经给出的派生项和本地默认值通常无需改动。
 
-   > **注意**：`VITE_*` 前缀的变量会由 Vite 注入浏览器 bundle，**对最终用户可见**，切勿将 secret 或敏感信息放入这些变量。后端私有配置（`API_ENTRA_APP_CLIENT_SECRET` 等）仅在服务端进程中读取，不会打包进前端。
+    > **注意**：`VITE_*` 前缀的变量会由 Vite 注入浏览器 bundle，**对最终用户可见**，切勿将 secret 或敏感信息放入这些变量。后端私有配置（`API_ENTRA_APP_CLIENT_SECRET` 等）仅在服务端进程中读取，不会打包进前端。
 
-4. 安装依赖并启动开发环境：
+4.  安装依赖并启动开发环境：
 
 ```bash
 npm install

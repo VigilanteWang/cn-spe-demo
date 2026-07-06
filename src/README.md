@@ -2,184 +2,77 @@
 
 > React + TypeScript + Fluent UI 实现的 SharePoint Embedded 文件管理前端
 
+前端当前可以按 5 个大模块来理解：应用壳层负责登录态、主题和全局错误边界；容器模块负责选择当前工作容器；文件模块承接日常文件操作；权限模块承接容器与 item 权限管理；预览模块负责文件预览体验。它们之间的关系是 `App` 提供顶层壳，`Containers` 决定当前容器上下文，`Files` 在该上下文里继续挂载预览、版本历史和权限能力。
+
+| 模块 | 主要职责 | 关键入口 |
+| --- | --- | --- |
+| 应用壳层 | 负责初始化前端运行环境，包括 `Msal2Provider`、Fluent UI 主题、登录按钮和全局错误兜底。它不承载具体业务细节，主要负责把“用户已登录”这个前提和页面骨架搭起来。 | `src/index.tsx`、`src/App.tsx`、`src/components/app/` |
+| 容器模块 | 负责列出当前用户可访问的 SharePoint Embedded 容器，并管理“选择哪个容器继续工作”。这里还承接创建容器和打开容器权限弹窗这两个页面级入口。 | `src/components/containers/` |
+| 文件模块 | 负责容器内文件/文件夹的主工作流，包括列表展示、目录导航、上传、下载、删除、新建文件夹、版本历史等。这个模块是前端最主要的业务中心，也负责继续挂载 item 权限与文件预览等子能力。 | `src/components/files/` |
+| 权限模块 | 负责容器权限、item user permission 和 item link permission 的前端建模、草稿编辑、搜索与写回调用。相比其他模块，这里概念密度更高，所以仓库里也单独补了说明文档。 | `src/components/permissions/` |
+| 预览模块 | 负责在对话框中加载文件预览 URL，并处理前后切换、下载、在新标签页打开等预览态操作。它从文件模块接收当前文件上下文，本身专注于预览体验，不重复处理文件列表逻辑。 | `src/components/preview/` |
+
 ---
 
 ## 目录结构
 
 ```
 src/
-├── index.tsx                  # 应用入口，初始化 MGT Provider
-├── App.tsx                    # 主组件，登录状态管理 + 布局
-├── customTheme.tsx            # Fluent UI 自定义主题配置
-├── index.css                  # 全局样式
-├── common/
-│   ├── config.ts              # 环境变量配置管理（云环境、API 地址等）
-│   ├── scopes.ts              # Microsoft Graph 和 SPE 权限常量
-│   └── types.ts               # TypeScript 类型定义（IContainer、IDriveItemExtended）
+├── index.tsx                           # 应用入口：初始化 MGT/MSAL Provider 并挂载 React
+├── App.tsx                             # 顶层页面壳：主题、登录态、错误边界、主内容区
+├── customTheme.tsx                     # Fluent UI 自定义主题
+├── index.css                           # 全局样式
+├── common/                             # 前端共享配置、基础类型、通用映射
+│   ├── config.ts                       # 环境变量与运行时配置
+│   ├── scopes.ts                       # Graph / SPE scope 常量
+│   ├── types.ts                        # 容器、文件等共享前端类型
+│   └── apiErrorMapper.ts               # 前端 API 错误到 UI 文案的映射
 ├── components/
-│   ├── containers.tsx         # 容器管理组件（列表、选择、创建）
-│   ├── files.tsx              # 文件管理组件（列表、上传、下载、删除、导航）
-│   └── preview.tsx            # 文件预览组件（iframe 预览、导航、操作）
-└── services/
-    └── spembedded.ts          # 后端 API 服务层（封装所有后端调用）
+│   ├── app/                            # 应用级组件（如错误边界）
+│   ├── containers/                     # 容器列表、容器选择、创建容器入口
+│   ├── files/                          # 文件列表主模块：导航、上传、下载、删除、版本、预览入口
+│   ├── permissions/                    # 容器 / item 权限对话框、hooks、服务与文档
+│   ├── preview/                        # 文件预览弹窗、导航与预览 URL 处理
+│   └── common/                         # 可复用通用 UI 组件
+├── services/                           # 前端 API 封装（容器、文件、权限、下载、版本）
+│   ├── containerAndFileApi.ts          # 容器与文件相关后端接口
+│   ├── containerPermissionApi.ts       # 容器权限接口
+│   ├── itemPermissionApi.ts            # item 权限接口
+│   ├── itemVersionApi.ts               # 文件版本历史接口
+│   └── downloadApi.ts                  # 归档下载任务接口
+└── test/
+    └── setup.ts                        # Vitest 前端测试初始化
 ```
+
+权限模块详细文档：
+- [README.md](./components/permissions/README.md)
+- [introduce-ItemLinkPermissionModule.md](./components/permissions/documents/introduce-ItemLinkPermissionModule.md)
 
 ## 核心概念
-
-### 身份验证流程
-
-```
-用户点击 <Login /> → Msal2Provider 弹窗登录 → 获取 ID Token + Access Token
-                                                        ↓
-                                             globalProvider.state = SignedIn
-                                                        ↓
-                              组件通过 provider.getAccessToken() 获取 API Token
-                                                        ↓
-                                    前端发送 API Token 给后端 → 后端 OBO 换取 Graph Token
-```
-
-1. **index.tsx** 初始化 `Msal2Provider`，配置 clientId、authority、scopes
-2. **App.tsx** 中的 `<Login />` 组件提供登录 UI，使用全局 Provider 完成登录
-3. **spembedded.ts** 的 `getApiAccessToken()` 从全局 Provider 获取 API 专用 Token
-4. Token 的 scope 格式为 `api://{apiClientId}/Container.AccessAsUser`
-5. 后端收到 Token 后通过 OBO（On-Behalf-Of）流程换取 Graph API Token
-
-### MGT (Microsoft Graph Toolkit)
-
-- `Providers.globalProvider`：全局唯一的身份验证提供者（Msal2Provider 实例）
-- `ProviderState.SignedIn`：表示用户已成功登录
-- `<Login />`：预置的登录/登出按钮组件
-- `Providers.globalProvider.graph.client`：已认证的 Graph 客户端，文件操作直接使用
 
 ### 组件树
 
 ```
 <FluentProvider theme={customTheme}>     ← 提供 Fluent UI 主题
   <App>
-    <Login />                            ← 登录按钮（来自 MGT）
-    <Containers>                         ← 容器选择 + 创建
-      <Files container={selected}>       ← 文件列表 + 工具栏
-        <Preview file={current} />       ← 文件预览对话框
-      </Files>
-    </Containers>
+    <AppErrorBoundary>                   ← 顶层错误兜底
+      <TopBanner>
+        <Login />                        ← MGT 登录按钮
+      </TopBanner>
+      <Containers />                     ← 容器页入口
+        <CreateContainerDialog />        ← 创建容器弹窗
+        <ContainerPermissionDialog />    ← 容器权限弹窗
+        <Files container={selected}>     ← 文件页入口
+          <FilesBreadcrumb />            ← 当前目录路径
+          <FilesToolbar />               ← 上传、下载、删除、权限等操作
+          <FilesProgress />              ← 上传/下载进度
+          <FilesDataGrid />              ← 文件/文件夹列表
+          <VersionHistoryDialog />       ← 版本历史弹窗
+          <ItemPermissionDialog />       ← item 权限弹窗
+          <Preview />                    ← 文件预览弹窗
+        </Files>
+      </Containers>
+    </AppErrorBoundary>
   </App>
 </FluentProvider>
 ```
-
-### 数据流
-
-| 操作       | 调用路径                                                     | API 类型       |
-| ---------- | ------------------------------------------------------------ | -------------- |
-| 列出容器   | `SpEmbedded.listContainers()` → 后端 `/api/listContainers`   | 后端 API       |
-| 创建容器   | `SpEmbedded.createContainer()` → 后端 `/api/createContainer` | 后端 API       |
-| 列出文件   | `graph.client.api(/drives/.../children)`                     | Graph API 直接 |
-| 上传文件   | `graph.client.api(/drives/.../content).putStream()`          | Graph API 直接 |
-| 创建文件夹 | `graph.client.api(/drives/.../children).post()`              | Graph API 直接 |
-| 删除文件   | `SpEmbedded.deleteItems()` → 后端 `/api/deleteItems`         | 后端 API       |
-| 下载文件   | `@microsoft.graph.downloadUrl` 直链                          | Graph 直链     |
-| 下载归档   | `downloadApi.startDownload()` → 后端 ZIP 准备任务           | 后端 API       |
-| 预览文件   | `graph.client.api(/drives/.../preview).post()`               | Graph API 直接 |
-
-## 主要功能流程
-
-### 1. 登录 → 容器列表
-
-```
-用户打开页面 → 点击 Login → globalProvider 登录
-                                    ↓
-                         App.tsx 检测到 isSignedIn=true
-                                    ↓
-                         渲染 <Containers />
-                                    ↓
-                         useEffect 调用 spe.listContainers()
-                                    ↓
-                         下拉框显示容器列表
-```
-
-### 2. 文件上传（支持文件夹）
-
-```
-用户点击 Upload File/Folder → 触发隐藏的 <input type="file">
-                                    ↓
-                         解析文件列表 + 相对路径
-                                    ↓
-                         逐文件处理：创建中间文件夹（如不存在）
-                                    ↓
-                         PUT /drives/{id}/items/{parent}:/{name}:/content
-                                    ↓
-                         刷新文件列表
-```
-
-### 3. ZIP 归档下载
-
-```
-用户选中多个文件/文件夹 → 点击 Download
-                                    ↓
-                         downloadApi.startDownload() → 获取 jobId
-                                    ↓
-                         每 800ms 轮询 getDownloadProgress()
-                                    ↓
-                         状态: queued → preparing → ready / failed
-                                    ↓
-                         getDownloadManifest() + downloadArchiveFromManifest()
-```
-
-### 4. 文件预览
-
-```
-用户点击文件名 → 打开 Preview 对话框
-                                    ↓
-                         Graph API POST /preview → 获取 previewUrl
-                                    ↓
-                         iframe 加载 previewUrl（附 &nb=true 去横幅）
-                                    ↓
-                         支持前/后导航、下载、新标签页打开、删除
-```
-
-## 开发指南
-
-### 环境要求
-
-- Node.js 18+
-- npm 9+
-
-### 启动前端开发服务器
-
-```bash
-npm run dev:frontend
-```
-
-前端运行在 `http://localhost:3000`，通过 CRA (Create React App) 的 proxy 或直接跨域调用后端 `http://localhost:3001`。
-
-### 环境变量
-
-前端环境变量配置在 `.env.development.local`（不提交到 Git）：
-
-| 变量名                                 | 说明                                        |
-| -------------------------------------- | ------------------------------------------- |
-| `VITE_CLIENT_ENTRA_APP_CLIENT_ID` | 前端 Entra App 的客户端 ID                  |
-| `VITE_CLIENT_ENTRA_APP_TENANT_ID` | Azure AD 租户 ID                            |
-| `VITE_API_ENTRA_APP_CLIENT_ID`    | 后端 API 的 Entra App 客户端 ID             |
-| `VITE_API_SERVER_URL`             | 后端 API 地址（如 `http://localhost:3001`） |
-| `VITE_CLOUD_ENV`                  | 云环境：`global`（默认）或 `china`          |
-| `VITE_GRAPH_BASE_URL`             | （可选）自定义 Graph API 基础 URL           |
-
-> **安全注意**：`VITE_*` 前缀变量会被 Vite 注入浏览器 bundle，对最终用户可见，不能放入 secret！
-
-### 与后端集成
-
-前端通过两种方式与 Microsoft 服务交互：
-
-1. **通过后端 API**（需要后端密钥的操作）：
-
-   - 容器的 CRUD 操作（需要 OBO 流程）
-   - 文件删除（需要后端权限验证）
-   - ZIP 归档生成（需要后端逐文件下载打包）
-
-2. **直接调用 Graph API**（使用前端 Token）：
-   - 文件列表查询
-   - 文件上传
-   - 文件夹创建
-   - 文件预览 URL 获取
-
-这种混合架构兼顾了安全性（密钥不暴露给前端）和性能（文件操作直接走 Graph API）。
