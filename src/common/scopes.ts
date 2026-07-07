@@ -9,7 +9,8 @@
  *    - SPEMBEDDED_FILESTORAGECONTAINER_SELECTED: 访问用户授权的容器的委托权限
  *
  * 2. spembedded.ts 获取 API token 时：
- *    - SPEMBEDDED_CONTAINER_MANAGE: 管理容器的权限，格式为 "api://{clientId}/Container.Manage"
+ *    - SPEMBEDDED_CONTAINER_ACCESS_AS_USER: 前端代表当前用户访问后端 API 的权限，
+ *      格式为 "api://{clientId}/Container.AccessAsUser"
  *
  * 权限类型说明：
  * - 委托权限 (Delegated): 以登录用户的身份执行操作，受用户自身权限限制
@@ -45,8 +46,8 @@ export const GRAPH_OPENID_CONNECT_BASIC = [
 ];
 
 // SharePoint Embedded 权限
-/** 容器管理权限：创建、删除、列出容器（用于后端 API 调用） */
-export const SPEMBEDDED_CONTAINER_MANAGE = "Container.Manage";
+/** 前端代表当前用户访问后端 API 的单一 delegated scope。 */
+export const SPEMBEDDED_CONTAINER_ACCESS_AS_USER = "Container.AccessAsUser";
 /** 容器文件操作权限：读写用户授权的容器内文件（委托权限，用于 Graph API 直接调用） */
 export const SPEMBEDDED_FILESTORAGECONTAINER_SELECTED =
   "FileStorageContainer.Selected";

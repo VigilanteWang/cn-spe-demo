@@ -4,7 +4,7 @@ import { withErrorHandling } from "../common/errorResponse";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../auth";
 import {
   getCurrentItemVersionFromGraph,
@@ -16,14 +16,14 @@ import {
 vi.mock("../auth", () => ({
   createGraphClient: vi.fn(),
   getGraphOBOToken: vi.fn(),
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
 }));
 
 describe("itemVersionHandlers", () => {
   it("should keep list route-param validation errors as ValidationError", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
 
     const req = { params: {} } as Parameters<
       typeof listItemVersionsFromGraph
@@ -44,9 +44,9 @@ describe("itemVersionHandlers", () => {
   });
 
   it("should keep single-version route-param validation errors as ValidationError", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
 
     const req = {
       params: {
@@ -70,9 +70,9 @@ describe("itemVersionHandlers", () => {
   });
 
   it("should keep current-version route-param validation errors as ValidationError", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
 
     const req = {
       params: {
@@ -95,9 +95,9 @@ describe("itemVersionHandlers", () => {
   });
 
   it("should return 204 after restore succeeds", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
     vi.mocked(createGraphClient).mockReturnValue(
       createMockGraphClient() as unknown as Client,

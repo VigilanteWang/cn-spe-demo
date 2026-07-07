@@ -17,7 +17,7 @@ import { sendGraphRequest } from "../../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../auth";
 import type {
   IContainerPermissionChangeSetFromUI,
@@ -29,10 +29,7 @@ import {
 } from "./containerPermissionsCommonAdapters";
 import { mapUiContainerPermissionRoleToGraph } from "./containerPermissionRoleMapper";
 import { parseContainerPermissionChangeSet } from "./containerPermissionsRequestParser";
-import {
-  readOptionalString,
-  readGraphToRecord,
-} from "../common/graphReaders";
+import { readOptionalString, readGraphToRecord } from "../common/graphReaders";
 import { createValidationError } from "../common/appErrorHelpers";
 
 /**
@@ -47,7 +44,7 @@ export const listContainerPermissionsFromGraph = async (
   res: Response,
 ) => {
   // 先做鉴权与 scope 校验，避免无权限请求继续访问 Graph。
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
 
   // 从路由参数读取容器 ID，作为后续 Graph 路径的关键输入。
   const containerId = readContainerId(req);
@@ -79,7 +76,7 @@ export const applyContainerPermissionsToGraph = async (
   res: Response,
 ) => {
   // 与读取接口保持一致，先进行统一鉴权。
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
 
   // 先读取容器 ID，缺失时直接返回 400，避免无效 Graph 请求。
   const containerId = readContainerId(req);

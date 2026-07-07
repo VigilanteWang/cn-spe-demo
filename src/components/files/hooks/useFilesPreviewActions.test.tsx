@@ -9,7 +9,7 @@ const { deleteItemsMock } = vi.hoisted(() => ({
   deleteItemsMock: vi.fn(),
 }));
 
-vi.mock("../../../services/backendApi", () => ({
+vi.mock("../../../services/containerAndFileApi", () => ({
   deleteItems: deleteItemsMock,
 }));
 

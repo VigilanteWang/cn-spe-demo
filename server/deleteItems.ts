@@ -3,7 +3,7 @@ import { sendGraphRequest } from "../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "./auth";
 import { createValidationError } from "./common/appErrorHelpers";
 
@@ -22,7 +22,7 @@ interface IDeleteItemsRequestBody {
  * @param res Restify 响应对象。
  */
 export const deleteItems = async (req: Request, res: Response) => {
-  const authResult = await requireContainerManageRequest(req);
+  const authResult = await requireContainerAccessAsUserRequest(req);
   const body = (req.body ?? {}) as IDeleteItemsRequestBody;
   const containerId = readNonEmptyString(body.containerId);
   const itemIds = readStringArray(body.itemIds);

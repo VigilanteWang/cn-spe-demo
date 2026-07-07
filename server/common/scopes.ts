@@ -8,6 +8,6 @@
 // export const GRAPH_OPENID_CONNECT_BASIC = ["openid", "profile", "offline_access"];
 
 // SharePoint Embedded 权限范围
-export const SPEMBEDDED_CONTAINER_MANAGE = "Container.Manage";
+export const SPEMBEDDED_CONTAINER_ACCESS_AS_USER = "Container.AccessAsUser";
 export const SPEMBEDDED_FILESTORAGECONTAINER_SELECTED =
   "FileStorageContainer.Selected";

@@ -17,7 +17,7 @@ import { sendGraphRequest } from "../common/graphError";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "./auth";
 import { createValidationError } from "./common/appErrorHelpers";
 import { serverConfig } from "./config";
@@ -34,7 +34,7 @@ import { serverConfig } from "./config";
  */
 export const createContainer = async (req: Request, res: Response) => {
   /** 所有创建操作都先经过统一权限校验。 */
-  const authorizationResult = await requireContainerManageRequest(req);
+  const authorizationResult = await requireContainerAccessAsUserRequest(req);
 
   if (
     typeof req.body?.displayName !== "string" ||

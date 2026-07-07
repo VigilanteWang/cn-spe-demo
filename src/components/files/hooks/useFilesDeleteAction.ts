@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { SelectionItemId } from "@fluentui/react-components";
 import type { AppError } from "../../../../common/appError";
-import { deleteItems } from "../../../services/backendApi";
+import { deleteItems } from "../../../services/containerAndFileApi";
 import {
   buildDeletePartialFailureError,
   normalizeFilesOperationError,

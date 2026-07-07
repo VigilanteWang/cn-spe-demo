@@ -4,7 +4,7 @@ import { withErrorHandling } from "../../common/errorResponse";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../../auth";
 import {
   applyItemLinkPermissionsToGraph,
@@ -14,14 +14,14 @@ import {
 vi.mock("../../auth", () => ({
   createGraphClient: vi.fn(),
   getGraphOBOToken: vi.fn(),
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
 }));
 
 describe("itemLinkPermissionHandlers", () => {
   it("should keep route-param validation errors as ValidationError", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
 
     const req = { params: {} } as Parameters<
       typeof listItemLinkPermissionsFromGraph
@@ -42,9 +42,9 @@ describe("itemLinkPermissionHandlers", () => {
   });
 
   it("should require all link change arrays on apply", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
     vi.mocked(createGraphClient).mockReturnValue({
       api: vi.fn(),

@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  Client,
-  GraphRequest,
-} from "@microsoft/microsoft-graph-client";
+import type { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
 import {
   fetchMapItemPermissionsFromGraphToResponse,
   listItemPermissionsFromGraph,
@@ -11,14 +8,14 @@ import { withErrorHandling } from "../common/errorResponse";
 import {
   createGraphClient,
   getGraphOBOToken,
-  requireContainerManageRequest,
+  requireContainerAccessAsUserRequest,
 } from "../auth";
 import { mapGraphItemPermissionsToResponse } from "./itemPermissionsGraphAdapters";
 
 vi.mock("../auth", () => ({
   createGraphClient: vi.fn(),
   getGraphOBOToken: vi.fn(),
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
 }));
 
 vi.mock("./itemPermissionsGraphAdapters", async () => {
@@ -163,9 +160,9 @@ describe("fetchMapItemPermissionsFromGraphToResponse", () => {
 
 describe("listItemPermissionsFromGraph", () => {
   it("should keep validation errors as ValidationError", async () => {
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
 
     const req = { params: {} } as unknown as Parameters<
       typeof listItemPermissionsFromGraph
@@ -199,9 +196,9 @@ describe("listItemPermissionsFromGraph", () => {
       },
     });
 
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
     vi.mocked(createGraphClient).mockReturnValue(graphClient as Client);
     vi.mocked(mapGraphItemPermissionsToResponse).mockImplementationOnce(() => {
@@ -227,7 +224,10 @@ describe("listItemPermissionsFromGraph", () => {
         }),
       }),
     );
-    expect(res.header).not.toHaveBeenCalledWith("Retry-After", expect.anything());
+    expect(res.header).not.toHaveBeenCalledWith(
+      "Retry-After",
+      expect.anything(),
+    );
   });
 
   it("should still map real Graph failures to GraphError", async () => {
@@ -256,9 +256,9 @@ describe("listItemPermissionsFromGraph", () => {
       return request;
     };
 
-    vi.mocked(requireContainerManageRequest).mockResolvedValue({
+    vi.mocked(requireContainerAccessAsUserRequest).mockResolvedValue({
       token: "access-token",
-    } as Awaited<ReturnType<typeof requireContainerManageRequest>>);
+    } as Awaited<ReturnType<typeof requireContainerAccessAsUserRequest>>);
     vi.mocked(getGraphOBOToken).mockResolvedValue("graph-token");
     vi.mocked(createGraphClient).mockReturnValue(graphClient as Client);
 

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { AppError } from "../../../../common/appError";
 import type { IDriveItemExtended } from "../../../common/types";
-import { deleteItems } from "../../../services/backendApi";
+import { deleteItems } from "../../../services/containerAndFileApi";
 import {
   buildDeletePartialFailureError,
   normalizeFilesOperationError,

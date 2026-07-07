@@ -5,7 +5,7 @@
  * 1. 获取后端 API 专用 Access Token（通过 MGT globalProvider）
  * 2. 封装带 Bearer Token 的授权请求，统一注入 Authorization header
  *
- * 所有后端服务模块（backendApi、containerPermissionApi、downloadApi）
+ * 所有后端服务模块（containerAndFileApi、containerPermissionApi、downloadApi）
  * 都应从此处 import，不要各自重复实现 token 获取逻辑。
  */
 
@@ -27,7 +27,8 @@ export interface IAbortRequestOptions {
 /**
  * 获取后端 API 专用 Access Token。
  *
- * 从全局 MGT Provider 获取 token，scope 为 "api://{apiClientId}/Container.Manage"。
+ * 从全局 MGT Provider 获取 token，
+ * scope 为 "api://{apiClientId}/Container.AccessAsUser"。
  * 后端收到后通过 OBO 流程换取 Graph API token。
  *
  * @returns Access Token 字符串
@@ -56,7 +57,7 @@ export async function getApiAccessToken(): Promise<string> {
   try {
     const accessToken = await provider.getAccessToken({
       scopes: [
-        `api://${clientConfig.apiEntraAppClientId}/${Scopes.SPEMBEDDED_CONTAINER_MANAGE}`,
+        `api://${clientConfig.apiEntraAppClientId}/${Scopes.SPEMBEDDED_CONTAINER_ACCESS_AS_USER}`,
       ],
     });
     return accessToken;

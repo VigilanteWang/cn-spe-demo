@@ -3,7 +3,7 @@ import { withErrorHandling } from "./common/errorResponse";
 import { createContainer } from "./createContainer";
 
 const authMocks = vi.hoisted(() => ({
-  requireContainerManageRequest: vi.fn(),
+  requireContainerAccessAsUserRequest: vi.fn(),
   getGraphOBOToken: vi.fn(),
   createGraphClient: vi.fn(),
 }));
@@ -16,7 +16,7 @@ vi.mock("./config", () => ({
 describe("createContainer error handling", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    authMocks.requireContainerManageRequest.mockResolvedValue({
+    authMocks.requireContainerAccessAsUserRequest.mockResolvedValue({
       token: "user-token",
     });
     authMocks.getGraphOBOToken.mockResolvedValue("graph-token");

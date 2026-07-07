@@ -3,7 +3,7 @@
  *
  * 本模块负责：
  * 1. 验证前端发来的 Access Token 是否有效
- * 2. 检查 Token 中是否有必要的权限 (Container.Manage)
+ * 2. 检查 Token 中是否有必要的权限 (Container.AccessAsUser)
  * 3. 使用 OBO (On-Behalf-Of) 流程获取 Graph API 的 Token
  * 4. 创建用于调用 Microsoft Graph API 的客户端
  *
@@ -22,7 +22,7 @@
  *   * v2.0: 新版本，issuer 为 login.microsoftonline.com（全球）或 login.partner.microsoftonline.cn（中国）
  *   * 两版本都有效，本模块同时支持
  *
- * - Scope: 权限标记，如 "Container.Manage" 表示能管理容器
+ * - Scope: 权限标记，如 "Container.AccessAsUser" 表示前端可代表当前用户访问本后端 API
  *   * Token 的 scp claim 包含拥有的所有权限，以空格分隔
  */
 
@@ -46,7 +46,7 @@ import { Request } from "restify";
 import type { IErrorResponseBody } from "../common/contracts/errorContracts";
 import { AppError, ensureErrorCause } from "../common/appError";
 import {
-  SPEMBEDDED_CONTAINER_MANAGE,
+  SPEMBEDDED_CONTAINER_ACCESS_AS_USER,
   SPEMBEDDED_FILESTORAGECONTAINER_SELECTED,
 } from "./common/scopes";
 import { createAuthError, createInternalError } from "./common/appErrorHelpers";
@@ -57,7 +57,7 @@ import { serverConfig } from "./config";
  * API Access Token 中包含的声明 (Claims)
  *
  * JWT token 的 payload 包含这些信息：
- * - scp: 权限范围，如 "FileStorageContainer.Selected Container.Manage"（空格分隔）
+ * - scp: 权限范围，如 "FileStorageContainer.Selected Container.AccessAsUser"（空格分隔）
  * - tid: 租户 ID，表示该 token 属于哪个 Azure 租户，用来防止跨租户攻击
  * - ver: token 版本，"1.0" 或 "2.0"，决定了 token 的签名方式和 issuer 格式
  *
@@ -408,25 +408,25 @@ const verifyAccessToken = async (
  * 检查 token 是否拥有必要的权限
  *
  * Token 的 scp claim 包含空格分隔的权限列表，如：
- * "FileStorageContainer.Selected Container.Manage"
+ * "FileStorageContainer.Selected Container.AccessAsUser"
  *
- * 我们的 API 需要 Container.Manage 权限才能允许容器操作
+ * 我们的 API 需要 Container.AccessAsUser 权限才能允许前端代表用户访问后端
  *
  * 逻辑：
  * 1. 获取 scp claim（没有则默认为空字符串）
  * 2. 按空格分割成权限数组
  * 3. 过滤掉空字符串（split 可能产生）
- * 4. 检查数组中是否包含 "Container.Manage"
+ * 4. 检查数组中是否包含 "Container.AccessAsUser"
  *
  * @param claims token 的声明
- * @returns true 如果有 Container.Manage 权限，否则 false
+ * @returns true 如果有 Container.AccessAsUser 权限，否则 false
  */
 const hasRequiredScope = (claims: ApiAccessTokenClaims): boolean => {
   /** 拆分权限列表并过滤多余空项。 */
   const scopes = (claims.scp ?? "").split(" ").filter(Boolean);
 
-  /** 检查是否包含所需的 Container.Manage 权限。 */
-  return scopes.includes(SPEMBEDDED_CONTAINER_MANAGE);
+  /** 检查是否包含所需的 Container.AccessAsUser 权限。 */
+  return scopes.includes(SPEMBEDDED_CONTAINER_ACCESS_AS_USER);
 };
 
 /**
@@ -436,7 +436,7 @@ const hasRequiredScope = (claims: ApiAccessTokenClaims): boolean => {
  * 1. 从 HTTP 请求 header 中提取 Authorization token
  * 2. 检查格式是否为 "Bearer <token>"
  * 3. 验证 token 的签名和声明
- * 4. 检查 token 是否有 Container.Manage 权限
+ * 4. 检查 token 是否有 Container.AccessAsUser 权限
  *
  * HTTP 状态码约定：
  * - 401: token 不存在、格式错误、签名无效、或其他验证失败 (Unauthorized)
@@ -448,7 +448,7 @@ const hasRequiredScope = (claims: ApiAccessTokenClaims): boolean => {
  *
  * 使用示例：
  * ```ts
- * const result = await authorizeContainerManageRequest(req);
+ * const result = await authorizeContainerAccessAsUserRequest(req);
  * if (!result.ok) {
  *   res.send(result.status, result.body);
  *   return;
@@ -456,7 +456,7 @@ const hasRequiredScope = (claims: ApiAccessTokenClaims): boolean => {
  * // result.token 和 result.claims 已验证，可以安全使用
  * ```
  */
-export const authorizeContainerManageRequest = async (
+export const authorizeContainerAccessAsUserRequest = async (
   req: Request,
 ): Promise<AuthorizationResult> => {
   /** 从请求头中提取 Authorization 字段。 */
@@ -503,7 +503,7 @@ export const authorizeContainerManageRequest = async (
         body: toApiErrorResponseBody(
           createAuthError(
             "forbidden",
-            `Access token is missing required scope ${SPEMBEDDED_CONTAINER_MANAGE}.`,
+            `Access token is missing required scope ${SPEMBEDDED_CONTAINER_ACCESS_AS_USER}.`,
           ),
         ),
       };
@@ -543,10 +543,10 @@ export const authorizeContainerManageRequest = async (
  * 这个入口适合新的 throw 风格 handler，
  * 让路由层可以统一交给 withErrorHandling 处理。
  */
-export const requireContainerManageRequest = async (
+export const requireContainerAccessAsUserRequest = async (
   req: Request,
 ): Promise<AuthorizationSuccess> => {
-  const authorizationResult = await authorizeContainerManageRequest(req);
+  const authorizationResult = await authorizeContainerAccessAsUserRequest(req);
 
   if (authorizationResult.ok) {
     return authorizationResult;
@@ -583,7 +583,7 @@ export const requireContainerManageRequest = async (
  * 后端对 Entra ID 说："用户授权了前端，我用我的密钥证明前端的要求有效"
  * Entra ID 对后端说："好的，这是你可以代表用户使用的 Graph token"
  *
- * @param token 用户 token（来自 authorizeContainerManageRequest）
+ * @param token 用户 token（来自 authorizeContainerAccessAsUserRequest）
  * @returns Graph API 的 access token
  * @throws 如果 OBO 流程失败
  *
